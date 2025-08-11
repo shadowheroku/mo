@@ -77,7 +77,7 @@ class Development:
     RMBG_API = "mHgMmpSvffqE8Ap5mUeDrqWt"
     PREFIX_HANDLER = ["!", "/", "$"]
     SUPPORT_GROUP = "ShadowsHQ"
-    SUPPORT_CHANNEL = "ShadowsBOTHQ"
+    SUPPORT_CHANNEL = "ShadowsBotsHQ"
     VERSION = "VERSION"
     TIME_ZONE = 'Asia/Kolkata'
     BDB_URI = "mongodb+srv://ryumasgod:ryumasgod@cluster0.ojfkovp.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
