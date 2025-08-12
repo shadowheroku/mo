@@ -1,6 +1,7 @@
 from pyrogram.types import Message
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
+from pyrogram import filters
 
 class Fonts:
     def typewriter(text):
