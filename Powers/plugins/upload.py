@@ -44,9 +44,13 @@ async def upload_media_to_catbox(c: Gojo, m: Message):
         os.remove(media_path)
 
         if r.status_code == 200 and r.text.startswith("http"):
+            catbox_url = r.text
             await msg.edit_text(
-                "✅ **Upload Successful!**",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔗 Open Link", url=r.text)]])
+                f"✅ **Upload Successful!**\n📎 Link: `{catbox_url}`",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔗 Open Link", url=catbox_url)],
+                    [InlineKeyboardButton("🔄 Share Link", url=f"https://t.me/share/url?url={catbox_url}")]
+                ])
             )
         elif r.status_code == 412:
             await msg.edit_text("🚫 **Catbox rejected the file!** Check format & extension.")
@@ -60,11 +64,12 @@ async def upload_media_to_catbox(c: Gojo, m: Message):
         if "media_path" in locals() and os.path.exists(media_path):
             os.remove(media_path)
 
-__PLUGIN__ = "upload"
+__PLUGIN__ = "catbox_upload"
 __HELP__ = """
 **📤 Catbox Uploader**
 `/tgm` — Reply to a media file to upload to Catbox.
 
 **✅ Supported formats:** JPG, PNG, GIF, MP4, WEBM, MOV  
-📦 **Max size:** 200MB
+📦 **Max size:** 200MB  
+🔄 **Includes share button for easy link sharing!**
 """
