@@ -1,49 +1,56 @@
-import speedtest
-import humanize
+import json
+import subprocess
 from pyrogram import filters
 from pyrogram.types import Message
 from Powers.bot_class import Gojo
-from Powers.utils.custom_filters import command
 
-# Function to run the speed test
-def run_speedtest():
-    st = speedtest.Speedtest()
-    st.get_best_server()
-    download_speed = st.download()
-    upload_speed = st.upload()
-    ping_result = st.results.ping
-
-    return download_speed, upload_speed, ping_result
+# Function to run the CLI speedtest
+def run_speedtest_cli():
+    try:
+        # Run Ookla's official CLI with JSON output
+        result = subprocess.run(
+            ["speedtest", "--accept-license", "--accept-gdpr", "-f", "json"],
+            capture_output=True, text=True, check=True
+        )
+        return json.loads(result.stdout)
+    except subprocess.CalledProcessError as e:
+        return {"error": e.stderr.strip() or str(e)}
 
 @Gojo.on_message(filters.command("speedtest"))
 async def speedtest_handler(client, message: Message):
-    msg = await message.reply_text("🚀 Running speed test... Please wait.")
+    msg = await message.reply_text("🚀 Running speed test... Please wait...")
 
-    try:
-        download_speed, upload_speed, ping_result = run_speedtest()
+    data = run_speedtest_cli()
 
-        # Convert speeds to human-readable format
-        download_human = humanize.naturalsize(download_speed, binary=True)
-        upload_human = humanize.naturalsize(upload_speed, binary=True)
+    if "error" in data:
+        await msg.edit_text(f"❌ Error running speedtest:\n`{data['error']}`")
+        return
 
-        result_text = (
-            "📡 **Speedtest Results**\n\n"
-            f"💨 **Download:** `{download_human}/s`\n"
-            f"📤 **Upload:** `{upload_human}/s`\n"
-            f"📶 **Ping:** `{ping_result} ms`\n"
-        )
+    download = round(data["download"]["bandwidth"] * 8 / 1_000_000, 2)  # Mbps
+    upload = round(data["upload"]["bandwidth"] * 8 / 1_000_000, 2)      # Mbps
+    ping = round(data["ping"]["latency"], 2)                            # ms
+    isp = data.get("isp", "Unknown ISP")
+    server_name = data["server"]["name"]
+    country = data["server"]["country"]
 
-        await msg.edit_text(result_text)
+    result_text = (
+        "📡 **Speedtest Results**\n\n"
+        f"💨 **Download:** `{download} Mbps`\n"
+        f"📤 **Upload:** `{upload} Mbps`\n"
+        f"📶 **Ping:** `{ping} ms`\n"
+        f"🏢 **ISP:** `{isp}`\n"
+        f"🌐 **Server:** `{server_name}, {country}`\n"
+    )
 
-    except Exception as e:
-        await msg.edit_text(f"❌ Error running speedtest:\n`{e}`")
+    await msg.edit_text(result_text)
 
 __PLUGIN__ = "Speedtest"
 __HELP__ = """
-📡 **Speedtest**
+📡 **Speedtest (CLI Version)**
 
-`/speedtest` — Runs an internet speed test and shows download, upload, and ping.
+`/speedtest` — Runs an internet speed test using Ookla's official CLI and shows download, upload, ping, ISP, and server.
 
-Example:
-`/speedtest`
+⚠️ Requires Ookla's speedtest CLI to be installed:
+• Debian/Ubuntu:
+`sudo apt install curl -y && curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash && sudo apt install speedtest`
 """
