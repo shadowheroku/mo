@@ -52,3 +52,4 @@ __HELP__ = """
 ⚠️ Requires `speedtest-cli`:
 ```bash
 pip install speedtest-cli
+"""
