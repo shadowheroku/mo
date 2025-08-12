@@ -46,11 +46,9 @@ async def insta_reel_downloader(c, m):
             os.remove(temp_file)
 
 # Plugin metadata
-plugin_name = "Instagram Reel Downloader"
-help = """
-Send any Instagram reel/post link in chat, and I will download it and send it to you.
+__PLUGIN__ = "Instagram Downloader"
 
-**Usage:**
-Just paste an Instagram link, e.g.:
-`https://www.instagram.com/reel/xyz/`
+__HELP__ = """
+• Send an Instagram reel link in private chat — I’ll download and send it to you with details.
+Only supports public reels (not private accounts).
 """
