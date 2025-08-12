@@ -39,7 +39,7 @@ async def figlet_cmd(c: Gojo, m: Message):
     )
 
 # Callback handler for "Change"
-@Gojo.on_callback_query(filters.regex("^figlet_change$"))
+@Gojo.on_callback_query(filter.regex("^figlet_change$"))
 async def figlet_change_callback(c: Gojo, q: CallbackQuery):
     text = last_figlet_text.get(q.message.chat.id)
     if not text:
@@ -52,7 +52,7 @@ async def figlet_change_callback(c: Gojo, q: CallbackQuery):
     )
 
 # Callback handler for "Close"
-@Gojo.on_callback_query(filters.regex("^figlet_close$"))
+@Gojo.on_callback_query(filter.regex("^figlet_close$"))
 async def figlet_close_callback(c: Gojo, q: CallbackQuery):
     await q.message.delete()
 
