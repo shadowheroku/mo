@@ -2,6 +2,8 @@ from pyrogram.types import Message
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 from pyrogram import filters
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
 
 class Fonts:
     def typewriter(text):
