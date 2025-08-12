@@ -45,8 +45,8 @@ __PLUGIN__ = "QrCode"
 __HELP__ = """
 ⏳ **Reminder**
 
-`/qrcode Reply to text or <text/links>` — Creates qrcode of text or links.
+`/qr Reply to text or <text/links>` — Creates qrcode of text or links.
 
 Example:
-`/qrcode t.me/MonicRobot`
+`/qr t.me/MonicRobot`
 """
