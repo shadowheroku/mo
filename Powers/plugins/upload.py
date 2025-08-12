@@ -1,13 +1,14 @@
 import requests
 import os
-from datetime import datetime
+from pathlib import Path
 from pyrogram import filters
 from pyrogram.types import Message
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
-# Catbox API URL
+# Catbox API Configuration
 CATBOX_URL = "https://catbox.moe/user/api.php"
+MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB (Catbox limit)
 
 @Gojo.on_message(command("tgm"))
 async def upload_media_to_catbox(c: Gojo, m: Message):
@@ -17,23 +18,42 @@ async def upload_media_to_catbox(c: Gojo, m: Message):
         return
 
     try:
-        # Download the media file
+        # Download the media file with progress
+        msg = await m.reply_text("Downloading media...")
         media_path = await m.reply_to_message.download()
+        file_size = os.path.getsize(media_path)
         
+        # Validate file size
+        if file_size > MAX_FILE_SIZE:
+            await msg.edit_text(f"File too large! Max size: {MAX_FILE_SIZE//(1024*1024)}MB")
+            os.remove(media_path)
+            return
+            
+        # Validate file extension
+        valid_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.webm', '.mov']
+        if Path(media_path).suffix.lower() not in valid_extensions:
+            await msg.edit_text("Unsupported file type! Supported: JPG, PNG, GIF, MP4, WEBM, MOV")
+            os.remove(media_path)
+            return
+
         # Upload to Catbox
+        await msg.edit_text("Uploading to Catbox...")
         files = {'fileToUpload': open(media_path, 'rb')}
         response = requests.post(CATBOX_URL, files=files)
         
-        # Clean up downloaded file
+        # Clean up
         os.remove(media_path)
         
-        if response.status_code == 200:
-            await m.reply_text(f"Media uploaded to Catbox!\nURL: {response.text}")
+        if response.status_code == 200 and response.text.startswith("http"):
+            await msg.edit_text(f"✅ Upload successful!\n🔗 URL: {response.text}")
         else:
-            await m.reply_text(f"Failed to upload media. Status code: {response.status_code}")
+            error_msg = f"Failed to upload (Status {response.status_code})"
+            if "412" in str(response.status_code):
+                error_msg += "\nCatbox rejected the file (possibly invalid format)"
+            await msg.edit_text(error_msg)
             
     except Exception as e:
-        await m.reply_text(f"An error occurred: {str(e)}")
+        await m.reply_text(f"⚠️ Error: {str(e)}")
         if 'media_path' in locals() and os.path.exists(media_path):
             os.remove(media_path)
 
@@ -47,6 +67,13 @@ async def upload_text_to_catbox(c: Gojo, m: Message):
     try:
         text_content = m.reply_to_message.text
         
+        # Check text length
+        if len(text_content) > 50000:
+            await m.reply_text("Text too long! Max 50,000 characters")
+            return
+
+        msg = await m.reply_text("Uploading text to Catbox...")
+        
         # Upload to Catbox
         data = {
             'reqtype': 'paste',
@@ -55,20 +82,24 @@ async def upload_text_to_catbox(c: Gojo, m: Message):
         }
         response = requests.post(CATBOX_URL, data=data)
         
-        if response.status_code == 200:
-            await m.reply_text(f"Text uploaded to Catbox!\nURL: {response.text}")
+        if response.status_code == 200 and response.text.startswith("http"):
+            await msg.edit_text(f"✅ Text uploaded!\n🔗 URL: {response.text}")
         else:
-            await m.reply_text(f"Failed to upload text. Status code: {response.status_code}")
+            await msg.edit_text(f"Failed to upload text (Status {response.status_code})")
             
     except Exception as e:
-        await m.reply_text(f"An error occurred: {str(e)}")
+        await m.reply_text(f"Error: {str(e)}")
 
 __PLUGIN__ = "catbox_upload"
 __HELP__ = """
-**Catbox Upload Commands**
+**📤 Catbox Uploader**
 
-• `/tgm` - Upload replied media file to Catbox
-• `/tgt` - Upload replied text to Catbox
+`/tgm` - Upload media to Catbox (reply to any media)
+Supported formats: JPG, PNG, GIF, MP4, WEBM, MOV
+Max size: 200MB
 
-Reply to a media file or text message with these commands to upload them to Catbox.
+`/tgt` - Upload text to Catbox (reply to any text)
+Max length: 50,000 characters
+
+The bot will reply with the Catbox URL after upload.
 """
