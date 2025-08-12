@@ -5,11 +5,14 @@ from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
 # Function to generate random figlet
-def figle(text: str):
-    fonts = pyfiglet.getFonts()
-    font = choice(fonts)
-    figled = pyfiglet.figlet_format(text, font=font)
-    return figled
+
+import pyfiglet
+
+def figle(text):
+    fig = pyfiglet.Figlet()  # Create a Figlet instance
+    fonts = fig.getFonts()   # Get available fonts
+    fig.setFont(font=random.choice(fonts))  # Pick a random font
+    return fig.renderText(text)
 
 # Command to create figlet
 @Gojo.on_message(command("figlet"))
