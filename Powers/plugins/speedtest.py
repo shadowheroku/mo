@@ -1,56 +1,54 @@
-import json
-import subprocess
+import speedtest
 from pyrogram import filters
 from pyrogram.types import Message
 from Powers.bot_class import Gojo
 
-# Function to run the CLI speedtest
-def run_speedtest_cli():
-    try:
-        # Run Ookla's official CLI with JSON output
-        result = subprocess.run(
-            ["speedtest", "--accept-license", "--accept-gdpr", "-f", "json"],
-            capture_output=True, text=True, check=True
-        )
-        return json.loads(result.stdout)
-    except subprocess.CalledProcessError as e:
-        return {"error": e.stderr.strip() or str(e)}
+
+def run_speedtest():
+    st = speedtest.Speedtest()
+    st.get_best_server()
+    download_speed = st.download()  # bits/sec
+    upload_speed = st.upload()      # bits/sec
+    ping_result = st.results.ping
+    server_name = st.results.server.get("name", "Unknown")
+    country = st.results.server.get("country", "Unknown")
+    isp = st.results.client.get("isp", "Unknown ISP")
+
+    return download_speed, upload_speed, ping_result, server_name, country, isp
+
 
 @Gojo.on_message(filters.command("speedtest"))
 async def speedtest_handler(client, message: Message):
     msg = await message.reply_text("🚀 Running speed test... Please wait...")
 
-    data = run_speedtest_cli()
+    try:
+        download_speed, upload_speed, ping_result, server_name, country, isp = run_speedtest()
 
-    if "error" in data:
-        await msg.edit_text(f"❌ Error running speedtest:\n`{data['error']}`")
-        return
+        # Convert to Mbps
+        download_mbps = round(download_speed / 1_000_000, 2)
+        upload_mbps = round(upload_speed / 1_000_000, 2)
 
-    download = round(data["download"]["bandwidth"] * 8 / 1_000_000, 2)  # Mbps
-    upload = round(data["upload"]["bandwidth"] * 8 / 1_000_000, 2)      # Mbps
-    ping = round(data["ping"]["latency"], 2)                            # ms
-    isp = data.get("isp", "Unknown ISP")
-    server_name = data["server"]["name"]
-    country = data["server"]["country"]
+        result_text = (
+            "📡 **Speedtest Results**\n\n"
+            f"💨 **Download:** `{download_mbps} Mbps`\n"
+            f"📤 **Upload:** `{upload_mbps} Mbps`\n"
+            f"📶 **Ping:** `{ping_result} ms`\n"
+            f"🏢 **ISP:** `{isp}`\n"
+            f"🌐 **Server:** `{server_name}, {country}`\n"
+        )
 
-    result_text = (
-        "📡 **Speedtest Results**\n\n"
-        f"💨 **Download:** `{download} Mbps`\n"
-        f"📤 **Upload:** `{upload} Mbps`\n"
-        f"📶 **Ping:** `{ping} ms`\n"
-        f"🏢 **ISP:** `{isp}`\n"
-        f"🌐 **Server:** `{server_name}, {country}`\n"
-    )
+        await msg.edit_text(result_text)
 
-    await msg.edit_text(result_text)
+    except Exception as e:
+        await msg.edit_text(f"❌ Error running speedtest:\n`{e}`")
+
 
 __PLUGIN__ = "Speedtest"
 __HELP__ = """
-📡 **Speedtest (CLI Version)**
+📡 **Speedtest (speedtest-cli)**
 
-`/speedtest` — Runs an internet speed test using Ookla's official CLI and shows download, upload, ping, ISP, and server.
+`/speedtest` — Runs an internet speed test and shows download, upload, ping, ISP, and server info.
 
-⚠️ Requires Ookla's speedtest CLI to be installed:
-• Debian/Ubuntu:
-`sudo apt install curl -y && curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash && sudo apt install speedtest`
-"""
+⚠️ Requires `speedtest-cli`:
+```bash
+pip install speedtest-cli
