@@ -45,44 +45,63 @@ async def pinterest_downloader(c, m):
     if "pin.it" in url:
         url = resolve_pinterest_url(url)
 
-    temp_file = "pinterest_dl.%(ext)s"
-    status = await m.reply_text("📥 Downloading Pinterest content...")
-
+    status = await m.reply_text("🔍 Analyzing Pinterest link...")
+    
     try:
-        # Universal download options (works for videos/images)
+        # First probe the URL to detect content type
+        probe_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "cookiefile": COOKIES_FILE,
+            "simulate": True,
+            "extract_flat": True,
+        }
+
+        with yt_dlp.YoutubeDL(probe_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            if not info:
+                raise Exception("No content found - private pin or invalid URL")
+
+        # Dynamic format selection based on content type
+        if info.get('_type') == 'video':
+            format_selector = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+            temp_file = "pinterest_video.%(ext)s"
+        else:  # images and other content
+            format_selector = "best[ext=jpg]/best[ext=png]/best[ext=webp]/best"
+            temp_file = "pinterest_image.%(ext)s"
+
+        # Download with optimized settings
         ydl_opts = {
             "outtmpl": temp_file,
+            "format": format_selector,
             "quiet": True,
             "no_warnings": True,
             "cookiefile": COOKIES_FILE,
             "http_headers": {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "Referer": "https://www.pinterest.com/",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             },
-            # Smart format selection
-            "format": "best[ext=mp4]/best[ext=webm]/best[ext=jpg]/best[ext=png]/best[ext=webp]/best",
             "retries": 3,
-            "socket_timeout": 10,
             "extractor_args": {
                 "pinterest": {
-                    "skip": ["dash", "hls"]  # Skip problematic formats
+                    "skip": ["dash", "hls", "story_pin"]  # Skip problematic formats
                 }
             },
+            "postprocessors": [{
+                'key': 'FFmpegVideoConvertor',
+                'preferedformat': 'mp4'  # Ensure MP4 output
+            }] if info.get('_type') == 'video' else [],
         }
 
+        await status.edit_text("📥 Downloading content...")
+        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            if not info:
-                raise Exception("No downloadable content found (private pin or invalid URL)")
-            
             file_path = ydl.prepare_filename(info)
             ext = info.get("ext", "").lower()
 
-        # Prepare caption
-        caption = f"🔗 [Original Pin]({url}) | 📥 Via @{c.me.username}"
+        caption = f"📌 From [Pinterest]({url}) | via @{c.me.username}"
 
-        # Send appropriate media type
         if ext in ["mp4", "webm", "mov"]:
             await m.reply_video(
                 video=file_path,
@@ -90,14 +109,13 @@ async def pinterest_downloader(c, m):
                 supports_streaming=True,
                 duration=info.get('duration'),
                 width=info.get('width'),
-                height=info.get('height'))
+                height=info.get('height')
         elif ext in ["jpg", "jpeg", "png", "webp"]:
             await m.reply_photo(
                 photo=file_path,
                 caption=caption
             )
         else:
-            # Fallback for unusual formats
             await m.reply_document(
                 document=file_path,
                 caption=caption
@@ -106,14 +124,13 @@ async def pinterest_downloader(c, m):
         await status.delete()
 
     except yt_dlp.utils.DownloadError as e:
-        error_msg = str(e).split(":")[-1].strip()
-        await status.edit_text(f"❌ Pinterest error:\n<code>{error_msg}</code>")
+        await status.edit_text(f"❌ Pinterest error:\n<code>Failed to download: {str(e).split(':')[-1].strip()}</code>")
     except Exception as e:
-        await status.edit_text(f"❌ Unexpected error:\n<code>{type(e).__name__}: {e}</code>")
+        await status.edit_text(f"❌ Unexpected error:\n<code>{type(e).__name__}: {str(e)}</code>")
     finally:
-        # Cleanup downloaded files
+        # Cleanup
         for f in os.listdir():
-            if f.startswith("pinterest_dl."):
+            if f.startswith("pinterest_") and os.path.isfile(f):
                 try:
                     os.remove(f)
                 except:
