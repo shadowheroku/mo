@@ -36,7 +36,7 @@ def resolve_pinterest_url(short_url: str) -> str:
         return short_url
 
 @Gojo.on_message(filters.regex(PINTEREST_REGEX))
-async def pinterest_video_downloader(c, m):
+async def pinterest_downloader(c, m):
     match = PINTEREST_REGEX.search(m.text or "")
     if not match:
         return
@@ -45,36 +45,12 @@ async def pinterest_video_downloader(c, m):
     if "pin.it" in url:
         url = resolve_pinterest_url(url)
 
-    status = await m.reply_text("🔍 Checking Pinterest link...")
-    
+    temp_file = "pinterest_dl.%(ext)s"
+    status = await m.reply_text("📥 Downloading Pinterest content...")
+
     try:
-        # First check the content type
-        probe_opts = {
-            "quiet": True,
-            "no_warnings": True,
-            "cookiefile": COOKIES_FILE,
-            "simulate": True,
-            "extract_flat": False,
-        }
-
-        with yt_dlp.YoutubeDL(probe_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            if not info:
-                raise Exception("Couldn't analyze this pin")
-
-            # Check if it's an image
-            if info.get('ext') in ['jpg', 'jpeg', 'png', 'webp']:
-                await status.edit_text("❌ I only support video downloads!\nPlease send a Pinterest video link.")
-                return
-            # Also check if it's not a video
-            elif info.get('_type') != 'video':
-                await status.edit_text("❌ This doesn't appear to be a video pin.\nI only download videos from Pinterest.")
-                return
-
-        # Video download settings
         ydl_opts = {
-            "outtmpl": "pinterest_video.%(ext)s",
-            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+            "outtmpl": temp_file,
             "quiet": True,
             "no_warnings": True,
             "cookiefile": COOKIES_FILE,
@@ -82,48 +58,48 @@ async def pinterest_video_downloader(c, m):
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "Referer": "https://www.pinterest.com/",
             },
+            # Critical format selection update:
+            "format": "(bestvideo[vcodec^=avc1][height<=1080][ext=mp4]/bestvideo[ext=mp4]/bestvideo)+(bestaudio[ext=m4a]/bestaudio)/best[ext=mp4]/best",
+            "merge_output_format": "mp4",
             "retries": 3,
+            "ignoreerrors": False,
             "extractor_args": {
                 "pinterest": {
-                    "skip": ["dash", "hls"]
+                    "skip": ["dash"],  # Skip problematic formats
                 }
             },
-            "postprocessors": [{
-                'key': 'FFmpegVideoConvertor',
-                'preferedformat': 'mp4'
-            }],
         }
 
-        await status.edit_text("📥 Downloading video...")
-        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
+            if not info:
+                raise Exception("No downloadable content found")
+            
             file_path = ydl.prepare_filename(info)
+            ext = info.get("ext", "mp4").lower()
 
-        await m.reply_video(
-            video=file_path,
-            caption=f"🎬 From [Pinterest]({url}) | via @{c.me.username}",
-            supports_streaming=True,
-            duration=info.get('duration'),
-            width=info.get('width'),
-            height=info.get('height')
-        )
+        caption = f"📌 **Source:** [Original Pin]({url})\n🤖 **Via:** @{c.me.username}"
+
+        if ext in ["mp4", "webm", "mov"]:
+            await m.reply_video(video=file_path, caption=caption)
+        elif ext in ["jpg", "jpeg", "png", "webp"]:
+            await m.reply_photo(photo=file_path, caption=caption)
+        else:
+            await m.reply_document(document=file_path, caption=caption)
 
         await status.delete()
 
-    except yt_dlp.utils.DownloadError as e:
-        await status.edit_text(f"❌ Video download failed:\n<code>{str(e).split(':')[-1].strip()}</code>")
     except Exception as e:
-        await status.edit_text(f"❌ Error:\n<code>{type(e).__name__}: {str(e)}</code>")
+        await status.edit_text(f"I can only downloads video posts of pintrest")
+        return
     finally:
         # Cleanup
         for f in os.listdir():
-            if f.startswith("pinterest_video.") and os.path.isfile(f):
+            if f.startswith("pinterest_dl."):
                 try:
                     os.remove(f)
                 except:
                     pass
-
 # Updated plugin metadata
 __PLUGIN__ = "Pinterest Video Downloader"
 __HELP__ = """
