@@ -36,7 +36,7 @@ def resolve_pinterest_url(short_url: str) -> str:
         return short_url
 
 @Gojo.on_message(filters.regex(PINTEREST_REGEX))
-async def pinterest_downloader(c, m):
+async def pinterest_video_downloader(c, m):
     match = PINTEREST_REGEX.search(m.text or "")
     if not match:
         return
@@ -45,10 +45,10 @@ async def pinterest_downloader(c, m):
     if "pin.it" in url:
         url = resolve_pinterest_url(url)
 
-    status = await m.reply_text("🔍 Analyzing Pinterest link...")
+    status = await m.reply_text("🔍 Checking Pinterest link...")
     
     try:
-        # First probe the URL to detect content type
+        # First check if it's a video
         probe_opts = {
             "quiet": True,
             "no_warnings": True,
@@ -60,20 +60,17 @@ async def pinterest_downloader(c, m):
         with yt_dlp.YoutubeDL(probe_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             if not info:
-                raise Exception("No content found - private pin or invalid URL")
+                raise Exception("Couldn't analyze this pin")
 
-        # Dynamic format selection based on content type
-        if info.get('_type') == 'video':
-            format_selector = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
-            temp_file = "pinterest_video.%(ext)s"
-        else:  # images and other content
-            format_selector = "best[ext=jpg]/best[ext=png]/best[ext=webp]/best"
-            temp_file = "pinterest_image.%(ext)s"
+            # Reject if not a video
+            if info.get('_type') != 'video':
+                await status.edit_text("❌ I only download videos from Pinterest!\nSend me a video pin instead.")
+                return
 
-        # Download with optimized settings
+        # Video download settings
         ydl_opts = {
-            "outtmpl": temp_file,
-            "format": format_selector,
+            "outtmpl": "pinterest_video.%(ext)s",
+            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
             "quiet": True,
             "no_warnings": True,
             "cookiefile": COOKIES_FILE,
@@ -84,67 +81,53 @@ async def pinterest_downloader(c, m):
             "retries": 3,
             "extractor_args": {
                 "pinterest": {
-                    "skip": ["dash", "hls", "story_pin"]  # Skip problematic formats
+                    "skip": ["dash", "hls", "story_pin"]
                 }
             },
             "postprocessors": [{
                 'key': 'FFmpegVideoConvertor',
-                'preferedformat': 'mp4'  # Ensure MP4 output
-            }] if info.get('_type') == 'video' else [],
+                'preferedformat': 'mp4'
+            }],
         }
 
-        await status.edit_text("📥 Downloading content...")
+        await status.edit_text("📥 Downloading video...")
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             file_path = ydl.prepare_filename(info)
-            ext = info.get("ext", "").lower()
 
-        caption = f"📌 From [Pinterest]({url}) | via @{c.me.username}"
-
-        if ext in ["mp4", "webm", "mov"]:
-            await m.reply_video(
-                video=file_path,
-                caption=caption,
-                supports_streaming=True,
-                duration=info.get('duration'),
-                width=info.get('width'),
-                height=info.get('height'))
-        elif ext in ["jpg", "jpeg", "png", "webp"]:
-            await m.reply_photo(
-                photo=file_path,
-                caption=caption
-            )
-        else:
-            await m.reply_document(
-                document=file_path,
-                caption=caption
-            )
+        await m.reply_video(
+            video=file_path,
+            caption=f"🎬 From [Pinterest]({url}) | via @{c.me.username}",
+            supports_streaming=True,
+            duration=info.get('duration'),
+            width=info.get('width'),
+            height=info.get('height')
+        )
 
         await status.delete()
 
     except yt_dlp.utils.DownloadError as e:
-        await status.edit_text(f"❌ Pinterest error:\n<code>Failed to download: {str(e).split(':')[-1].strip()}</code>")
+        await status.edit_text(f"❌ Video download failed:\n<code>{str(e).split(':')[-1].strip()}</code>")
     except Exception as e:
-        await status.edit_text(f"❌ Unexpected error:\n<code>{type(e).__name__}: {str(e)}</code>")
+        await status.edit_text(f"❌ Error:\n<code>{type(e).__name__}: {str(e)}</code>")
     finally:
         # Cleanup
         for f in os.listdir():
-            if f.startswith("pinterest_") and os.path.isfile(f):
+            if f.startswith("pinterest_video.") and os.path.isfile(f):
                 try:
                     os.remove(f)
                 except:
                     pass
 
-# Plugin metadata
-__PLUGIN__ = "Pinterest Downloader"
+# Updated plugin metadata
+__PLUGIN__ = "Pinterest Video Downloader"
 __HELP__ = """
-📌 Send any Pinterest pin link (image/video) and I'll download it for you!
+🎥 Download videos from Pinterest:
 
-• Works with:
-  - https://pin.it/abc123
-  - https://pinterest.com/pin/123456789
+• Just send me a Pinterest video link
+• Formats: MP4, WebM, MOV
+• Supports private videos (with valid cookies)
 
-• Auto-deletes after sending
-• Supports private pins (with valid cookies)
+⚠️ I don't download images - only videos!
 """
