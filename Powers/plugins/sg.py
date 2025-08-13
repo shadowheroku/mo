@@ -74,7 +74,7 @@ async def sg_cmd(c: Gojo, m: Message):
                 f"━━━━━━━━━━━━━━━━━\n"
                 f"{stalk.text}\n"
                 f"━━━━━━━━━━━━━━━━━\n"
-                f"🔍 _Powered by Sangmata_"
+                f"🔍 _Powered by @MonicRobot _"
             )
             await m.reply_text(result)
             break
