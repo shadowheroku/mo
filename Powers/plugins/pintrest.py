@@ -2,6 +2,7 @@ import os
 import re
 import yt_dlp
 import asyncio
+import requests
 from pyrogram import filters
 from Powers.bot_class import Gojo
 
@@ -21,9 +22,18 @@ COOKIES_FILE = "pinterest_cookies.txt"
 with open(COOKIES_FILE, "w", encoding="utf-8") as f:
     f.write(COOKIES_TEXT.strip() + "\n")
 
-# Regex to match Pinterest URLs
-PINTEREST_REGEX = r"(https?:\/\/(?:www\.)?(?:pin\.it\/[A-Za-z0-9]+|pinterest\.com\/pin\/\d+))"
+# Regex to match Pinterest URLs (short & full)
+PINTEREST_REGEX = re.compile(
+    r"(https?:\/\/(?:www\.)?(?:pin\.it\/[A-Za-z0-9]+|pinterest\.com\/pin\/\d+))"
+)
 
+def resolve_pinterest_url(short_url: str) -> str:
+    """Resolve pin.it short URL to real Pinterest URL."""
+    try:
+        r = requests.head(short_url, allow_redirects=True, timeout=10)
+        return r.url
+    except Exception:
+        return short_url
 
 @Gojo.on_message(filters.regex(PINTEREST_REGEX))
 async def pinterest_downloader(c, m):
@@ -32,8 +42,12 @@ async def pinterest_downloader(c, m):
         return
 
     url = match.group(1)
-    temp_file = "pinterest_media.%(ext)s"
 
+    # Resolve short links if necessary
+    if "pin.it" in url:
+        url = resolve_pinterest_url(url)
+
+    temp_file = "pinterest_media.%(ext)s"
     status = await m.reply_text("📥 Downloading Pinterest content...")
 
     try:
