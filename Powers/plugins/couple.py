@@ -41,9 +41,9 @@ async def waifu_cmd(c: Gojo, m: Message):
     bond_percentage = random.randint(10, 100)
 
     message = (
-        f"✨ {m.from_user.first_name}'s Today's Waifu ✨\n"
+        f"✨ {m.from_user.mention}'s Today's Waifu ✨\n"
         f"╭──────────────\n"
-        f"┊•➢ {waifu.first_name}\n"
+        f"┊•➢ {waifu.mention}\n"
         f"┊•➢ Bond Percentage: {bond_percentage}%\n"
         f"╰───•➢♡"
     )
@@ -64,10 +64,11 @@ async def couple_cmd(c: Gojo, m: Message):
         return await m.reply_text("Need at least 2 members to form a couple!")
 
     user1, user2 = random.sample(members, 2)
+
     message = (
         f"🎀  𝒞❁𝓊𝓅𝓁𝑒 ❀𝒻 𝒯𝒽𝑒 𝒟𝒶𝓎  🎀\n"
         f"╭──────────────\n"
-        f"┊•➢ {user1.first_name} <3 + {user2.first_name} = 💞\n"
+        f"┊•➢ {user1.mention} <3 + {user2.mention} = 💞\n"
         f"╰───•➢♡"
     )
     await m.reply_text(message)
