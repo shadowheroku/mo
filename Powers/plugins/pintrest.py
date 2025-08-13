@@ -122,3 +122,4 @@ __HELP__ = """
 
 • Auto-deletes after sending
 • Supports private pins (with valid cookies)
+"""
