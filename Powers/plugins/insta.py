@@ -4,6 +4,9 @@ import yt_dlp
 from pyrogram import filters
 from Powers.bot_class import Gojo
 
+# Path to cookies file (make sure it's accessible)
+COOKIES_FILE = "instagram_cookies.txt"  # Save your cookies here in Netscape format
+
 # Regex to match Instagram URLs (reels, posts, videos)
 INSTAGRAM_REGEX = re.compile(
     r"(https?://(?:www\.)?instagram\.com/(?:p|reel|tv)/[A-Za-z0-9_-]+)"
@@ -23,6 +26,7 @@ async def insta_reel_downloader(c, m):
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
+            "cookiefile": COOKIES_FILE,  # Use your cookies
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -50,5 +54,6 @@ __PLUGIN__ = "Instagram Downloader"
 
 __HELP__ = """
 • Send an Instagram reel link in private chat — I’ll download and send it to you with details.
-Only supports public reels (not private accounts).
+• Now supports private reels using your Instagram cookies.
+Only works if cookies are valid and account has access.
 """
