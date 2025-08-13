@@ -22,9 +22,8 @@ with open(COOKIES_FILE, "w", encoding="utf-8") as f:
     f.write(COOKIES_TEXT.strip() + "\n")
 
 # Regex to match Pinterest URLs
-PINTEREST_REGEX = re.compile(
-    r"(https?://(?:www\.)?pinterest\.[a-z]+/pin/[A-Za-z0-9_-]+(?:\?[^\s]*)?)"
-)
+PINTEREST_REGEX = r"(https?:\/\/(?:www\.)?(?:pin\.it\/[A-Za-z0-9]+|pinterest\.com\/pin\/\d+))"
+
 
 @Gojo.on_message(filters.regex(PINTEREST_REGEX))
 async def pinterest_downloader(c, m):
