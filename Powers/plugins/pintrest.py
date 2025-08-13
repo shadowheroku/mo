@@ -48,13 +48,13 @@ async def pinterest_video_downloader(c, m):
     status = await m.reply_text("🔍 Checking Pinterest link...")
     
     try:
-        # First check if it's a video
+        # First check the content type
         probe_opts = {
             "quiet": True,
             "no_warnings": True,
             "cookiefile": COOKIES_FILE,
             "simulate": True,
-            "extract_flat": True,
+            "extract_flat": False,
         }
 
         with yt_dlp.YoutubeDL(probe_opts) as ydl:
@@ -62,9 +62,13 @@ async def pinterest_video_downloader(c, m):
             if not info:
                 raise Exception("Couldn't analyze this pin")
 
-            # Reject if not a video
-            if info.get('_type') != 'video':
-                await status.edit_text("❌ I only download videos from Pinterest!\nSend me a video pin instead.")
+            # Check if it's an image
+            if info.get('ext') in ['jpg', 'jpeg', 'png', 'webp']:
+                await status.edit_text("❌ I only support video downloads!\nPlease send a Pinterest video link.")
+                return
+            # Also check if it's not a video
+            elif info.get('_type') != 'video':
+                await status.edit_text("❌ This doesn't appear to be a video pin.\nI only download videos from Pinterest.")
                 return
 
         # Video download settings
@@ -81,7 +85,7 @@ async def pinterest_video_downloader(c, m):
             "retries": 3,
             "extractor_args": {
                 "pinterest": {
-                    "skip": ["dash", "hls", "story_pin"]
+                    "skip": ["dash", "hls"]
                 }
             },
             "postprocessors": [{
@@ -125,9 +129,9 @@ __PLUGIN__ = "Pinterest Video Downloader"
 __HELP__ = """
 🎥 Download videos from Pinterest:
 
-• Just send me a Pinterest video link
-• Formats: MP4, WebM, MOV
-• Supports private videos (with valid cookies)
+• Send me any Pinterest video link
+• Supports MP4, WebM, MOV formats
+• Works with private videos (needs valid cookies)
 
-⚠️ I don't download images - only videos!
+⚠️ I only download videos - image pins will be rejected!
 """
