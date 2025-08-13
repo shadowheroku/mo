@@ -8,7 +8,7 @@ from pyrogram.types import Message
 from Powers.bot_class import Gojo
 
 # Path to your exported cookies file
-COOKIES_FILE = "cookies.txt"  # Put this in the same folder as the bot
+COOKIES_FILE = "cookies.txt"  # Make sure this exists
 
 # YouTube link pattern
 YT_REGEX = r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/\S+"
@@ -18,7 +18,7 @@ async def yt_auto_download(c: Gojo, m: Message):
     url = re.search(YT_REGEX, m.text).group(0)
     user_mention = m.from_user.mention
 
-    status = await m.reply_text("🔍 **Fetching YouTube video...**")
+    status = await m.reply_text("🔍 **Fetching the highest quality video (up to 4K)...**")
 
     try:
         # Get video ID for thumbnail
@@ -29,20 +29,20 @@ async def yt_auto_download(c: Gojo, m: Message):
             video_id = url.split("v=")[1].split("&")[0]
         thumb_path = None
         if video_id:
-            thumb_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+            thumb_url = f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
             thumb_path = wget.download(thumb_url)
 
-        # Download options
+        # Download options for best 4K
         opts = {
-            "format": "best",
+            "format": "bestvideo[ext=mp4][height<=4320]+bestaudio[ext=m4a]/best",
+            "merge_output_format": "mp4",  # Force MP4 merge
             "addmetadata": True,
             "key": "FFmpegMetadata",
             "prefer_ffmpeg": True,
             "geo_bypass": True,
             "nocheckcertificate": True,
-            "cookiefile": COOKIES_FILE,  # ⬅ Use saved cookies file
-            "postprocessors": [{"key": "FFmpegVideoConvertor", "preferedformat": "mp4"}],
-            "outtmpl": "%(id)s.mp4",
+            "cookiefile": COOKIES_FILE,  # Use saved cookies
+            "outtmpl": "%(id)s.%(ext)s",
             "quiet": True,
         }
 
@@ -53,6 +53,7 @@ async def yt_auto_download(c: Gojo, m: Message):
         caption = (
             f"🎬 **Title:** [{info['title']}]({url})\n"
             f"📺 **Channel:** {info.get('uploader', 'Unknown')}\n"
+            f"🎥 **Quality:** {info.get('height', 'Unknown')}p\n"
             f"🙋 **Requested by:** {user_mention}\n"
             f"📥 **Downloaded by:** {c.me.mention}"
         )
@@ -61,7 +62,7 @@ async def yt_auto_download(c: Gojo, m: Message):
             m.chat.id,
             video=open(file_path, "rb"),
             duration=int(info["duration"]),
-            file_name=str(info["title"]),
+            file_name=f"{info['title']}.mp4",
             thumb=thumb_path if thumb_path else None,
             caption=caption,
             supports_streaming=True
@@ -80,7 +81,8 @@ async def yt_auto_download(c: Gojo, m: Message):
 
 __PLUGIN__ = "youtube"
 __HELP__ = """
-**🎥 Auto YouTube Video Downloader**
-• Just send any YouTube link in chat — it will be downloaded and sent automatically.
+**🎥 Auto YouTube 4K Video Downloader**
+• Sends the best possible quality (up to 4K or 8K).
+• Just send any YouTube link.
 • Requires `cookies.txt` in the bot folder for age-restricted/private videos.
 """
