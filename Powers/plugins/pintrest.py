@@ -22,7 +22,7 @@ COOKIES_FILE = "pinterest_cookies.txt"
 with open(COOKIES_FILE, "w", encoding="utf-8") as f:
     f.write(COOKIES_TEXT.strip() + "\n")
 
-# Regex to match Pinterest URLs (short & full)
+
 PINTEREST_REGEX = re.compile(
     r"(https?:\/\/(?:www\.)?(?:pin\.it\/[A-Za-z0-9]+|pinterest\.com\/pin\/\d+))"
 )
@@ -42,71 +42,83 @@ async def pinterest_downloader(c, m):
         return
 
     url = match.group(1)
-
-    # Resolve short links if necessary
     if "pin.it" in url:
         url = resolve_pinterest_url(url)
 
-    temp_file = "pinterest_media.%(ext)s"
+    temp_file = "pinterest_dl.%(ext)s"
     status = await m.reply_text("📥 Downloading Pinterest content...")
 
     try:
         ydl_opts = {
-    "outtmpl": temp_file,
-    "quiet": True,
-    "no_warnings": True,
-    "cookiefile": COOKIES_FILE,
-    "http_headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://www.pinterest.com/",
-    },
-    # Try different format selection methods
-    "format": "bestvideo+bestaudio/best",
-    "merge_output_format": "mp4",
-    # Alternative format selection approach
-    "format_sort": ["vcodec:h264", "acodec:aac"],
-    # Force retries
-    "retries": 3,
-}
+            "outtmpl": temp_file,
+            "quiet": True,
+            "no_warnings": True,
+            "cookiefile": COOKIES_FILE,
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Referer": "https://www.pinterest.com/",
+            },
+            # Universal format selection
+            "format": "best[ext=mp4]/best[ext=webm]/best[ext=jpg]/best[ext=png]/best",
+            "retries": 3,
+            "ignoreerrors": True,
+        }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
+            if not info:
+                raise Exception("No downloadable content found")
+            
             file_path = ydl.prepare_filename(info)
+            ext = info.get("ext", "mp4").lower()
 
         caption = (
             f"📌 **Title:** {info.get('title', 'Unknown')}\n"
-            f"👤 **Uploader:** {info.get('uploader', 'Unknown')}\n"
-            f"📅 **Upload Date:** {info.get('upload_date', 'Unknown')}\n"
-            f"🔗 **Original Link:** {url}\n\n"
-            f"🤖 **Downloaded by:** @{c.me.username}"
+            f"🔗 **Source:** [Original Pin]({url})\n"
+            f"🤖 **Via:** @{c.me.username}"
         )
 
-        # Detect if it's video or image
-        if info.get("ext") in ["mp4", "mov", "webm"]:
-            sent_msg = await m.reply_video(video=file_path, caption=caption)
+        # Send appropriate media type
+        if ext in ["mp4", "webm", "mov"]:
+            await m.reply_video(
+                video=file_path,
+                caption=caption,
+                supports_streaming=True
+            )
+        elif ext in ["jpg", "jpeg", "png", "webp"]:
+            await m.reply_photo(
+                photo=file_path,
+                caption=caption
+            )
         else:
-            sent_msg = await m.reply_photo(photo=file_path, caption=caption)
+            await m.reply_document(
+                document=file_path,
+                caption=caption
+            )
 
         await status.delete()
 
-        # Wait 30 seconds, then delete the sent media
-        await asyncio.sleep(30)
-        await sent_msg.delete()
-
     except Exception as e:
-        await status.edit_text(f"❌ Failed to download:\n`{e}`")
+        await status.edit_text(f"❌ Download failed:\n<code>{e}</code>")
+        return
 
     finally:
-        # Remove downloaded file(s)
-        for f_name in os.listdir():
-            if f_name.startswith("pinterest_media."):
-                os.remove(f_name)
+        # Cleanup downloaded files
+        for f in os.listdir():
+            if f.startswith("pinterest_dl."):
+                try:
+                    os.remove(f)
+                except:
+                    pass
 
 # Plugin metadata
 __PLUGIN__ = "Pinterest Downloader"
-
 __HELP__ = """
-• Send a Pinterest pin link (image or video) — I’ll download and send it to you with details.
-• Works for public and private pins if cookies are valid.
-• Sent media will auto-delete after 30 seconds.
-"""
+📌 Send any Pinterest pin link (image/video) and I'll download it for you!
+
+• Works with:
+  - https://pin.it/abc123
+  - https://pinterest.com/pin/123456789
+
+• Auto-deletes after sending
+• Supports private pins (with valid cookies)
