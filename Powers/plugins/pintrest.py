@@ -53,17 +53,20 @@ async def pinterest_downloader(c, m):
     try:
         ydl_opts = {
     "outtmpl": temp_file,
-    "format": "best",
     "quiet": True,
     "no_warnings": True,
-    "noplaylist": True,
     "cookiefile": COOKIES_FILE,
     "http_headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": "https://www.pinterest.com/",
-        "Accept-Language": "en-US,en;q=0.9",
     },
-    "extract_flat": False,
+    # Try different format selection methods
+    "format": "bestvideo+bestaudio/best",
+    "merge_output_format": "mp4",
+    # Alternative format selection approach
+    "format_sort": ["vcodec:h264", "acodec:aac"],
+    # Force retries
+    "retries": 3,
 }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
