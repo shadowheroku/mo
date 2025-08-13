@@ -1,13 +1,14 @@
 import os
 import re
 import time
-import asyncio
 import wget
-from urllib.parse import urlparse
 from yt_dlp import YoutubeDL
 from pyrogram import filters
 from pyrogram.types import Message
-from Powers.bot_class import Gojo  # Your bot class
+from Powers.bot_class import Gojo
+
+# Path to your exported cookies file
+COOKIES_FILE = "cookies.txt"  # Put this in the same folder as the bot
 
 # YouTube link pattern
 YT_REGEX = r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/\S+"
@@ -39,10 +40,10 @@ async def yt_auto_download(c: Gojo, m: Message):
             "prefer_ffmpeg": True,
             "geo_bypass": True,
             "nocheckcertificate": True,
+            "cookiefile": COOKIES_FILE,  # ⬅ Use saved cookies file
             "postprocessors": [{"key": "FFmpegVideoConvertor", "preferedformat": "mp4"}],
             "outtmpl": "%(id)s.mp4",
             "quiet": True,
-            "cookiesfrombrowser": ("chrome",),  # ⬅ Get cookies from Chrome automatically
         }
 
         with YoutubeDL(opts) as ytdl:
@@ -81,5 +82,5 @@ __PLUGIN__ = "youtube"
 __HELP__ = """
 **🎥 Auto YouTube Video Downloader**
 • Just send any YouTube link in chat — it will be downloaded and sent automatically.
-• Uses your browser's live cookies for maximum compatibility.
+• Requires `cookies.txt` in the bot folder for age-restricted/private videos.
 """
