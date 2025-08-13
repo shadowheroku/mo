@@ -12,7 +12,7 @@ from Powers.bot_class import Gojo
 # YouTube link pattern
 YT_REGEX = r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/\S+"
 
-@Gojo.on_message(filters.regex(YT_REGEX) & ~filters.bot)
+@Gojo.on_message(filters.regex(YT_REGEX) )
 async def yt_auto_download(c: Gojo, m: Message):
     url = re.search(YT_REGEX, m.text).group(0)
     user_mention = m.from_user.mention
