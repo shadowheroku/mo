@@ -8,7 +8,6 @@ import requests
 from io import BytesIO
 
 from Powers.bot_class import Gojo
-from Powers.utils.commands import command
 from Powers.utils.extract_user import extract_user
 
 async def get_user_photo(user_id: int, client: Gojo) -> Optional[BytesIO]:
