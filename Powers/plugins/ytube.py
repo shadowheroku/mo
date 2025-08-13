@@ -49,17 +49,17 @@ async def yt_auto_download(c: Gojo, m: Message):
 
         # yt_dlp download options
         opts = {
-            "format": "best",
-            "addmetadata": True,
-            "key": "FFmpegMetadata",
-            "prefer_ffmpeg": True,
-            "geo_bypass": True,
-            "nocheckcertificate": True,
-            "cookiefile": COOKIES_FILE,
-            "postprocessors": [{"key": "FFmpegVideoConvertor", "preferedformat": "mp4"}],
-            "outtmpl": "%(id)s.mp4",
-            "quiet": True,
-        }
+    "format": "best",
+    "addmetadata": True,
+    "key": "FFmpegMetadata",
+    "prefer_ffmpeg": True,
+    "geo_bypass": True,
+    "nocheckcertificate": True,
+    "cookiefile": "yt_cookies.txt",  # real browser cookies
+    "postprocessors": [{"key": "FFmpegVideoConvertor", "preferedformat": "mp4"}],
+    "outtmpl": "%(id)s.mp4",
+    "quiet": True,
+}
 
         with YoutubeDL(opts) as ytdl:
             info = ytdl.extract_info(url, download=True)
