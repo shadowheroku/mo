@@ -8,7 +8,86 @@ import requests
 from io import BytesIO
 
 from Powers.bot_class import Gojo
-from Powers.utils.extract_user import extract_user
+from pyrogram import filters
+
+def command(commands: str or list, prefixes: str or list = "/", case_sensitive: bool = False):
+    """
+    Decorator for creating command filters.
+    
+    Args:
+        commands (str or list): Command or list of commands
+        prefixes (str or list): Prefix or list of prefixes (default: "/")
+        case_sensitive (bool): Whether commands are case sensitive (default: False)
+    """
+    if isinstance(commands, str):
+        commands = [commands]
+    if isinstance(prefixes, str):
+        prefixes = [prefixes]
+
+    async def func(flt, _, message):
+        text = message.text or message.caption or ""
+        if not text:
+            return False
+
+        text = text.split()
+        if not text:
+            return False
+
+        command_parts = text[0].lower() if not flt.case_sensitive else text[0]
+        command_parts = command_parts.lstrip(flt.prefixes[0])
+
+        for command in flt.commands:
+            cmd = command.lower() if not flt.case_sensitive else command
+            if command_parts == cmd:
+                return True
+
+        return False
+
+    return filters.create(
+        func,
+        "CustomCommandFilter",
+        commands=commands,
+        prefixes=prefixes,
+        case_sensitive=case_sensitive
+    )
+
+from typing import Union, Optional
+from pyrogram.types import Message, User
+
+async def extract_user(client, message: Message) -> Union[int, str, None]:
+    """
+    Extract user ID or username from a message.
+    
+    Args:
+        client: Pyrogram client
+        message: Message object
+        
+    Returns:
+        Union[int, str, None]: User ID, username, or None if not found
+    """
+    # If replied to message
+    if message.reply_to_message:
+        user = message.reply_to_message.from_user
+        return user.id if user else None
+
+    # If command has arguments
+    if len(message.command) > 1:
+        user = message.command[1]
+        
+        # Check if it's a user ID
+        if user.isdigit():
+            return int(user)
+        
+        # Check if it's a username
+        if user.startswith("@"):
+            try:
+                user_obj = await client.get_users(user)
+                return user_obj.id
+            except Exception:
+                return None
+    
+    # If no user specified, return the message author
+    return message.from_user.id if message.from_user else None
 
 async def get_user_photo(user_id: int, client: Gojo) -> Optional[BytesIO]:
     try:
