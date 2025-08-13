@@ -71,7 +71,7 @@ async def generate_couple_message(user1_mention: str, user2_mention: str) -> str
         f"🔥 **Dynamic Duo Alert** 🔥\n{user1_mention} & {user2_mention} {emoji}",
         f"💑 {user1_mention} and {user2_mention} sitting in a tree... K-I-S-S-I-N-G! 💏"
     ]
-    return random.choice(templates)
+    return random.choice(templates) 
 
 @Gojo.on_message(command("waifu"))
 async def waifu_cmd(c: Gojo, m: Message):
