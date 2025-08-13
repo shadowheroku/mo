@@ -109,7 +109,7 @@ async def pinterest_downloader(c, m):
                 supports_streaming=True,
                 duration=info.get('duration'),
                 width=info.get('width'),
-                height=info.get('height')
+                height=info.get('height'))
         elif ext in ["jpg", "jpeg", "png", "webp"]:
             await m.reply_photo(
                 photo=file_path,
