@@ -1,64 +1,37 @@
-import os
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import Message
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
-from urllib.parse import quote
 
-# Your private channel ID (make bot admin there)
-UPLOAD_CHANNEL = -1002800777153  # replace with your channel ID
+@Gojo.on_message(command(["upload", "tgm"]))
+async def bot_api_upload(c: Gojo, m: Message):
+    """Upload to Telegram's CDN and get a direct link"""
+    if not m.reply_to_message or not m.reply_to_message.media:
+        return await m.reply_text("❌ Please reply to a file or media")
 
-def has_media(msg: Message) -> bool:
-    """Check if message contains any kind of media/file"""
-    return any([
-        msg.document,
-        msg.photo,
-        msg.video,
-        msg.audio,
-        msg.voice,
-        msg.video_note,
-        msg.animation,
-        msg.sticker,
-    ])
-
-@Gojo.on_message(command(["upload", "ul"]))
-async def tg_channel_upload(c: Gojo, m: Message):
-    """Upload any file type to a private Telegram channel and return a link"""
-    if not m.reply_to_message or not has_media(m.reply_to_message):
-        return await m.reply_text("❌ Please reply to any file, photo, video, audio, sticker, etc.")
-
-    msg = await m.reply_text("📥 Downloading your file...")
-    file_path = None
+    msg = await m.reply_text("📥 Processing your file...")
 
     try:
-        # Download any file type
-        file_path = await m.reply_to_message.download()
+        # Send the replied media to bot's own saved messages
+        sent = await m.reply_to_message.copy("me")
 
-        await msg.edit_text("☁️ Uploading to Telegram channel...")
-        sent = await c.send_document(
-            chat_id=UPLOAD_CHANNEL,
-            document=file_path,
-            caption=f"Uploaded by {m.from_user.mention}"
-        )
+        # Get file info from Telegram
+        file_info = await c.get_file(sent.document.file_id if sent.document else sent.photo.file_id)
+        
+        # Direct link from Telegram API
+        bot_token = c.exported_token  # Some Pyrogram clients store it
+        if not bot_token:
+            bot_token = "<YOUR_BOT_TOKEN>"  # Put manually if needed
 
-        # Create link for private channel messages
-        channel_id_str = str(UPLOAD_CHANNEL).replace("-100", "")
-        file_url = f"https://t.me/c/{channel_id_str}/{sent.id}"
-        share_url = f"https://t.me/share/url?url={quote(file_url)}"
+        direct_link = f"https://api.telegram.org/file/bot{bot_token}/{file_info.file_path}"
 
         await msg.edit_text(
-            f"✅ **Uploaded!**\n\n🔗 URL: `{file_url}`",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🌐 Open", url=file_url)],
-                [InlineKeyboardButton("📤 Share", url=share_url)]
-            ])
+            f"✅ **Uploaded to Telegram CDN**\n"
+            f"🔗 Direct Link: `{direct_link}`\n\n"
+            f"⚠️ Keep your bot token secret — this link contains it."
         )
 
     except Exception as e:
-        await msg.edit_text(f"❌ Failed to upload:\n{str(e)}")
-    finally:
-        if file_path and os.path.exists(file_path):
-            os.remove(file_path)
-
+        await msg.edit_text(f"❌ Failed: {str(e)}")
 
 
 __PLUGIN__ = "catbox_uploader"
