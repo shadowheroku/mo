@@ -5,13 +5,13 @@ from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 from urllib.parse import quote
 
-TRANSFER_API = "https://transfer.sh"
-MAX_FILE_SIZE = 1 * 1024 * 1024 * 1024  # 1GB
+FILEIO_API = "https://file.io"
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 TIMEOUT = 60  # seconds
 
 @Gojo.on_message(command(["upload", "ul"]))
-async def transfer_upload(c: Gojo, m: Message):
-    """Upload files to transfer.sh"""
+async def fileio_upload(c: Gojo, m: Message):
+    """Upload files to file.io"""
     if not m.reply_to_message or not m.reply_to_message.media:
         return await m.reply_text("❌ Please reply to a file to upload!")
 
@@ -23,22 +23,26 @@ async def transfer_upload(c: Gojo, m: Message):
         file_size = os.path.getsize(file_path)
 
         if file_size > MAX_FILE_SIZE:
-            raise ValueError(f"File too large ({file_size//(1024*1024)}MB > 1024MB limit)")
+            raise ValueError(f"File too large ({file_size//(1024*1024)}MB > 100MB limit)")
 
-        await msg.edit_text("☁️ Uploading to Transfer.sh...")
+        await msg.edit_text("☁️ Uploading to File.io...")
         file_name = os.path.basename(file_path)
 
         with open(file_path, "rb") as f:
-            response = requests.put(
-                f"{TRANSFER_API}/{file_name}",
-                data=f,
+            response = requests.post(
+                FILEIO_API,
+                files={"file": (file_name, f)},
                 timeout=TIMEOUT
             )
 
         if response.status_code != 200:
             raise ValueError(f"HTTP Error {response.status_code}: {response.text}")
 
-        file_url = response.text.strip()
+        data = response.json()
+        if not data.get("success"):
+            raise ValueError(f"Upload failed: {data}")
+
+        file_url = data.get("link")
         share_url = f"https://t.me/share/url?url={quote(file_url)}"
 
         await msg.edit_text(
