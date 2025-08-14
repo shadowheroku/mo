@@ -7,6 +7,9 @@ from pyrogram.types import Message
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
+# Track ongoing tagging sessions
+ACTIVE_TAGS = {}
+
 # Different styles for tagall
 TAGALL_STYLES = [
     "🔥 Attention everyone!\n\n{msg}\n\n{mentions}",
@@ -32,6 +35,10 @@ async def send_in_batches(c, chat_id, members, base_msg, style):
     """Send mentions in batches of 5 users per message with delay"""
     batch = []
     for i, member in enumerate(members, start=1):
+        if chat_id not in ACTIVE_TAGS or not ACTIVE_TAGS[chat_id]:
+            # Tagging canceled
+            break
+
         if not member.user.is_bot and not member.user.is_deleted:
             batch.append(member)
 
@@ -48,6 +55,7 @@ async def send_in_batches(c, chat_id, members, base_msg, style):
 async def tag_all(c: Gojo, m: Message):
     """Tags all members in the group with random style, supports text or reply."""
     chat = m.chat
+    ACTIVE_TAGS[chat.id] = True  # Mark tagging as active
 
     # Determine message content
     if m.reply_to_message:
@@ -63,16 +71,20 @@ async def tag_all(c: Gojo, m: Message):
             members.append(member)
 
     if not members:
+        ACTIVE_TAGS.pop(chat.id, None)
         return await m.reply_text("No valid members found to tag.")
 
     style = choice(TAGALL_STYLES)
     await send_in_batches(c, chat.id, members, base_msg, style)
+
+    ACTIVE_TAGS.pop(chat.id, None)  # Clear when done
 
 
 @Gojo.on_message(command(["atag", "admincall"]) & filters.group)
 async def tag_admins(c: Gojo, m: Message):
     """Tags only admins in batches."""
     chat = m.chat
+    ACTIVE_TAGS[chat.id] = True  # Mark tagging as active
 
     # Determine message content
     if m.reply_to_message:
@@ -92,16 +104,30 @@ async def tag_admins(c: Gojo, m: Message):
             admins.append(member)
 
     if not admins:
+        ACTIVE_TAGS.pop(chat.id, None)
         return await m.reply_text("No valid admins found to tag.")
 
     await send_in_batches(c, chat.id, admins, base_msg, ADMIN_STYLE)
 
+    ACTIVE_TAGS.pop(chat.id, None)  # Clear when done
+
+
+@Gojo.on_message(command(["cancel"]) & filters.group)
+async def cancel_tagging(c: Gojo, m: Message):
+    """Cancels the current tagging process in the chat."""
+    chat = m.chat
+    if chat.id in ACTIVE_TAGS and ACTIVE_TAGS[chat.id]:
+        ACTIVE_TAGS[chat.id] = False
+        await m.reply_text("🚫 Tagging process has been cancelled.")
+    else:
+        await m.reply_text("No active tagging process to cancel.")
+
 
 __PLUGIN__ = "tagall"
 
-_DISABLE_CMDS_ = ["tagall", "all", "callall", "atag", "admincall"]
+_DISABLE_CMDS_ = ["tagall", "all", "callall", "atag", "admincall", "cancel"]
 
-__alt_name__ = ["all", "callall", "admincall"]
+__alt_name__ = ["all", "callall", "admincall", "cancel"]
 
 __HELP__ = """
 **Tagging Commands**
@@ -109,4 +135,5 @@ __HELP__ = """
 • Reply to a message with /tagall — Tags all under that replied message
 • /atag [text] — Tag only admins
 • Reply to a message with /atag — Tags all admins under that replied message
+• /cancel — Cancel the current tagging process
 """
