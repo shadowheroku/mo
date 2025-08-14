@@ -75,6 +75,8 @@ async def kick_all_cmd(c: Gojo, m: Message):
     await start_confirmation(m, "kickall")
 
 # ===== Callback Handling =====
+import time
+
 @Gojo.on_callback_query(filters.regex(r"^(confirm|cancel):"))
 async def confirm_action(c: Gojo, cb: CallbackQuery):
     action = cb.data.split(":")[1]
@@ -96,13 +98,24 @@ async def confirm_action(c: Gojo, cb: CallbackQuery):
     processed = 0
     skipped = 0
     failed = 0
-    status_msg = await cb.message.edit_text(f"✅ Confirmed. Executing `{action}`...\nProcessed: 0 | Skipped: 0 | Failed: 0")
+    last_update = time.time()
+    status_msg = await cb.message.edit_text(
+        f"✅ Confirmed. Executing `{action}`...\nProcessed: 0 | Skipped: 0 | Failed: 0"
+    )
 
-    async def update_status():
-        await status_msg.edit_text(
-            f"⚡ Executing `{action}`...\n"
-            f"Processed: {processed} | Skipped: {skipped} | Failed: {failed}"
-        )
+    async def update_status(force=False):
+        nonlocal last_update
+        now = time.time()
+        # Only update if 3 seconds have passed or if forced
+        if force or (now - last_update >= 3):
+            last_update = now
+            try:
+                await status_msg.edit_text(
+                    f"⚡ Executing `{action}`...\n"
+                    f"Processed: {processed} | Skipped: {skipped} | Failed: {failed}"
+                )
+            except:
+                pass  # Ignore if Telegram blocks due to flood control
 
     # ==== DELETE ALL ====
     if action == "deleteall":
@@ -112,9 +125,8 @@ async def confirm_action(c: Gojo, cb: CallbackQuery):
                 processed += 1
             except:
                 failed += 1
-            if processed % 20 == 0:
-                await update_status()
-        await update_status()
+            await update_status()
+        await update_status(force=True)
         await c.send_message(chat_id, f"🗑 All messages deleted.\n✅ {processed} deleted | ❌ {failed} failed.")
 
     # ==== BAN ALL ====
@@ -128,10 +140,9 @@ async def confirm_action(c: Gojo, cb: CallbackQuery):
                 processed += 1
             except:
                 failed += 1
-            if processed % 10 == 0:
-                await update_status()
+            await update_status()
             await asyncio.sleep(0.1)
-        await update_status()
+        await update_status(force=True)
         await c.send_message(chat_id, f"🚫 Ban complete!\n✅ {processed} banned | ⏭ {skipped} skipped | ❌ {failed} failed.")
 
     # ==== UNBAN ALL ====
@@ -142,10 +153,9 @@ async def confirm_action(c: Gojo, cb: CallbackQuery):
                 processed += 1
             except:
                 failed += 1
-            if processed % 10 == 0:
-                await update_status()
+            await update_status()
             await asyncio.sleep(0.1)
-        await update_status()
+        await update_status(force=True)
         await c.send_message(chat_id, f"✅ Unban complete!\n✅ {processed} unbanned | ❌ {failed} failed.")
 
     # ==== MUTE ALL ====
@@ -160,10 +170,9 @@ async def confirm_action(c: Gojo, cb: CallbackQuery):
                 processed += 1
             except:
                 failed += 1
-            if processed % 10 == 0:
-                await update_status()
+            await update_status()
             await asyncio.sleep(0.1)
-        await update_status()
+        await update_status(force=True)
         await c.send_message(chat_id, f"🔇 Mute complete!\n✅ {processed} muted | ⏭ {skipped} skipped | ❌ {failed} failed.")
 
     # ==== UNMUTE ALL ====
@@ -174,10 +183,9 @@ async def confirm_action(c: Gojo, cb: CallbackQuery):
                 processed += 1
             except:
                 failed += 1
-            if processed % 10 == 0:
-                await update_status()
+            await update_status()
             await asyncio.sleep(0.1)
-        await update_status()
+        await update_status(force=True)
         await c.send_message(chat_id, f"🔊 Unmute complete!\n✅ {processed} unmuted | ❌ {failed} failed.")
 
     # ==== KICK ALL ====
@@ -192,14 +200,13 @@ async def confirm_action(c: Gojo, cb: CallbackQuery):
                 processed += 1
             except:
                 failed += 1
-            if processed % 10 == 0:
-                await update_status()
+            await update_status()
             await asyncio.sleep(0.1)
-        await update_status()
+        await update_status(force=True)
         await c.send_message(chat_id, f"👢 Kick complete!\n✅ {processed} kicked | ⏭ {skipped} skipped | ❌ {failed} failed.")
 
-    # Remove confirmation entry
     del PENDING_CONFIRM[chat_id][user_id]
+
 
 
 
