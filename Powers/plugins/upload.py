@@ -106,7 +106,7 @@ async def upload_to_service(service: str, file_path: str) -> Tuple[Optional[str]
     except Exception as e:
         return None, f"Unexpected error: {str(e)}"
 
-@Gojo.on_message(command("upload"))
+@Gojo.on_message(command(["upload", "tgm"]))
 async def handle_file_upload(c: Gojo, m: Message):
     if not m.reply_to_message or not m.reply_to_message.media:
         return await m.reply_text("❌ Please reply to a file to upload!")
