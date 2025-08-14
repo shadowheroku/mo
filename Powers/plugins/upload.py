@@ -10,7 +10,7 @@ from typing import Tuple, Optional
 # Upload services configuration
 UPLOAD_SERVICES = {
     "gofile": {
-        "url": ""https://api.gofile.io/uploadFile"",
+        "url": "https://api.gofile.io/uploadFile",
         "max_size": 2 * 1024 * 1024 * 1024,  # 2GB
         "expires": "permanent",
         "requires_api_key": False
