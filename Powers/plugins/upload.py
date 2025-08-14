@@ -3,8 +3,8 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
-# Catbox settings
-CATBOX_URL = "https://catbox.moe/user/api.php"
+# File.io settings
+FILEIO_URL = "https://file.io"
 MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB
 SUPPORTED_MIME_TYPES = {
     "image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif",
@@ -12,7 +12,7 @@ SUPPORTED_MIME_TYPES = {
 }
 
 @Gojo.on_message(command("tgm"))
-async def upload_media_to_catbox(c: Gojo, m: Message):
+async def upload_media_to_fileio(c: Gojo, m: Message):
     if not m.reply_to_message or not m.reply_to_message.media:
         return await m.reply_text("❌ **Reply to a photo/video/document to upload!**")
 
@@ -38,22 +38,24 @@ async def upload_media_to_catbox(c: Gojo, m: Message):
             media_path = new_path
 
         # Upload
-        await msg.edit_text("☁️ **Step 2:** Uploading to Catbox...")
+        await msg.edit_text("☁️ **Step 2:** Uploading to File.io...")
         with open(media_path, "rb") as f:
-            r = requests.post(CATBOX_URL, data={"reqtype": "fileupload"}, files={"fileToUpload": f})
+            r = requests.post(FILEIO_URL, files={"file": f})
         os.remove(media_path)
 
-        if r.status_code == 200 and r.text.startswith("http"):
-            catbox_url = r.text
-            await msg.edit_text(
-                f"✅ **Upload Successful!**\n📎 Link: `{catbox_url}`",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔗 Open Link", url=catbox_url)],
-                    [InlineKeyboardButton("🔄 Share Link", url=f"https://t.me/share/url?url={catbox_url}")]
-                ])
-            )
-        elif r.status_code == 412:
-            await msg.edit_text("🚫 **Catbox rejected the file!** Check format & extension.")
+        if r.status_code == 200:
+            data = r.json()
+            if data.get("success") and "link" in data:
+                fileio_url = data["link"]
+                await msg.edit_text(
+                    f"✅ **Upload Successful!**\n📎 Link: `{fileio_url}`",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔗 Open Link", url=fileio_url)],
+                        [InlineKeyboardButton("🔄 Share Link", url=f"https://t.me/share/url?url={fileio_url}")]
+                    ])
+                )
+            else:
+                await msg.edit_text(f"❌ **Upload failed!**\nResponse: {data}")
         else:
             await msg.edit_text(f"❌ **Upload failed!**\nHTTP {r.status_code}\n{r.text}")
 
@@ -64,10 +66,10 @@ async def upload_media_to_catbox(c: Gojo, m: Message):
         if "media_path" in locals() and os.path.exists(media_path):
             os.remove(media_path)
 
-__PLUGIN__ = "catbox_upload"
+__PLUGIN__ = "Upload"
 __HELP__ = """
-**📤 Catbox Uploader**
-`/tgm` — Reply to a media file to upload to Catbox.
+**📤 File.io Uploader**
+`/tgm` — Reply to a media file to upload to File.io.
 
 **✅ Supported formats:** JPG, PNG, GIF, MP4, WEBM, MOV  
 📦 **Max size:** 200MB  
