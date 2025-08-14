@@ -32,7 +32,8 @@ def get_readable_time(seconds: int) -> str:
     return " ".join(time_parts) if time_parts else "0s"
 
 
-adminlist = []  # Assuming you have an adminlist dict like in ERISMUSIC
+adminlist[chat_id] = []
+  # Assuming you have an adminlist dict like in ERISMUSIC
 
 # cooldown tracker
 _admin_reload_cooldown = {}
