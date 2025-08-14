@@ -92,72 +92,115 @@ async def confirm_action(c: Gojo, cb: CallbackQuery):
         del PENDING_CONFIRM[chat_id][user_id]
         return
 
-    await cb.message.edit_text(f"✅ Confirmed. Executing `{action}`...")
+    # Progress tracking
+    processed = 0
+    skipped = 0
+    failed = 0
+    status_msg = await cb.message.edit_text(f"✅ Confirmed. Executing `{action}`...\nProcessed: 0 | Skipped: 0 | Failed: 0")
 
-    # Perform the action
+    async def update_status():
+        await status_msg.edit_text(
+            f"⚡ Executing `{action}`...\n"
+            f"Processed: {processed} | Skipped: {skipped} | Failed: {failed}"
+        )
+
+    # ==== DELETE ALL ====
     if action == "deleteall":
         async for msg in c.get_chat_history(chat_id):
             try:
                 await c.delete_messages(chat_id, msg.id)
+                processed += 1
             except:
-                pass
-        await c.send_message(chat_id, "🗑 All messages deleted.")
+                failed += 1
+            if processed % 20 == 0:
+                await update_status()
+        await update_status()
+        await c.send_message(chat_id, f"🗑 All messages deleted.\n✅ {processed} deleted | ❌ {failed} failed.")
 
+    # ==== BAN ALL ====
     elif action == "banall":
         async for member in c.get_chat_members(chat_id):
             if member.user.is_bot or member.status == ChatMemberStatus.OWNER:
+                skipped += 1
                 continue
             try:
                 await c.ban_chat_member(chat_id, member.user.id)
-                await asyncio.sleep(0.1)
+                processed += 1
             except:
-                pass
-        await c.send_message(chat_id, "🚫 All members banned.")
+                failed += 1
+            if processed % 10 == 0:
+                await update_status()
+            await asyncio.sleep(0.1)
+        await update_status()
+        await c.send_message(chat_id, f"🚫 Ban complete!\n✅ {processed} banned | ⏭ {skipped} skipped | ❌ {failed} failed.")
 
+    # ==== UNBAN ALL ====
     elif action == "unbanall":
         async for member in c.get_chat_members(chat_id, filter=ChatMembersFilter.BANNED):
             try:
                 await c.unban_chat_member(chat_id, member.user.id)
-                await asyncio.sleep(0.1)
+                processed += 1
             except:
-                pass
-        await c.send_message(chat_id, "✅ All members unbanned.")
+                failed += 1
+            if processed % 10 == 0:
+                await update_status()
+            await asyncio.sleep(0.1)
+        await update_status()
+        await c.send_message(chat_id, f"✅ Unban complete!\n✅ {processed} unbanned | ❌ {failed} failed.")
 
+    # ==== MUTE ALL ====
     elif action == "muteall":
         from pyrogram.types import ChatPermissions
         async for member in c.get_chat_members(chat_id):
             if member.user.is_bot or member.status == ChatMemberStatus.OWNER:
+                skipped += 1
                 continue
             try:
                 await c.restrict_chat_member(chat_id, member.user.id, permissions=ChatPermissions())
-                await asyncio.sleep(0.1)
+                processed += 1
             except:
-                pass
-        await c.send_message(chat_id, "🔇 All members muted.")
+                failed += 1
+            if processed % 10 == 0:
+                await update_status()
+            await asyncio.sleep(0.1)
+        await update_status()
+        await c.send_message(chat_id, f"🔇 Mute complete!\n✅ {processed} muted | ⏭ {skipped} skipped | ❌ {failed} failed.")
 
+    # ==== UNMUTE ALL ====
     elif action == "unmuteall":
         async for member in c.get_chat_members(chat_id, filter=ChatMembersFilter.RESTRICTED):
             try:
                 await c.restrict_chat_member(chat_id, member.user.id, permissions=None)
-                await asyncio.sleep(0.1)
+                processed += 1
             except:
-                pass
-        await c.send_message(chat_id, "🔊 All members unmuted.")
+                failed += 1
+            if processed % 10 == 0:
+                await update_status()
+            await asyncio.sleep(0.1)
+        await update_status()
+        await c.send_message(chat_id, f"🔊 Unmute complete!\n✅ {processed} unmuted | ❌ {failed} failed.")
 
+    # ==== KICK ALL ====
     elif action == "kickall":
         async for member in c.get_chat_members(chat_id):
             if member.user.is_bot or member.status == ChatMemberStatus.OWNER:
+                skipped += 1
                 continue
             try:
                 await c.ban_chat_member(chat_id, member.user.id)
                 await c.unban_chat_member(chat_id, member.user.id)
-                await asyncio.sleep(0.1)
+                processed += 1
             except:
-                pass
-        await c.send_message(chat_id, "👢 All members kicked.")
+                failed += 1
+            if processed % 10 == 0:
+                await update_status()
+            await asyncio.sleep(0.1)
+        await update_status()
+        await c.send_message(chat_id, f"👢 Kick complete!\n✅ {processed} kicked | ⏭ {skipped} skipped | ❌ {failed} failed.")
 
-    # Remove confirmation
+    # Remove confirmation entry
     del PENDING_CONFIRM[chat_id][user_id]
+
 
 
 __PLUGIN__ = "MassActions"
