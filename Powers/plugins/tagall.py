@@ -1,3 +1,4 @@
+import asyncio
 from random import choice
 from pyrogram import filters
 from pyrogram.enums import ParseMode as PM, ChatMemberStatus, ChatMembersFilter
@@ -28,16 +29,18 @@ async def get_mentions(members):
 
 
 async def send_in_batches(c, chat_id, members, base_msg, style):
-    """Send mentions in batches of 10 users per message"""
+    """Send mentions in batches of 5 users per message with delay"""
     batch = []
     for i, member in enumerate(members, start=1):
         if not member.user.is_bot:
             batch.append(member)
-        if len(batch) == 10 or i == len(members):
+
+        if len(batch) == 5 or i == len(members):
             mentions = await get_mentions(batch)
             text = style.format(msg=base_msg, mentions=mentions)
             await c.send_message(chat_id, text, parse_mode=PM.MARKDOWN)
             batch.clear()
+            await asyncio.sleep(1.5)  # delay to avoid flood
 
 
 @Gojo.on_message(command(["tagall", "all", "callall"]) & filters.group)
@@ -97,7 +100,7 @@ __alt_name__ = ["all", "callall", "admincall"]
 
 __HELP__ = """
 **Tagging Commands**
-• /tagall [text] — Tag all members (batch of 10 per message)
+• /tagall [text] — Tag all members (batch of 5 per message, with delay)
 • Reply to a message with /tagall — Tags all under that replied message
 • /atag [text] — Tag only admins
 • Reply to a message with /atag — Tags all admins under that replied message
