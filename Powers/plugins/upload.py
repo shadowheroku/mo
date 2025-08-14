@@ -13,25 +13,29 @@ UPLOAD_SERVICES = {
         "url": "https://api.gofile.io/uploadFile",
         "max_size": 2 * 1024 * 1024 * 1024,  # 2GB
         "expires": "permanent",
-        "requires_api_key": False
+        "requires_api_key": False,
+        "display_name": "GoFile.io"
     },
     "fileio": {
         "url": "https://file.io",
         "max_size": 100 * 1024 * 1024,  # 100MB
         "expires": "14d",
-        "requires_api_key": False
+        "requires_api_key": False,
+        "display_name": "File.io"
     },
     "transfersh": {
         "url": "https://transfer.sh",
         "max_size": 10 * 1024 * 1024 * 1024,  # 10GB
         "expires": "14d",
-        "requires_api_key": False
+        "requires_api_key": False,
+        "display_name": "Transfer.sh"
     },
     "0x0st": {
         "url": "https://0x0.st",
         "max_size": 512 * 1024 * 1024,  # 512MB
         "expires": "30d",
-        "requires_api_key": False
+        "requires_api_key": False,
+        "display_name": "0x0.st"
     }
 }
 
@@ -58,8 +62,20 @@ async def upload_to_service(service: str, file_path: str) -> Tuple[Optional[str]
     try:
         with open(file_path, "rb") as f:
             if service == "gofile":
+                # First get the best server
+                server_resp = requests.get("https://api.gofile.io/getServer", timeout=TIMEOUT)
+                if server_resp.status_code != 200:
+                    return None, "Failed to get GoFile server"
+                
+                server_data = server_resp.json()
+                if server_data["status"] != "ok":
+                    return None, server_data.get("message", "Failed to get server")
+                
+                server = server_data["data"]["server"]
+                upload_url = f"https://{server}.gofile.io/uploadFile"
+                
                 response = requests.post(
-                    config["url"],
+                    upload_url,
                     files={"file": f},
                     timeout=TIMEOUT
                 )
@@ -76,7 +92,7 @@ async def upload_to_service(service: str, file_path: str) -> Tuple[Optional[str]
                     timeout=TIMEOUT
                 )
                 data = response.json()
-                if data["success"]:
+                if data.get("success"):
                     return data["link"], None
                 return None, data.get("message", "Upload failed")
 
@@ -85,6 +101,7 @@ async def upload_to_service(service: str, file_path: str) -> Tuple[Optional[str]
                 response = requests.put(
                     f"{config['url']}/{filename}",
                     data=f,
+                    headers={"Max-Days": "14"},
                     timeout=TIMEOUT
                 )
                 if response.status_code == 200:
@@ -102,7 +119,7 @@ async def upload_to_service(service: str, file_path: str) -> Tuple[Optional[str]
                 return None, f"HTTP {response.status_code}"
 
     except requests.RequestException as e:
-        return None, str(e)
+        return None, f"Network error: {str(e)}"
     except Exception as e:
         return None, f"Unexpected error: {str(e)}"
 
@@ -125,13 +142,13 @@ async def handle_file_upload(c: Gojo, m: Message):
         return await msg.edit_text(f"🚫 File too large! Max supported size is {max_allowed//(1024*1024)}MB")
 
     # Try uploading to default service first
-    await msg.edit_text(f"☁️ Uploading to {DEFAULT_SERVICE}...")
+    await msg.edit_text(f"☁️ Uploading to {UPLOAD_SERVICES[DEFAULT_SERVICE]['display_name']}...")
     file_url, error = await upload_to_service(DEFAULT_SERVICE, file_path)
     
     # If default fails, try other services
     if not file_url:
         for service in [s for s in UPLOAD_SERVICES if s != DEFAULT_SERVICE]:
-            await msg.edit_text(f"⚠️ Retrying with {service}...")
+            await msg.edit_text(f"⚠️ Retrying with {UPLOAD_SERVICES[service]['display_name']}...")
             file_url, error = await upload_to_service(service, file_path)
             if file_url:
                 break
@@ -158,7 +175,7 @@ async def handle_file_upload(c: Gojo, m: Message):
 __PLUGIN__ = "file_uploader"
 __HELP__ = """
 **📤 Multi-File Uploader**
-`/upload` - Upload files to various hosting services
+`/upload` or `/tgm` - Upload files to various hosting services
 
 **Features:**
 - Automatic service fallback if one fails
@@ -167,8 +184,10 @@ __HELP__ = """
 - Easy sharing interface
 
 **Supported Services:**
-- GoFile.io (2GB, permanent)
-- File.io (100MB, 14 days)
-- transfer.sh (10GB, 14 days)
-- 0x0.st (512MB, 30 days)
+- GoFile.io (2GB, permanent storage)
+- File.io (100MB, expires after 14 days)
+- Transfer.sh (10GB, expires after 14 days)
+- 0x0.st (512MB, expires after 30 days)
+
+**Note:** The bot will automatically select the best service based on file size.
 """
