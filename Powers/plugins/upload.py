@@ -1,77 +1,88 @@
-import requests, os, mimetypes
+import requests
+import os
+import mimetypes
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
+from urllib.parse import quote
 
-# File.io settings
-FILEIO_URL = "https://file.io"
-MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB
-SUPPORTED_MIME_TYPES = {
-    "image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif",
-    "video/mp4": ".mp4", "video/webm": ".webm", "video/quicktime": ".mov"
-}
+# Updated AnonFiles settings
+ANONFILES_UPLOAD_URL = "https://api.anonfiles.com/upload"
+ANONFILES_STATUS_URL = "https://api.anonfiles.com/v2/file/{}/info"
+MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024  # 2GB
+TIMEOUT = 30  # seconds
 
 @Gojo.on_message(command("tgm"))
-async def upload_media_to_fileio(c: Gojo, m: Message):
+async def upload_media_to_anonfiles(c: Gojo, m: Message):
     if not m.reply_to_message or not m.reply_to_message.media:
-        return await m.reply_text("❌ **Reply to a photo/video/document to upload!**")
+        return await m.reply_text("❌ Please reply to a media file to upload!")
 
-    msg = await m.reply_text("📥 **Step 1:** Downloading...")
+    msg = await m.reply_text("📥 Downloading your file...")
+    
     try:
-        # Download
+        # Download file
         media_path = await m.reply_to_message.download()
-        if os.path.getsize(media_path) > MAX_FILE_SIZE:
+        file_size = os.path.getsize(media_path)
+
+        # Check file size
+        if file_size > MAX_FILE_SIZE:
             os.remove(media_path)
-            return await msg.edit_text(f"🚫 **File too large!** Max {MAX_FILE_SIZE//(1024*1024)}MB")
+            return await msg.edit_text(f"🚫 File too large! Max size is {MAX_FILE_SIZE//(1024*1024)}MB")
 
-        # Validate type
-        mime_type, _ = mimetypes.guess_type(media_path)
-        if not mime_type or mime_type not in SUPPORTED_MIME_TYPES:
+        # Upload to AnonFiles
+        await msg.edit_text("☁️ Uploading to AnonFiles...")
+        
+        try:
+            with open(media_path, "rb") as f:
+                response = requests.post(
+                    ANONFILES_UPLOAD_URL,
+                    files={"file": f},
+                    timeout=TIMEOUT
+                )
+            response.raise_for_status()
+            data = response.json()
+        except requests.exceptions.RequestException as e:
             os.remove(media_path)
-            return await msg.edit_text("⚠️ **Unsupported format!** JPG, PNG, GIF, MP4, WEBM, MOV")
+            return await msg.edit_text(f"❌ Upload failed: {str(e)}")
 
-        # Correct extension
-        ext = SUPPORTED_MIME_TYPES[mime_type]
-        if not media_path.lower().endswith(ext):
-            new_path = os.path.splitext(media_path)[0] + ext
-            os.rename(media_path, new_path)
-            media_path = new_path
+        # Check response
+        if not data.get("status"):
+            error = data.get("error", {}).get("message", "Unknown error")
+            os.remove(media_path)
+            return await msg.edit_text(f"❌ AnonFiles error: {error}")
 
-        # Upload
-        await msg.edit_text("☁️ **Step 2:** Uploading to File.io...")
-        with open(media_path, "rb") as f:
-            r = requests.post(FILEIO_URL, files={"file": f})
+        # Get file URL
+        file_url = data["data"]["file"]["url"]["full"]
+        short_url = data["data"]["file"]["url"]["short"]
+        
+        # Create share button
+        share_url = f"https://t.me/share/url?url={quote(file_url)}&text=Check%20this%20file%20I%20uploaded!"
+        
+        await msg.edit_text(
+            f"✅ **Upload Successful!**\n\n"
+            f"🔗 Full URL: `{file_url}`\n"
+            f"🪶 Short URL: `{short_url}`",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🌐 Open Link", url=file_url)],
+                [InlineKeyboardButton("📤 Share", url=share_url)]
+            ])
+        )
+        
         os.remove(media_path)
 
-        if r.status_code == 200:
-            data = r.json()
-            if data.get("success") and "link" in data:
-                fileio_url = data["link"]
-                await msg.edit_text(
-                    f"✅ **Upload Successful!**\n📎 Link: `{fileio_url}`",
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("🔗 Open Link", url=fileio_url)],
-                        [InlineKeyboardButton("🔄 Share Link", url=f"https://t.me/share/url?url={fileio_url}")]
-                    ])
-                )
-            else:
-                await msg.edit_text(f"❌ **Upload failed!**\nResponse: {data}")
-        else:
-            await msg.edit_text(f"❌ **Upload failed!**\nHTTP {r.status_code}\n{r.text}")
-
-    except requests.RequestException as re:
-        await msg.edit_text(f"🌐 **Network Error:** `{re}`")
     except Exception as e:
-        await msg.edit_text(f"⚠️ **Error:** `{e}`")
+        await msg.edit_text(f"⚠️ An error occurred: {str(e)}")
         if "media_path" in locals() and os.path.exists(media_path):
             os.remove(media_path)
 
-__PLUGIN__ = "Upload"
+__PLUGIN__ = "anonfiles_upload"
 __HELP__ = """
-**📤 File.io Uploader**
-`/tgm` — Reply to a media file to upload to File.io.
+**📤 AnonFiles Uploader**
+`/tgm` - Upload media files to AnonFiles
 
-**✅ Supported formats:** JPG, PNG, GIF, MP4, WEBM, MOV  
-📦 **Max size:** 200MB  
-🔄 **Includes share button for easy link sharing!**
+**Features:**
+- Supports most file types
+- Max size: 2GB
+- Direct download links
+- Easy sharing options
 """
