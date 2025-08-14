@@ -1,52 +1,37 @@
+
+import requests
 import os
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-from Powers.bot_class import Gojo
-from Powers.utils.custom_filters import command
-from urllib.parse import quote
+from pyrogram import filters
+from pyrogram.types import Message
+from Powers.bot_class import Gojo  # Gojo client
 
-@Gojo.on_message(command(["tgm"]))
-async def tgm_uploader(c: Gojo, m: Message):
-    """Upload a file to Telegram and get direct/public links."""
-    if not m.reply_to_message or not m.reply_to_message.media:
-        return await m.reply_text("❌ Please reply to a file to upload!")
+API_URL = "https://file.io"
 
-    msg = await m.reply_text("📥 Downloading your file…")
-    file_path = None
+@Gojo.on_message(filters.command(["upload", "ul"]))
+async def upload_file(_, message: Message):
+    if not message.reply_to_message or not message.reply_to_message.document:
+        return await message.reply_text("⚠️ Reply to a file to upload.")
+
+    file_path = await message.reply_to_message.download()
+    await message.reply_text("⏳ Uploading file to File.io...")
 
     try:
-        # Download file locally
-        file_path = await m.reply_to_message.download()
+        with open(file_path, "rb") as f:
+            response = requests.post(API_URL, files={"file": f})
+        os.remove(file_path)
 
-        await msg.edit_text("☁️ Uploading to Telegram…")
-        # Send to Telegram (your own uploads channel or saved messages)
-        up_msg = await c.send_document(
-            "me",  # change to your uploads channel ID if needed
-            document=file_path,
-            caption=f"Uploaded from {m.from_user.mention}"
-        )
-
-        # Direct CDN link
-        direct_link = await c.get_file_url(up_msg.document.file_id)
-
-        # Public Telegram view link (share link)
-        share_url = f"https://t.me/share/url?url={quote(direct_link)}"
-
-        buttons = [
-            [InlineKeyboardButton("📥 Direct Download", url=direct_link)],
-            [InlineKeyboardButton("📤 Share", url=share_url)]
-        ]
-
-        await msg.edit_text(
-            f"✅ **Uploaded to Telegram!**\n\n"
-            f"📥 Direct Link: `{direct_link}`",
-            reply_markup=InlineKeyboardMarkup(buttons)
-        )
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                await message.reply_text(f"✅ Uploaded successfully!\n🔗 {data['link']}")
+            else:
+                await message.reply_text(f"❌ Upload failed: {data.get('error', 'Unknown error')}")
+        else:
+            await message.reply_text(f"❌ HTTP Error {response.status_code}")
 
     except Exception as e:
-        await msg.edit_text(f"❌ Upload failed:\n{e}")
-
-    finally:
-        if file_path and os.path.exists(file_path):
+        await message.reply_text(f"❌ Error: {e}")
+        if os.path.exists(file_path):
             os.remove(file_path)
 
 __PLUGIN__ = "tgm_uploader"
