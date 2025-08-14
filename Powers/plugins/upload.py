@@ -5,13 +5,13 @@ from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 from urllib.parse import quote
 
-FILEIO_API = "https://file.io"
-MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
+PIXEL_API = "https://pixeldrain.com/api/file"
 TIMEOUT = 60  # seconds
+MAX_FILE_SIZE = 1 * 1024 * 1024 * 1024  # 1GB
 
 @Gojo.on_message(command(["upload", "ul"]))
-async def fileio_upload(c: Gojo, m: Message):
-    """Upload files to file.io"""
+async def pixeldrain_upload(c: Gojo, m: Message):
+    """Upload files to Pixeldrain"""
     if not m.reply_to_message or not m.reply_to_message.media:
         return await m.reply_text("❌ Please reply to a file to upload!")
 
@@ -23,14 +23,14 @@ async def fileio_upload(c: Gojo, m: Message):
         file_size = os.path.getsize(file_path)
 
         if file_size > MAX_FILE_SIZE:
-            raise ValueError(f"File too large ({file_size//(1024*1024)}MB > 100MB limit)")
+            raise ValueError(f"File too large ({file_size//(1024*1024)}MB > 1024MB limit)")
 
-        await msg.edit_text("☁️ Uploading to File.io...")
+        await msg.edit_text("☁️ Uploading to Pixeldrain...")
         file_name = os.path.basename(file_path)
 
         with open(file_path, "rb") as f:
             response = requests.post(
-                FILEIO_API,
+                PIXEL_API,
                 files={"file": (file_name, f)},
                 timeout=TIMEOUT
             )
@@ -39,10 +39,11 @@ async def fileio_upload(c: Gojo, m: Message):
             raise ValueError(f"HTTP Error {response.status_code}: {response.text}")
 
         data = response.json()
-        if not data.get("success"):
+        if "id" not in data:
             raise ValueError(f"Upload failed: {data}")
 
-        file_url = data.get("link")
+        file_id = data["id"]
+        file_url = f"https://pixeldrain.com/u/{file_id}"
         share_url = f"https://t.me/share/url?url={quote(file_url)}"
 
         await msg.edit_text(
@@ -58,6 +59,7 @@ async def fileio_upload(c: Gojo, m: Message):
     finally:
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
+
 
 
 __PLUGIN__ = "catbox_uploader"
