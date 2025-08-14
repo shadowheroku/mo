@@ -31,6 +31,8 @@ def get_readable_time(seconds: int) -> str:
 
     return " ".join(time_parts) if time_parts else "0s"
 
+# Store chat admins
+adminlist = {}
 
 adminlist[chat_id] = []
   # Assuming you have an adminlist dict like in ERISMUSIC
