@@ -46,21 +46,7 @@ async def tag_all(c: Gojo, m: Message):
     await m.reply_text(style, parse_mode=PM.MARKDOWN)
 
 
-@Gojo.on_message(command(["atag", "admincall"]) & filters.group)
-async def tag_admins(c: Gojo, m: Message):
-    """Tags only admins."""
-    chat = m.chat
-
-    admins = []
-    async for member in c.get_chat_members(chat.id, filter="administrators"):
-        if member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER] and not member.user.is_bot:
-            admins.append(member)
-
-    if not admins:
-        return await m.reply_text("No admins found to tag.")
-
-    mentions = await get_mentions(admins)
-    await m.reply_text(ADMIN_STYLE.format(mentions=mentions), parse_mode=PM.MARKDOWN)
+async for member in c.get_chat_members(chat.id, filter=ChatMembersFilter.ADMINISTRATORS):
 
 
 __PLUGIN__ = "tagall"
