@@ -4,7 +4,7 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 from urllib.parse import quote
-
+import mimetypes 
 # Catbox.moe configuration
 CATBOX_API = "https://catbox.moe/user/api.php"
 MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB
