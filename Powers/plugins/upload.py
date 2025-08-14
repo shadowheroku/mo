@@ -6,34 +6,30 @@ from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 from urllib.parse import quote
 
-# Gofile.io configuration
-GOFILE_API = "https://api.gofile.io/uploadFile"
+GOFILE_API = "https://upload.gofile.io/uploadfile"
 TIMEOUT = 60  # seconds
-MAX_FILE_SIZE = 10 * 1024 * 1024 * 1024  # 10GB
+MAX_FILE_SIZE = 10 * 1024 * 1024 * 1024  # 10 GB
 
 @Gojo.on_message(command(["gofile", "gf"]))
 async def gofile_uploader(c: Gojo, m: Message):
-    """Upload files to Gofile.io with proper error handling"""
+    """Upload any file to Gofile.io reliably."""
     if not m.reply_to_message or not m.reply_to_message.media:
         return await m.reply_text("❌ Please reply to a file to upload!")
 
-    msg = await m.reply_text("📥 Downloading your file...")
+    msg = await m.reply_text("📥 Downloading your file…")
     file_path = None
-    
+
     try:
-        # Download file
+        # Download the media
         file_path = await m.reply_to_message.download()
-        file_size = os.path.getsize(file_path)
+        size = os.path.getsize(file_path)
+        if size > MAX_FILE_SIZE:
+            raise ValueError(f"File too large ({size//(1024*1024)} MB > 10 GB limit)")
 
-        # Check file size
-        if file_size > MAX_FILE_SIZE:
-            raise ValueError(f"File too large ({file_size//(1024*1024)}MB > 10GB limit)")
+        mime_type, _ = mimetypes.guess_type(file_path)
+        mime_type = mime_type or "application/octet-stream"
 
-        # Check MIME type
-        mime_type = get_mime_type(file_path)
-
-        # Upload to Gofile.io
-        await msg.edit_text("☁️ Uploading to Gofile.io...")
+        await msg.edit_text("☁️ Uploading to Gofile.io…")
         with open(file_path, "rb") as f:
             response = requests.post(
                 GOFILE_API,
@@ -46,48 +42,33 @@ async def gofile_uploader(c: Gojo, m: Message):
 
         result = response.json()
         if result.get("status") != "ok":
-            raise ValueError(f"Gofile API Error: {result.get('status')}")
+            raise ValueError(f"Gofile API error: {result.get('status')}")
 
-        file_link = result["data"]["downloadPage"]
+        download_page = result["data"]["downloadPage"]
         direct_link = result["data"]["directLink"]
 
-        # Success - send result
-        share_url = f"https://t.me/share/url?url={quote(file_link)}"
+        share_url = f"https://t.me/share/url?url={quote(download_page)}"
         await msg.edit_text(
             f"✅ **Uploaded to Gofile.io!**\n\n"
-            f"🔗 Download Page: `{file_link}`\n"
-            f"📥 Direct Link: `{direct_link}`",
+            f"• Download Page: `{download_page}`\n"
+            f"• Direct Link: `{direct_link}`",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🌐 Open", url=file_link)],
-                [InlineKeyboardButton("📥 Direct Download", url=direct_link)],
-                [InlineKeyboardButton("📤 Share", url=share_url)],
-                [InlineKeyboardButton("📋 Copy", callback_data=f"copy_{quote(file_link)}")]
+                [InlineKeyboardButton("Open", url=download_page)],
+                [InlineKeyboardButton("Direct Download", url=direct_link)],
+                [InlineKeyboardButton("Share Link", url=share_url)],
             ])
         )
 
     except Exception as e:
-        await msg.edit_text(f"❌ Failed to upload:\n{str(e)}")
-        
+        await msg.edit_text(f"❌ Failed to upload:\n{e}")
+
     finally:
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
 
-def get_mime_type(file_path: str) -> str:
-    """Get MIME type with proper fallback"""
-    mime_type, _ = mimetypes.guess_type(file_path)
-    return mime_type or "application/octet-stream"
-
 __PLUGIN__ = "gofile_uploader"
 __HELP__ = """
-**☁️ Gofile.io Uploader**
-`/gofile` or `/gf` - Upload files to Gofile.io
-
-✅ **Supported Files:**
-- Any type (≤10GB)
-- Permanent storage
-- Direct download links
-
-❌ **Common Issues:**
-- Files >10GB will be rejected
-- Some countries may block Gofile.io
+**Gofile.io Uploader**
+`/gofile` or `/gf` – Upload files (≤ 10 GB) to Gofile.io
+• Returns both a public page link and a direct download link
 """
