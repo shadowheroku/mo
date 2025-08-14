@@ -7,17 +7,30 @@ from urllib.parse import quote
 # Your private channel ID (make bot admin there)
 UPLOAD_CHANNEL = -1002800777153  # replace with your channel ID
 
+def has_media(msg: Message) -> bool:
+    """Check if message contains any kind of media/file"""
+    return any([
+        msg.document,
+        msg.photo,
+        msg.video,
+        msg.audio,
+        msg.voice,
+        msg.video_note,
+        msg.animation,
+        msg.sticker,
+    ])
+
 @Gojo.on_message(command(["upload", "ul"]))
 async def tg_channel_upload(c: Gojo, m: Message):
-    """Upload files to a private Telegram channel and return a link"""
-    if not m.reply_to_message or not m.reply_to_message.media:
-        return await m.reply_text("❌ Please reply to a file to upload!")
+    """Upload any file type to a private Telegram channel and return a link"""
+    if not m.reply_to_message or not has_media(m.reply_to_message):
+        return await m.reply_text("❌ Please reply to any file, photo, video, audio, sticker, etc.")
 
     msg = await m.reply_text("📥 Downloading your file...")
     file_path = None
 
     try:
-        # Download
+        # Download any file type
         file_path = await m.reply_to_message.download()
 
         await msg.edit_text("☁️ Uploading to Telegram channel...")
@@ -27,8 +40,7 @@ async def tg_channel_upload(c: Gojo, m: Message):
             caption=f"Uploaded by {m.from_user.mention}"
         )
 
-        # Telegram public link format
-        # For private channel: https://t.me/c/<channel_id_without_-100>/<message_id>
+        # Create link for private channel messages
         channel_id_str = str(UPLOAD_CHANNEL).replace("-100", "")
         file_url = f"https://t.me/c/{channel_id_str}/{sent.id}"
         share_url = f"https://t.me/share/url?url={quote(file_url)}"
