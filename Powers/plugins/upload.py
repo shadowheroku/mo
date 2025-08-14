@@ -1,95 +1,60 @@
 import os
-import mimetypes
-import requests
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 from urllib.parse import quote
 
-TIMEOUT = 60
-MAX_FILE_SIZE = 10 * 1024 * 1024 * 1024  # 10 GB
-
-# ===================== transfer.sh =====================
-@Gojo.on_message(command(["transfer", "ts"]))
-async def transfer_uploader(c: Gojo, m: Message):
+@Gojo.on_message(command(["tgm"]))
+async def tgm_uploader(c: Gojo, m: Message):
+    """Upload a file to Telegram and get direct/public links."""
     if not m.reply_to_message or not m.reply_to_message.media:
         return await m.reply_text("❌ Please reply to a file to upload!")
 
     msg = await m.reply_text("📥 Downloading your file…")
     file_path = None
+
     try:
+        # Download file locally
         file_path = await m.reply_to_message.download()
-        size = os.path.getsize(file_path)
-        if size > MAX_FILE_SIZE:
-            raise ValueError(f"File too large ({size//(1024*1024)} MB > 10 GB limit)")
 
-        filename = os.path.basename(file_path)
-        await msg.edit_text("☁️ Uploading to transfer.sh…")
-        with open(file_path, "rb") as f:
-            res = requests.put(f"https://transfer.sh/{filename}", data=f, timeout=TIMEOUT)
+        await msg.edit_text("☁️ Uploading to Telegram…")
+        # Send to Telegram (your own uploads channel or saved messages)
+        up_msg = await c.send_document(
+            "me",  # change to your uploads channel ID if needed
+            document=file_path,
+            caption=f"Uploaded from {m.from_user.mention}"
+        )
 
-        if res.status_code != 200:
-            raise ValueError(f"HTTP Error {res.status_code}: {res.text}")
+        # Direct CDN link
+        direct_link = await c.get_file_url(up_msg.document.file_id)
 
-        link = res.text.strip()
-        share_url = f"https://t.me/share/url?url={quote(link)}"
+        # Public Telegram view link (share link)
+        share_url = f"https://t.me/share/url?url={quote(direct_link)}"
+
         buttons = [
-            [InlineKeyboardButton("🌐 Open", url=link)],
+            [InlineKeyboardButton("📥 Direct Download", url=direct_link)],
             [InlineKeyboardButton("📤 Share", url=share_url)]
         ]
+
         await msg.edit_text(
-            f"✅ **Uploaded to transfer.sh!**\n\n🔗 `{link}`",
+            f"✅ **Uploaded to Telegram!**\n\n"
+            f"📥 Direct Link: `{direct_link}`",
             reply_markup=InlineKeyboardMarkup(buttons)
         )
+
     except Exception as e:
-        await msg.edit_text(f"❌ Failed to upload:\n{e}")
+        await msg.edit_text(f"❌ Upload failed:\n{e}")
+
     finally:
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
 
-# ===================== 0x0.st =====================
-@Gojo.on_message(command(["0x0", "0x0st"]))
-async def oxo_uploader(c: Gojo, m: Message):
-    if not m.reply_to_message or not m.reply_to_message.media:
-        return await m.reply_text("❌ Please reply to a file to upload!")
-
-    msg = await m.reply_text("📥 Downloading your file…")
-    file_path = None
-    try:
-        file_path = await m.reply_to_message.download()
-        size = os.path.getsize(file_path)
-        if size > MAX_FILE_SIZE:
-            raise ValueError(f"File too large ({size//(1024*1024)} MB > 10 GB limit)")
-
-        await msg.edit_text("☁️ Uploading to 0x0.st…")
-        with open(file_path, "rb") as f:
-            res = requests.post("https://0x0.st", files={"file": f}, timeout=TIMEOUT)
-
-        if res.status_code != 200:
-            raise ValueError(f"HTTP Error {res.status_code}: {res.text}")
-
-        link = res.text.strip()
-        share_url = f"https://t.me/share/url?url={quote(link)}"
-        buttons = [
-            [InlineKeyboardButton("🌐 Open", url=link)],
-            [InlineKeyboardButton("📤 Share", url=share_url)]
-        ]
-        await msg.edit_text(
-            f"✅ **Uploaded to 0x0.st!**\n\n🔗 `{link}`",
-            reply_markup=InlineKeyboardMarkup(buttons)
-        )
-    except Exception as e:
-        await msg.edit_text(f"❌ Failed to upload:\n{e}")
-    finally:
-        if file_path and os.path.exists(file_path):
-            os.remove(file_path)
-
-__PLUGIN__ = "file_uploaders"
+__PLUGIN__ = "tgm_uploader"
 __HELP__ = """
-**📤 File Uploaders**
-`/transfer` or `/ts` - Upload file to transfer.sh (14 days retention)  
-`/0x0` or `/0x0st` - Upload file to 0x0.st (short permanent link)  
+**📤 Telegram Uploader**
+`/tgm` — Upload a file to Telegram and get a direct CDN link.
 
-✅ Any file type (≤10 GB)  
-✅ Direct links  
+✅ Fast, no size limits (up to Telegram’s 2 GB/4 GB limit)
+✅ Works from any network/IP
+✅ Direct file link + share button
 """
