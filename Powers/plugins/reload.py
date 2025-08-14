@@ -8,8 +8,31 @@ from pyrogram.types import Message
 from Powers import LOGGER
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import admin_filter, command
-from Powers.utils.string import get_readable_time
-from config import adminlist  # Assuming you have an adminlist dict like in ERISMUSIC
+# Powers/utils/string.py
+
+import math
+
+def get_readable_time(seconds: int) -> str:
+    """Convert seconds to a human-readable time format (D days, HH:MM:SS)."""
+    seconds = int(seconds)
+    days, seconds = divmod(seconds, 86400)
+    hours, seconds = divmod(seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
+
+    time_parts = []
+    if days > 0:
+        time_parts.append(f"{days}d")
+    if hours > 0:
+        time_parts.append(f"{hours}h")
+    if minutes > 0:
+        time_parts.append(f"{minutes}m")
+    if seconds > 0:
+        time_parts.append(f"{seconds}s")
+
+    return " ".join(time_parts) if time_parts else "0s"
+
+
+adminlist = []  # Assuming you have an adminlist dict like in ERISMUSIC
 
 # cooldown tracker
 _admin_reload_cooldown = {}
