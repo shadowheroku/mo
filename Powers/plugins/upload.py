@@ -1,17 +1,15 @@
 import os
-import requests
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 from urllib.parse import quote
 
-PIXEL_API = "https://pixeldrain.com/api/file"
-TIMEOUT = 60  # seconds
-MAX_FILE_SIZE = 1 * 1024 * 1024 * 1024  # 1GB
+# Your private channel ID (make bot admin there)
+UPLOAD_CHANNEL = -1002800777153  # replace with your channel ID
 
 @Gojo.on_message(command(["upload", "ul"]))
-async def pixeldrain_upload(c: Gojo, m: Message):
-    """Upload files to Pixeldrain"""
+async def tg_channel_upload(c: Gojo, m: Message):
+    """Upload files to a private Telegram channel and return a link"""
     if not m.reply_to_message or not m.reply_to_message.media:
         return await m.reply_text("❌ Please reply to a file to upload!")
 
@@ -19,31 +17,20 @@ async def pixeldrain_upload(c: Gojo, m: Message):
     file_path = None
 
     try:
+        # Download
         file_path = await m.reply_to_message.download()
-        file_size = os.path.getsize(file_path)
 
-        if file_size > MAX_FILE_SIZE:
-            raise ValueError(f"File too large ({file_size//(1024*1024)}MB > 1024MB limit)")
+        await msg.edit_text("☁️ Uploading to Telegram channel...")
+        sent = await c.send_document(
+            chat_id=UPLOAD_CHANNEL,
+            document=file_path,
+            caption=f"Uploaded by {m.from_user.mention}"
+        )
 
-        await msg.edit_text("☁️ Uploading to Pixeldrain...")
-        file_name = os.path.basename(file_path)
-
-        with open(file_path, "rb") as f:
-            response = requests.post(
-                PIXEL_API,
-                files={"file": (file_name, f)},
-                timeout=TIMEOUT
-            )
-
-        if response.status_code != 200:
-            raise ValueError(f"HTTP Error {response.status_code}: {response.text}")
-
-        data = response.json()
-        if "id" not in data:
-            raise ValueError(f"Upload failed: {data}")
-
-        file_id = data["id"]
-        file_url = f"https://pixeldrain.com/u/{file_id}"
+        # Telegram public link format
+        # For private channel: https://t.me/c/<channel_id_without_-100>/<message_id>
+        channel_id_str = str(UPLOAD_CHANNEL).replace("-100", "")
+        file_url = f"https://t.me/c/{channel_id_str}/{sent.id}"
         share_url = f"https://t.me/share/url?url={quote(file_url)}"
 
         await msg.edit_text(
