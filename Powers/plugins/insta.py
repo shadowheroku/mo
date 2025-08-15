@@ -7,14 +7,8 @@ from Powers.bot_class import Gojo
 # ========================
 # CONFIG
 # ========================
-SESSIONID = os.getenv("IG_SESSIONID", "70808632711%3AlFZHiMj36HbzqW%3A29%3AAYd0oBrQN7WAFhQF8MexRDyxF855nDTF_KcN7JqiAg")  # put your sessionid here or set env var
-COOKIE_FILE = "ig_session.txt"
-
-# Create minimal cookie file if it doesn't exist
-if not os.path.exists(COOKIE_FILE):
-    with open(COOKIE_FILE, "w", encoding="utf-8") as f:
-        f.write("# Netscape HTTP Cookie File\n")
-        f.write(f".instagram.com\tTRUE\t/\tTRUE\t0\tsessionid\t{SESSIONID}\n")
+# Change this to your browser name: chrome, brave, edge, firefox, chromium
+BROWSER_NAME = os.getenv("BROWSER_NAME", "chrome")  
 
 # Regex to match Instagram post/reel URLs
 INSTAGRAM_REGEX = re.compile(
@@ -36,7 +30,7 @@ async def insta_downloader(c, m):
 
     try:
         ydl_opts = {
-            "cookiefile": COOKIE_FILE,
+            "cookiesfrombrowser": (BROWSER_NAME,),  # grabs cookies from your local browser
             "outtmpl": temp_file,
             "format": "mp4",
             "quiet": True,
@@ -65,9 +59,9 @@ async def insta_downloader(c, m):
 # ========================
 # PLUGIN INFO
 # ========================
-__PLUGIN__ = "Instagram Downloader (SessionID)"
+__PLUGIN__ = "Instagram Downloader (Browser Cookies)"
 __HELP__ = """
-• Send an Instagram reel/post link — I’ll download it using your `sessionid` (no login needed).
-• Set `IG_SESSIONID` in your VPS environment.
-• Session lasts until Instagram expires it (~1 month or more).
+• Send an Instagram reel/post link — I’ll download it using your **browser cookies** (no manual sessionid needed).
+• Set `BROWSER_NAME` env var to your browser (chrome, brave, edge, firefox, chromium).
+• Must run the bot on the same machine where you are logged into Instagram in that browser.
 """
