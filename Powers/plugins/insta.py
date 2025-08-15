@@ -1,7 +1,6 @@
 import os
 import re
 import requests
-import asyncio
 from pyrogram import filters
 from Powers.bot_class import Gojo
 
@@ -9,18 +8,19 @@ from Powers.bot_class import Gojo
 # CONFIG
 # ========================
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "db695f9a31msh317d0f72b049ab7p1c6935jsn65e8560b2087")
-RAPIDAPI_HOST = "instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com"  # Example, replace with your API host from RapidAPI
+RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST", "instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com")
 
+# Regex to match Instagram post/reel URLs
 INSTAGRAM_REGEX = re.compile(
     r"(https?://(?:www\.)?instagram\.com/(?:p|reel|tv)/[A-Za-z0-9_-]+(?:\?[^\s]*)?)"
 )
 
+
 # ========================
-# API FUNCTION
+# API REQUEST
 # ========================
 def get_instagram_download(url: str):
-    """Fetch download link from RapidAPI Instagram downloader."""
-    endpoint = f"https://{RAPIDAPI_HOST}/get"  # Adjust path based on your API docs
+    endpoint = f"https://{RAPIDAPI_HOST}/hls"
     headers = {
         "X-RapidAPI-Key": RAPIDAPI_KEY,
         "X-RapidAPI-Host": RAPIDAPI_HOST
@@ -29,6 +29,7 @@ def get_instagram_download(url: str):
     r = requests.get(endpoint, headers=headers, params=params)
     r.raise_for_status()
     return r.json()
+
 
 # ========================
 # BOT COMMAND
@@ -40,34 +41,34 @@ async def insta_downloader(c, m):
         return
 
     url = match.group(1)
-    status = await m.reply_text("📥 Fetching download link from API...")
+    status = await m.reply_text("📥 Fetching Instagram video...")
 
     try:
         data = get_instagram_download(url)
 
-        # Depending on API, adjust JSON parsing here
-        video_url = data.get("media", [])[0].get("url") if "media" in data else data.get("url")
-
+        # API should return a direct video URL under a known key (check docs)
+        video_url = data.get("url") or data.get("video") or None
         if not video_url:
-            await status.edit_text("❌ Could not find a downloadable video.")
-            return
+            raise ValueError("No video URL found in API response.")
 
-        sent_msg = await m.reply_video(video_url, caption=f"🔗 [Original Post]({url})", quote=True)
+        caption = (
+            f"🎬 **Instagram Download**\n"
+            f"🔗 **Original:** {url}\n"
+            f"🤖 **Downloaded by:** @{c.me.username}"
+        )
+
+        await m.reply_video(video=video_url, caption=caption)
         await status.delete()
-
-        # Auto-delete after 30 seconds
-        await asyncio.sleep(30)
-        await sent_msg.delete()
 
     except Exception as e:
         await status.edit_text(f"❌ Failed:\n`{e}`")
+
 
 # ========================
 # PLUGIN INFO
 # ========================
 __PLUGIN__ = "Instagram Downloader (RapidAPI)"
 __HELP__ = """
-• Send an Instagram reel/post link — I’ll download it via RapidAPI (no login needed).
+• Send an Instagram reel/post link — I’ll download it using RapidAPI (no login needed).
 • Set `RAPIDAPI_KEY` and `RAPIDAPI_HOST` in your VPS environment.
-• No cookies, no session expiry.
 """
