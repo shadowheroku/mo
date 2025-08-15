@@ -1,35 +1,25 @@
 import os
 import re
-import requests
+import yt_dlp
 from pyrogram import filters
 from Powers.bot_class import Gojo
 
 # ========================
 # CONFIG
 # ========================
-RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "db695f9a31msh317d0f72b049ab7p1c6935jsn65e8560b2087")
-RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST", "instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com")
+SESSIONID = os.getenv("IG_SESSIONID", "70808632711%3AJycNCkj1wzuDLO%3A29%3AAYf96VLRjfMtGMxkNhQcuXis8j_vXPDZl0mccRC5xg")  # put your sessionid here or set env var
+COOKIE_FILE = "ig_session.txt"
+
+# Create minimal cookie file if it doesn't exist
+if not os.path.exists(COOKIE_FILE):
+    with open(COOKIE_FILE, "w", encoding="utf-8") as f:
+        f.write("# Netscape HTTP Cookie File\n")
+        f.write(f".instagram.com\tTRUE\t/\tTRUE\t0\tsessionid\t{SESSIONID}\n")
 
 # Regex to match Instagram post/reel URLs
 INSTAGRAM_REGEX = re.compile(
     r"(https?://(?:www\.)?instagram\.com/(?:p|reel|tv)/[A-Za-z0-9_-]+(?:\?[^\s]*)?)"
 )
-
-
-# ========================
-# API REQUEST
-# ========================
-def get_instagram_download(url: str):
-    endpoint = f"https://{RAPIDAPI_HOST}/hls"
-    headers = {
-        "X-RapidAPI-Key": RAPIDAPI_KEY,
-        "X-RapidAPI-Host": RAPIDAPI_HOST
-    }
-    params = {"url": url}
-    r = requests.get(endpoint, headers=headers, params=params)
-    r.raise_for_status()
-    return r.json()
-
 
 # ========================
 # BOT COMMAND
@@ -41,34 +31,43 @@ async def insta_downloader(c, m):
         return
 
     url = match.group(1)
-    status = await m.reply_text("📥 Fetching Instagram video...")
+    temp_file = "insta_video.mp4"
+    status = await m.reply_text("📥 Downloading from Instagram...")
 
     try:
-        data = get_instagram_download(url)
+        ydl_opts = {
+            "cookiefile": COOKIE_FILE,
+            "outtmpl": temp_file,
+            "format": "mp4",
+            "quiet": True,
+            "noplaylist": True,
+        }
 
-        # API should return a direct video URL under a known key (check docs)
-        video_url = data.get("url") or data.get("video") or None
-        if not video_url:
-            raise ValueError("No video URL found in API response.")
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
 
         caption = (
-            f"🎬 **Instagram Download**\n"
-            f"🔗 **Original:** {url}\n"
+            f"🎬 **Title:** {info.get('title', 'Unknown')}\n"
+            f"👤 **Uploader:** {info.get('uploader', 'Unknown')}\n"
+            f"🔗 **Original Link:** {url}\n"
             f"🤖 **Downloaded by:** @{c.me.username}"
         )
 
-        await m.reply_video(video=video_url, caption=caption)
+        await m.reply_video(video=temp_file, caption=caption)
         await status.delete()
 
     except Exception as e:
         await status.edit_text(f"❌ Failed:\n`{e}`")
-
+    finally:
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
 
 # ========================
 # PLUGIN INFO
 # ========================
-__PLUGIN__ = "Instagram Downloader (RapidAPI)"
+__PLUGIN__ = "Instagram Downloader (SessionID)"
 __HELP__ = """
-• Send an Instagram reel/post link — I’ll download it using RapidAPI (no login needed).
-• Set `RAPIDAPI_KEY` and `RAPIDAPI_HOST` in your VPS environment.
+• Send an Instagram reel/post link — I’ll download it using your `sessionid` (no login needed).
+• Set `IG_SESSIONID` in your VPS environment.
+• Session lasts until Instagram expires it (~1 month or more).
 """
