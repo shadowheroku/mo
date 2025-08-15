@@ -7,7 +7,7 @@ from Powers.bot_class import Gojo
 # ========================
 # CONFIG
 # ========================
-SESSIONID = os.getenv("IG_SESSIONID", "70808632711%3AJycNCkj1wzuDLO%3A29%3AAYf96VLRjfMtGMxkNhQcuXis8j_vXPDZl0mccRC5xg")  # put your sessionid here or set env var
+SESSIONID = os.getenv("IG_SESSIONID", "70808632711%3AlFZHiMj36HbzqW%3A29%3AAYd0oBrQN7WAFhQF8MexRDyxF855nDTF_KcN7JqiAg")  # put your sessionid here or set env var
 COOKIE_FILE = "ig_session.txt"
 
 # Create minimal cookie file if it doesn't exist
