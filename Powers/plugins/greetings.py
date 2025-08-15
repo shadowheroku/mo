@@ -3,7 +3,7 @@ from secrets import choice
 from traceback import format_exc
 from typing import List
 
-from pyrogram import emoji, enums, filters
+from pyrogram import enums, filters
 from pyrogram.errors import ChannelPrivate, ChatAdminRequired, RPCError
 from pyrogram.types import Message, User
 
@@ -26,7 +26,9 @@ gdb = GBan()
 
 ChatType = enums.ChatType
 
-
+WELCOME = "👋"
+CHECK = "✅"
+CROSS = "❌"
 async def escape_mentions_using_curly_brackets_wl(
         user: User,
         m: Message,
