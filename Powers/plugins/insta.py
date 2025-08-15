@@ -1,36 +1,58 @@
 import os
 import re
+import json
 import yt_dlp
 import asyncio
+from instagrapi import Client
 from pyrogram import filters
 from Powers.bot_class import Gojo
 
-# ===== CONFIG =====
-COOKIES_TEXT = """# Netscape HTTP Cookie File
-.instagram.com	TRUE	/	TRUE	1777919447	datr	143pZ1hYClbcexl_gUXN3Pal
-.instagram.com	TRUE	/	TRUE	1774895498	ig_did	60AE72B3-FADF-4895-AB50-0F0393CB9FD8
-.instagram.com	TRUE	/	TRUE	1774895447	ig_nrcb	1
-.instagram.com	TRUE	/	TRUE	1779637219	ps_l	1
-.instagram.com	TRUE	/	TRUE	1779637219	ps_n	1
-.instagram.com	TRUE	/	TRUE	1781798892	mid	aCS_7QALAAHzdnVO36G_4nmAqE1e
-.instagram.com	TRUE	/	TRUE	1789651699	csrftoken	Ul6BXwt15N6lKAjGxyx9p9LGCYAxonVw
-.instagram.com	TRUE	/	TRUE	1762867699	ds_user_id	70808632711
-.instagram.com	TRUE	/	TRUE	1755696498	dpr	1.25
-.instagram.com	TRUE	/	TRUE	1755696498	wd	1536x695
-.instagram.com	TRUE	/	TRUE	1755600820	ig_direct_region_hint	"EAG\05470808632711\0541786532020:01fe1f4bd9d8d1909a6f0198c673a815a80184dafee3a9672a9f7e5d83afb54e342d0510"
-.instagram.com	TRUE	/	TRUE	0	rur	"HIL\05470808632711\0541786627701:01fe2ed3df0d5a7b88a6724de023b481bfacbc88577aacc9497d9cfd5ca72ab551a900e7"
-.instagram.com	TRUE	/	TRUE	1786627699	sessionid	70808632711%3AxRnDEvMHeyi86d%3A21%3AAYdZ3EHIFH_lwcZsN45_PyS4QLPAh24iBnjP3HJ1UA
-"""
+# ========================
+# CONFIG
+# ========================
+IG_USERNAME = os.getenv("IG_USERNAME", "nxtego")
+IG_PASSWORD = os.getenv("IG_PASSWORD", "xd_ego")
 
+SESSION_FILE = "insta_session.json"
 COOKIES_FILE = "instagram_cookies.txt"
-with open(COOKIES_FILE, "w", encoding="utf-8") as f:
-    f.write(COOKIES_TEXT.strip() + "\n")
 
-# Regex to match Instagram URLs (supports query params)
+# Regex to match Instagram post/reel URLs
 INSTAGRAM_REGEX = re.compile(
     r"(https?://(?:www\.)?instagram\.com/(?:p|reel|tv)/[A-Za-z0-9_-]+(?:\?[^\s]*)?)"
 )
 
+# ========================
+# LOGIN & COOKIE HANDLING
+# ========================
+def ensure_instagram_session():
+    """Login or load session, then export cookies to yt-dlp format."""
+    cl = Client()
+
+    if os.path.exists(SESSION_FILE):
+        try:
+            cl.load_settings(SESSION_FILE)
+            cl.login(IG_USERNAME, IG_PASSWORD)
+        except Exception:
+            # If session is broken, re-login fresh
+            cl.login(IG_USERNAME, IG_PASSWORD)
+            cl.dump_settings(SESSION_FILE)
+    else:
+        cl.login(IG_USERNAME, IG_PASSWORD)
+        cl.dump_settings(SESSION_FILE)
+
+    # Export cookies for yt-dlp
+    cookies = cl.get_cookie_dict()
+    with open(COOKIES_FILE, "w", encoding="utf-8") as f:
+        f.write("# Netscape HTTP Cookie File\n")
+        for name, value in cookies.items():
+            f.write(f".instagram.com\tTRUE\t/\tTRUE\t0\t{name}\t{value}\n")
+
+    return COOKIES_FILE
+
+
+# ========================
+# BOT COMMAND
+# ========================
 @Gojo.on_message(filters.regex(INSTAGRAM_REGEX))
 async def insta_downloader(c, m):
     match = INSTAGRAM_REGEX.search(m.text or "")
@@ -40,16 +62,18 @@ async def insta_downloader(c, m):
     url = match.group(1)
     temp_file = "insta_reel.mp4"
 
-    status = await m.reply_text("📥 Downloading Instagram reel/post...")
+    status = await m.reply_text("📥 Logging into Instagram & downloading...")
 
     try:
+        cookie_path = ensure_instagram_session()
+
         ydl_opts = {
             "outtmpl": temp_file,
             "format": "mp4",
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
-            "cookiefile": COOKIES_FILE,
+            "cookiefile": cookie_path,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -66,22 +90,24 @@ async def insta_downloader(c, m):
         sent_msg = await m.reply_video(video=temp_file, caption=caption)
         await status.delete()
 
-        # Wait 30 seconds, then delete the sent video
+        # Auto-delete after 30 sec
         await asyncio.sleep(30)
         await sent_msg.delete()
 
     except Exception as e:
-        await status.edit_text(f"❌ Failed to download:\n`{e}`")
+        await status.edit_text(f"❌ Failed:\n`{e}`")
 
     finally:
         if os.path.exists(temp_file):
             os.remove(temp_file)
 
-# Plugin metadata
-__PLUGIN__ = "Instagram Downloader"
 
+# ========================
+# PLUGIN INFO
+# ========================
+__PLUGIN__ = "Instagram Downloader (Auto-Login)"
 __HELP__ = """
-• Send an Instagram reel/post link (in groups or private) — I’ll download and send it to you with details.
-• Works for public and private content if cookies are valid.
-• Sent media will auto-delete after 30 seconds.
+• Send an Instagram reel/post link — I’ll download it with auto-login cookies.
+• You only need to set `IG_USERNAME` and `IG_PASSWORD` in your VPS env once.
+• Cookies refresh automatically — no need to paste them manually.
 """
