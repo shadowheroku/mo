@@ -1,54 +1,34 @@
 import os
 import re
-import json
-import yt_dlp
+import requests
 import asyncio
-from instagrapi import Client
 from pyrogram import filters
 from Powers.bot_class import Gojo
 
 # ========================
 # CONFIG
 # ========================
-IG_USERNAME = os.getenv("IG_USERNAME", "nxtego")
-IG_PASSWORD = os.getenv("IG_PASSWORD", "xd_ego")
+RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "db695f9a31msh317d0f72b049ab7p1c6935jsn65e8560b2087")
+RAPIDAPI_HOST = "instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com"  # Example, replace with your API host from RapidAPI
 
-SESSION_FILE = "insta_session.json"
-COOKIES_FILE = "instagram_cookies.txt"
-
-# Regex to match Instagram post/reel URLs
 INSTAGRAM_REGEX = re.compile(
     r"(https?://(?:www\.)?instagram\.com/(?:p|reel|tv)/[A-Za-z0-9_-]+(?:\?[^\s]*)?)"
 )
 
 # ========================
-# LOGIN & COOKIE HANDLING
+# API FUNCTION
 # ========================
-def ensure_instagram_session():
-    """Login or load session, then export cookies to yt-dlp format."""
-    cl = Client()
-
-    if os.path.exists(SESSION_FILE):
-        try:
-            cl.load_settings(SESSION_FILE)
-            cl.login(IG_USERNAME, IG_PASSWORD)
-        except Exception:
-            # If session is broken, re-login fresh
-            cl.login(IG_USERNAME, IG_PASSWORD)
-            cl.dump_settings(SESSION_FILE)
-    else:
-        cl.login(IG_USERNAME, IG_PASSWORD)
-        cl.dump_settings(SESSION_FILE)
-
-    # Export cookies for yt-dlp
-    cookies = cl.get_cookie_dict()
-    with open(COOKIES_FILE, "w", encoding="utf-8") as f:
-        f.write("# Netscape HTTP Cookie File\n")
-        for name, value in cookies.items():
-            f.write(f".instagram.com\tTRUE\t/\tTRUE\t0\t{name}\t{value}\n")
-
-    return COOKIES_FILE
-
+def get_instagram_download(url: str):
+    """Fetch download link from RapidAPI Instagram downloader."""
+    endpoint = f"https://{RAPIDAPI_HOST}/get"  # Adjust path based on your API docs
+    headers = {
+        "X-RapidAPI-Key": RAPIDAPI_KEY,
+        "X-RapidAPI-Host": RAPIDAPI_HOST
+    }
+    params = {"url": url}
+    r = requests.get(endpoint, headers=headers, params=params)
+    r.raise_for_status()
+    return r.json()
 
 # ========================
 # BOT COMMAND
@@ -60,54 +40,34 @@ async def insta_downloader(c, m):
         return
 
     url = match.group(1)
-    temp_file = "insta_reel.mp4"
-
-    status = await m.reply_text("📥 Logging into Instagram & downloading...")
+    status = await m.reply_text("📥 Fetching download link from API...")
 
     try:
-        cookie_path = ensure_instagram_session()
+        data = get_instagram_download(url)
 
-        ydl_opts = {
-            "outtmpl": temp_file,
-            "format": "mp4",
-            "quiet": True,
-            "no_warnings": True,
-            "noplaylist": True,
-            "cookiefile": cookie_path,
-        }
+        # Depending on API, adjust JSON parsing here
+        video_url = data.get("media", [])[0].get("url") if "media" in data else data.get("url")
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+        if not video_url:
+            await status.edit_text("❌ Could not find a downloadable video.")
+            return
 
-        caption = (
-            f"🎬 **Title:** {info.get('title', 'Unknown')}\n"
-            f"👤 **Uploader:** {info.get('uploader', 'Unknown')}\n"
-            f"📅 **Upload Date:** {info.get('upload_date', 'Unknown')}\n"
-            f"🔗 **Original Link:** {url}\n\n"
-            f"🤖 **Downloaded by:** @{c.me.username}"
-        )
-
-        sent_msg = await m.reply_video(video=temp_file, caption=caption)
+        sent_msg = await m.reply_video(video_url, caption=f"🔗 [Original Post]({url})", quote=True)
         await status.delete()
 
-        # Auto-delete after 30 sec
+        # Auto-delete after 30 seconds
         await asyncio.sleep(30)
         await sent_msg.delete()
 
     except Exception as e:
         await status.edit_text(f"❌ Failed:\n`{e}`")
 
-    finally:
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
-
-
 # ========================
 # PLUGIN INFO
 # ========================
-__PLUGIN__ = "Instagram Downloader (Auto-Login)"
+__PLUGIN__ = "Instagram Downloader (RapidAPI)"
 __HELP__ = """
-• Send an Instagram reel/post link — I’ll download it with auto-login cookies.
-• You only need to set `IG_USERNAME` and `IG_PASSWORD` in your VPS env once.
-• Cookies refresh automatically — no need to paste them manually.
+• Send an Instagram reel/post link — I’ll download it via RapidAPI (no login needed).
+• Set `RAPIDAPI_KEY` and `RAPIDAPI_HOST` in your VPS environment.
+• No cookies, no session expiry.
 """
