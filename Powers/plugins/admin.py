@@ -17,7 +17,13 @@ from pyrogram.errors import (
     RPCError,
     UserAdminInvalid,
 )
-from pyrogram.helpers import mention_html
+from html import escape
+
+def mention_html(name: str, user_id: int) -> str:
+    """Return an HTML mention of a user."""
+    name = escape(name)
+    return f'<a href="tg://user?id={user_id}">{name}</a>'
+
 from pyrogram.types import ChatPrivileges, Message
 
 from Powers import LOGGER, OWNER_ID
