@@ -30,45 +30,20 @@ DB_PATH = DB_DIR / "karma.db"
 COOLDOWN_SECONDS = 30  # prevent karma spam by same user
 
 UPVOTE_PATTERNS = [
-    # Basic
-    r"^\s*\+\s*$",
-    r"^\s*\+1\s*$",
-    r"^\s*100\s*$",
-    r"^\s*y\s*e\s*s\s*$",
-
-    # Thanks / appreciation
-    r"thanks", r"thank\s*you", r"ty", r"tysm", r"thx",
-    r"appreciate", r"gracias", r"merci", r"dank[e]?",
-
-    # Praise words
-    r"good\s*job", r"well\s*done", r"nice\s*work", r"great\s*job",
-    r"awesome", r"amazing", r"wonderful", r"fantastic", r"perfect",
-    r"legend", r"epic", r"goat", r"based", r"valid",
-
-    # Gaming / slang
-    r"gg", r"glhf", r"pog", r"poggers", r"clutch", r"pro", r"skill",
-    r"ez\s*clap", r"w\s*$",  # standalone W
-
-    # Emojis / reactions
-    r"👍", r"👌", r"❤️", r"💖", r"💯", r"🔥", r"👏", r"🙌", r"😍", r"🥳",
-    r"😊", r"😁", r"😎", r"🤩", r"🤝", r"🌟", r"✨",
+    r"^\s*\+\s*$",       # +
+    r"^\s*\+1\s*$",      # +1
+    r"thanks", r"thank\s*you", r"ty", r"thx",  # basic thanks
+    r"good\s*job", r"well\s*done", r"nice", r"great", r"awesome",  # praise
+    r"gg", r"pog",       # gaming slang
+    r"👍", r"❤️", r"🔥", r"👏", r"💯",  # core emojis
 ]
 
 DOWNVOTE_PATTERNS = [
-    # Basic
-    r"^\s*-\s*$",
-    r"^\s*-1\s*$",
-    r"^\s*n\s*o\s*$",
-
-    # Negative words
-    r"bad", r"terrible", r"awful", r"worst", r"trash",
-    r"stupid", r"idiot", r"dumb", r"useless", r"lame",
-    r"boring", r"fail", r"cringe", r"mid", r"skill\s*issue",
-    r"cope", r"ratio", r"ngmi", r"noob", r"feeder",
-
-    # Emojis / reactions
-    r"👎", r"💔", r"😒", r"😡", r"🤮", r"😭", r"😤", r"🤡", r"🙄",
-    r"👀\s*roll",  # text/emoji combos
+    r"^\s*-\s*$",       # -
+    r"^\s*-1\s*$",      # -1
+    r"bad", r"trash", r"worst", r"cringe", r"fail",  # negative words
+    r"noob", r"stupid", r"dumb",  # insults
+    r"👎", r"💔", r"🤡", r"😡",  # core negative emojis
 ]
 
 
