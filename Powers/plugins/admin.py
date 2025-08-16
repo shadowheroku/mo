@@ -96,7 +96,7 @@ async def adminlist_show(c: Gojo, m: Message) -> None:
         # Send the message with HTML parsing
         await m.reply_text(
             f"{admin_str}\n\n<i>{note}</i>",
-            parse_mode="HTML",
+            parse_mode="html",
             disable_web_page_preview=True
         )
 
