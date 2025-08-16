@@ -521,33 +521,39 @@ async def lock_del_mess(c: Gojo, m: Message):
     if not chat_locks:
         return
 
+    # 🔒 Anti-channel lock
     if (
-            chat_locks["anti_channel"]
-            and m.sender_chat
-            and not m.forward_from_chat
-            and not m.forward_from
+        chat_locks["anti_channel"]
+        and m.sender_chat
+        and not (m.forward_origin and (m.forward_origin.sender_user or (m.forward_origin.chat and m.forward_origin.chat.sender_chat)))
     ):
         if m.chat.is_admin:
             return
         await delete_messages(c, m)
         return
+
+    # ✅ Approved users bypass
     is_approved = await is_approved_user(c, m)
     if is_approved:
         return
+
+    # 🔗 Anti-links lock
     entity = m.entities if m.text else m.caption_entities
     if entity and chat_locks["anti_links"]:
         for i in entity:
-            if i.type in [MET.URL or MET.TEXT_LINK]:
+            if i.type in [MET.URL, MET.TEXT_LINK]:
                 await delete_messages(c, m)
                 return
-    elif any(chat_locks["anti_fwd"].values()) and (m.forward_from or m.forward_from_chat):
+
+    # 📩 Anti-forward lock
+    if any(chat_locks["anti_fwd"].values()) and m.forward_origin:
         if all(chat_locks["anti_fwd"].values()):
             await delete_messages(c, m)
             return
-        elif chat_locks["anti_fwd"]["user"] and not m.forward_from_chat:
+        elif chat_locks["anti_fwd"]["user"] and m.forward_origin.sender_user:
             await delete_messages(c, m)
             return
-        elif chat_locks["anti_fwd"]["chat"] and m.forward_from_chat:
+        elif chat_locks["anti_fwd"]["chat"] and (m.forward_origin.chat and m.forward_origin.chat.sender_chat):
             await delete_messages(c, m)
             return
 
