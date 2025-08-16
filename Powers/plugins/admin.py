@@ -81,7 +81,7 @@ async def adminlist_show(c: Gojo, m: Message) -> None:
 # -----------------------------
 # Tag admins
 # -----------------------------
-@Gojo.on_message(filters.regex(r"@admins?", flags=re.IGNORECASE) & filters.group)
+@Gojo.on_message(filters.regex(r"^(?i)@admin(s)?") & filters.group)
 async def tag_admins(c: Gojo, m: Message) -> None:
     """Tag admins in the group."""
     db = Reporting(m.chat.id)
@@ -92,22 +92,27 @@ async def tag_admins(c: Gojo, m: Message) -> None:
         admin_list = ADMIN_CACHE[m.chat.id]
     except KeyError:
         admin_list = await admin_cache_reload(m, "adminlist")
-        ADMIN_CACHE[m.chat.id] = admin_list
 
     user_admins = [i for i in admin_list if not i[1].lower().endswith("bot")]
+    
+    # Create mentions without parse_mode
+    mentions = []
+    for admin in user_admins:
+        try:
+            user = await c.get_users(admin[0])
+            mentions.append(user.mention)
+        except Exception:
+            continue
+    
+    if not mentions:
+        return await m.reply_text("No admins found to tag!")
 
-    if not user_admins:
-        await m.reply_text("❌ No admins found to tag!")
-        return
-
-    mention_users = [mention_html(admin[1], admin[0]) for admin in user_admins]
-    mention_str = " ".join(mention_users)
-
+    # Send message without HTML parse_mode
     await m.reply_text(
-        f"{mention_html(m.from_user.first_name, m.from_user.id)} reported the message to admins! {mention_str}",
-        parse_mode="html",
+        f"{m.from_user.mention} reported the message to admins!\n\n"
+        + "\n".join(mentions),
+        disable_web_page_preview=True
     )
-
 
 # -----------------------------
 # Zombies (deleted accounts)
