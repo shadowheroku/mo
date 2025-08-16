@@ -454,33 +454,43 @@ async def is_approved_user(c: Gojo, m: Message):
 
     SUDO_LEVEL = get_support_staff("sudo_level")
 
-    if m.forward_from:
-        return bool(
-            m.from_user
-            and (
+    if m.forward_origin:
+        # Forwarded from a user
+        if m.forward_origin.sender_user:
+            return bool(
+                m.from_user
+                and (
                     m.from_user.id in ul
                     or m.from_user.id in SUDO_LEVEL
                     or m.from_user.id in admins_group
                     or m.from_user.id == c.me.id
+                )
             )
-        )
-    elif m.forward_from_chat:
-        if m.from_user and (
-                m.from_user.id in ul or m.from_user.id in SUDO_LEVEL or m.from_user.id in admins_group or m.from_user.id == c.me.id):
-            return True
-        elif m.automatic_forward:
-            return True
-        else:
-            return False
-    elif m.from_user:
-        return (
+
+        # Forwarded from a chat (channel / group)
+        elif m.forward_origin.chat and m.forward_origin.chat.sender_chat:
+            if m.from_user and (
                 m.from_user.id in ul
                 or m.from_user.id in SUDO_LEVEL
                 or m.from_user.id in admins_group
                 or m.from_user.id == c.me.id
+            ):
+                return True
+            elif m.automatic_forward:  # For auto-forwards from linked channels
+                return True
+            else:
+                return False
+
+    elif m.from_user:
+        return (
+            m.from_user.id in ul
+            or m.from_user.id in SUDO_LEVEL
+            or m.from_user.id in admins_group
+            or m.from_user.id == c.me.id
         )
-    else:
-        return False
+
+    return False
+
 
 
 @Gojo.on_message(filters.service & filters.group, 19)
