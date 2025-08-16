@@ -83,7 +83,7 @@ async def adminlist_show(c: Gojo, m: Message) -> None:
 # -----------------------------
 @Gojo.on_message(filters.regex(r"^(?i)@admin(s)?") & filters.group)
 async def tag_admins(c: Gojo, m: Message) -> None:
-    """Tag admins in the group."""
+    """Tag all admins in one mention when someone uses @admin."""
     db = Reporting(m.chat.id)
     if not db.get_settings():
         return
@@ -93,27 +93,40 @@ async def tag_admins(c: Gojo, m: Message) -> None:
     except KeyError:
         admin_list = await admin_cache_reload(m, "adminlist")
 
-    user_admins = [i for i in admin_list if not i[1].lower().endswith("bot")]
+    # Filter out bots and get only user admins
+    user_admins = [admin[0] for admin in admin_list if not admin[1].lower().endswith("bot")]
     
-    # Create mentions without parse_mode
-    mentions = []
-    for admin in user_admins:
-        try:
-            user = await c.get_users(admin[0])
-            mentions.append(user.mention)
-        except Exception:
-            continue
-    
-    if not mentions:
-        return await m.reply_text("No admins found to tag!")
+    if not user_admins:
+        return await m.reply_text("No admins available to tag in this group!")
 
-    # Send message without HTML parse_mode
-    await m.reply_text(
-        f"{m.from_user.mention} reported the message to admins!\n\n"
-        + "\n".join(mentions),
-        disable_web_page_preview=True
-    )
+    try:
+        # Create one big mention of all admins
+        admin_mentions = []
+        for user_id in user_admins:
+            try:
+                user = await c.get_users(user_id)
+                admin_mentions.append(user.mention)
+            except Exception:
+                continue
+        
+        if not admin_mentions:
+            return await m.reply_text("Couldn't fetch any admin information!")
 
+        # Format the message with sender's name and all admin mentions
+        message_text = (
+            f"🚨 {m.from_user.mention} is calling for admins! 🚨\n\n"
+            f"Admins: {' '.join(admin_mentions)}"
+        )
+
+        await m.reply_text(
+            message_text,
+            disable_web_page_preview=True,
+            disable_notification=True  # To avoid spammy notifications
+        )
+        
+    except Exception as e:
+        LOGGER.error(f"Error in tag_admins: {e}\n{format_exc()}")
+        await m.reply_text("Failed to tag admins. Please try again later.")
 # -----------------------------
 # Zombies (deleted accounts)
 # -----------------------------
