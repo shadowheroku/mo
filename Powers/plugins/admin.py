@@ -483,41 +483,25 @@ async def set_user_title(c: Gojo, m: Message) -> None:
 
 @Gojo.on_message(command("setgpic") & admin_filter)
 async def setgpic(c: Gojo, m: Message) -> None:
-    """Set group photo."""
-    # Check admin permissions
+    """Set group photo (images only)."""
     user = await m.chat.get_member(m.from_user.id)
     if not user.privileges.can_change_info and user.status != CMS.OWNER:
         await m.reply_text("❌ You don't have permission to change group info!")
         return
 
-    # Check if replying to media
     if not m.reply_to_message:
-        await m.reply_text("ℹ️ Reply to a photo or video to set as group photo!")
+        await m.reply_text("ℹ️ Reply to a photo to set as group photo!")
         return
 
-    # Check media type
-    is_video = False
     if m.reply_to_message.photo:
         file_id = m.reply_to_message.photo.file_id
-    elif m.reply_to_message.video:
-        file_id = m.reply_to_message.video.file_id
-        is_video = True
-    elif m.reply_to_message.document:
-        mime_type = m.reply_to_message.document.mime_type or ""
-        if mime_type.startswith("image/"):
-            file_id = m.reply_to_message.document.file_id
-        elif mime_type.startswith("video/"):
-            file_id = m.reply_to_message.document.file_id
-            is_video = True
-        else:
-            await m.reply_text("❌ Only photos and videos can be set as group photo!")
-            return
+    elif m.reply_to_message.document and (m.reply_to_message.document.mime_type or "").startswith("image/"):
+        file_id = m.reply_to_message.document.file_id
     else:
-        await m.reply_text("❌ Unsupported media type!")
+        await m.reply_text("❌ Only photos can be set as group photo!")
         return
 
     try:
-        # Download the file directly as bytes
         msg = await m.reply_text("⬇️ Downloading media...")
         media_bytes = await c.download_media(file_id, in_memory=True)
         
@@ -526,34 +510,22 @@ async def setgpic(c: Gojo, m: Message) -> None:
             return
 
         await msg.edit_text("🖼️ Setting group photo...")
-        
-        # Create a temporary file
-        temp_file = f"temp_{m.chat.id}_{file_id}.{'mp4' if is_video else 'jpg'}"
-        with open(temp_file, "wb") as f:
-            f.write(media_bytes.getbuffer() if hasattr(media_bytes, 'getbuffer') else media_bytes)
 
-        # Set the group photo
-        with open(temp_file, "rb") as file_obj:
-            await m.chat.set_photo(
-                photo=file_obj,
-                video=is_video
-            )
+        from io import BytesIO
+        bio = BytesIO(media_bytes)
+        bio.name = "group_photo.jpg"  # Pyrogram requires a filename attribute
+        bio.seek(0)
 
+        await m.chat.set_photo(photo=bio)
         await msg.edit_text("✅ Group photo updated successfully!")
-        
+
     except RPCError as e:
         await msg.edit_text(f"❌ Telegram error: {e}")
         LOGGER.error(f"Setgpic RPCError: {e}\n{format_exc()}")
     except Exception as e:
         await msg.edit_text(f"❌ Failed to set group photo: {e}")
         LOGGER.error(f"Setgpic error: {e}\n{format_exc()}")
-    finally:
-        # Clean up temporary file
-        try:
-            if 'temp_file' in locals():
-                remove(temp_file)
-        except Exception as e:
-            LOGGER.error(f"Error removing temp file: {e}")
+
 
 __PLUGIN__ = "admin"
 __alt_name__ = [
