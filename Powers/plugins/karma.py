@@ -6,7 +6,7 @@ from Powers.bot_class import Gojo
 
 # ===== CONFIG =====
 DB_FILE = "karma.json"
-COOLDOWN = 30  # seconds between votes to prevent spam
+COOLDOWN = 10  # seconds between votes to prevent spam
 lock = asyncio.Lock()  # prevent race conditions
 
 # ===== DATABASE HELPERS =====
