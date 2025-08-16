@@ -297,18 +297,12 @@ async def karma_alias(_, m: Message):
 
 __PLUGIN__ = "Karma"
 
-__HELP__ = """
-**Karma System** ⚡
+__HELP__ = """ Here is the help for the Karma module:
 
-Gain or lose karma by replying with positive or negative reactions!
+• [UPVOTE] - Use upvote keywords like "+", "+1", "thanks" etc to upvote a message.
+• [DOWNVOTE] - Use downvote keywords like "-", "-1", etc to downvote a message.
 
-✅ **Increase Karma:**
-- Reply with `+`, `++`, `thanks`, `good`, `love`, `pro`, etc.
-
-❌ **Decrease Karma:**
-- Reply with `-`, `--`, `bad`, `noob`, `hate`, etc.
-
-📌 **Commands:**
-- `/karma` (reply to user) → Check their karma
-- `/topkarma` → Show top 10 users by karma
+• /karmastat [OFF|ON] - Enable or Disable Karma System In Your Chat.
+• /karma - Reply to a message with to check a user's karma
+• /karma - without replying to any message to chek karma list of top 10 users
 """
