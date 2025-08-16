@@ -41,42 +41,77 @@ from Powers.utils.extract_user import extract_user
 # -----------------------------
 @Gojo.on_message(command("adminlist"))
 async def adminlist_show(c: Gojo, m: Message) -> None:
-    """List all admins in the chat."""
+    """List all admins in the chat with proper formatting."""
     if m.chat.type not in (ChatType.SUPERGROUP, ChatType.GROUP):
         await m.reply_text("This command is made for groups only!")
         return
 
     try:
+        # Try to get cached admin list first
         try:
             admin_list = ADMIN_CACHE[m.chat.id]
-            note = "<i>Note:</i> These are cached values!"
+            note = "Note: These are cached values!"
         except KeyError:
             admin_list = await admin_cache_reload(m, "adminlist")
-            note = "<i>Note:</i> These are up-to-date values!"
+            note = "Note: These are up-to-date values!"
 
+        # Prepare the admin list message
         admin_str = f"Admins in <b>{escape(m.chat.title)}</b>:\n\n"
 
-        bot_admins = [i for i in admin_list if i[1].lower().endswith("bot")]
-        user_admins = [i for i in admin_list if not i[1].lower().endswith("bot")]
+        # Separate bots and human admins
+        bot_admins = []
+        user_admins = []
+        
+        for admin in admin_list:
+            if isinstance(admin[1], str) and admin[1].lower().endswith("bot"):
+                bot_admins.append(admin)
+            else:
+                user_admins.append(admin)
 
+        # Format admin mentions
         def format_admin(admin: Tuple[int, str, bool]) -> str:
-            return admin[1] if admin[1].startswith("@") else mention_html(admin[1], admin[0])
+            if admin[1].startswith("@"):
+                return admin[1]
+            try:
+                user = await c.get_users(admin[0])
+                return user.mention
+            except Exception:
+                return f"<a href='tg://user?id={admin[0]}'>{escape(admin[1])}</a>"
 
-        mention_users = [format_admin(admin) for admin in user_admins if not admin[2]]
-        mention_bots = [format_admin(admin) for admin in bot_admins]
+        # Format user admins (non-bots)
+        mention_users = []
+        for admin in user_admins:
+            if not admin[2]:  # Skip anonymous admins
+                formatted = await format_admin(admin)
+                mention_users.append(formatted)
 
+        # Format bot admins
+        mention_bots = []
+        for admin in bot_admins:
+            formatted = await format_admin(admin)
+            mention_bots.append(formatted)
+
+        # Sort alphabetically (case-insensitive)
         mention_users.sort(key=lambda x: x.lower())
         mention_bots.sort(key=lambda x: x.lower())
 
-        admin_str += "<b>User Admins:</b>\n" + "\n".join(f"- {i}" for i in mention_users)
-        admin_str += "\n\n<b>Bots:</b>\n" + "\n".join(f"- {i}" for i in mention_bots)
+        # Build the final message
+        admin_str += "<b>User Admins:</b>\n" + "\n".join(f"• {user}" for user in mention_users)
+        admin_str += "\n\n<b>Bots:</b>\n" + "\n".join(f"• {bot}" for bot in mention_bots)
 
-        await m.reply_text(f"{admin_str}\n\n{note}", parse_mode="html")
+        # Send the message with HTML parsing
+        await m.reply_text(
+            f"{admin_str}\n\n<i>{note}</i>",
+            parse_mode="HTML",
+            disable_web_page_preview=True
+        )
 
     except Exception as ef:
         LOGGER.error(f"Error in adminlist: {ef}\n{format_exc()}")
-        await m.reply_text(f"An error occurred. Report using `/bug`\n<b>Error:</b> <code>{escape(str(ef))}</code>")
-
+        await m.reply_text(
+            "An error occurred while fetching admin list.\n"
+            f"Error: {escape(str(ef))}"
+        )
 
 # -----------------------------
 # Tag admins
