@@ -28,7 +28,7 @@ async def initial_works(_, m: Message):
             except RPCError as ef:
                 LOGGER.error(ef)
                 return
-        elif m.reply_to_message and not m.forward_from:
+        elif m.reply_to_message and not hasattr(m, 'forward_origin'):
             chatdb.update_chat(
                 m.chat.title,
                 m.reply_to_message.from_user.id,
@@ -41,31 +41,31 @@ async def initial_works(_, m: Message):
                 ),
                 m.reply_to_message.from_user.username,
             )
-        elif m.forward_from and not m.reply_to_message:
+        elif hasattr(m, 'forward_origin') and m.forward_origin and hasattr(m.forward_origin, 'sender_user') and not m.reply_to_message:
             chatdb.update_chat(
                 m.chat.title,
-                m.forward_from.id,
+                m.forward_origin.sender_user.id,
             )
-            Users(m.forward_from.id).update_user(
+            Users(m.forward_origin.sender_user.id).update_user(
                 (
-                    f"{m.forward_from.first_name} {m.forward_from.last_name}"
-                    if m.forward_from.last_name
-                    else m.forward_from.first_name
+                    f"{m.forward_origin.sender_user.first_name} {m.forward_origin.sender_user.last_name}"
+                    if m.forward_origin.sender_user.last_name
+                    else m.forward_origin.sender_user.first_name
                 ),
-                m.forward_from.username,
+                m.forward_origin.sender_user.username,
             )
-        elif m.reply_to_message:
+        elif m.reply_to_message and hasattr(m.reply_to_message, 'forward_origin') and m.reply_to_message.forward_origin:
             chatdb.update_chat(
                 m.chat.title,
-                m.reply_to_message.forward_from.id,
+                m.reply_to_message.forward_origin.sender_user.id,
             )
-            Users(m.forward_from.id).update_user(
+            Users(m.reply_to_message.forward_origin.sender_user.id).update_user(
                 (
-                    f"{m.reply_to_message.forward_from.first_name} {m.reply_to_message.forward_from.last_name}"
-                    if m.reply_to_message.forward_from.last_name
-                    else m.reply_to_message.forward_from.first_name
+                    f"{m.reply_to_message.forward_origin.sender_user.first_name} {m.reply_to_message.forward_origin.sender_user.last_name}"
+                    if m.reply_to_message.forward_origin.sender_user.last_name
+                    else m.reply_to_message.forward_origin.sender_user.first_name
                 ),
-                m.forward_from.username,
+                m.reply_to_message.forward_origin.sender_user.username,
             )
         else:
             chatdb.update_chat(m.chat.title, m.from_user.id)
