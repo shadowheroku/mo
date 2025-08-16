@@ -147,50 +147,68 @@ async def id_info(c: Gojo, m: Message):
             return
         elif m.chat.type in [ChatType.SUPERGROUP, ChatType.GROUP] and not m.reply_to_message:
             await m.reply_text(
-                text=f"This Group's ID is <code>{m.chat.id}</code>\nYour ID <code>{m.from_user.id}</code>")
+                text=f"This Group's ID is <code>{m.chat.id}</code>\nYour ID <code>{m.from_user.id}</code>"
+            )
             return
-
         elif m.chat.type == ChatType.PRIVATE and not m.reply_to_message:
             await m.reply_text(text=f"Your ID is <code>{m.chat.id}</code>.")
             return
     except Exception as e:
-        await m.reply_text(e)
+        await m.reply_text(str(e))
         return
+
     if user_id:
-        if m.reply_to_message and m.reply_to_message.forward_from:
+        if m.reply_to_message and m.reply_to_message.forward_origin:
             user1 = m.reply_to_message.from_user
-            user2 = m.reply_to_message.forward_from
-            orig_sender = await mention_html(user2.first_name, user2.id)
-            orig_id = f"<code>{user2.id}</code>"
-            fwd_sender = await mention_html(user1.first_name, user1.id)
-            fwd_id = f"<code>{user1.id}</code>"
-            await m.reply_text(
-                text=f"""Original Sender - {orig_sender} (<code>{orig_id}</code>)
-Forwarder - {fwd_sender} (<code>{fwd_id}</code>)""",
-                parse_mode=enums.ParseMode.HTML,
-            )
+
+            # Forwarded from a user
+            if m.reply_to_message.forward_origin.sender_user:
+                user2 = m.reply_to_message.forward_origin.sender_user
+                orig_sender = await mention_html(user2.first_name, user2.id)
+                orig_id = f"<code>{user2.id}</code>"
+                fwd_sender = await mention_html(user1.first_name, user1.id)
+                fwd_id = f"<code>{user1.id}</code>"
+                await m.reply_text(
+                    text=f"""Original Sender - {orig_sender} ({orig_id})
+Forwarder - {fwd_sender} ({fwd_id})""",
+                    parse_mode=enums.ParseMode.HTML,
+                )
+
+            # Forwarded from a chat (channel / group)
+            elif m.reply_to_message.forward_origin.chat and m.reply_to_message.forward_origin.chat.sender_chat:
+                chat_fwd = m.reply_to_message.forward_origin.chat.sender_chat
+                orig_sender = chat_fwd.title
+                orig_id = f"<code>{chat_fwd.id}</code>"
+                fwd_sender = await mention_html(user1.first_name, user1.id)
+                fwd_id = f"<code>{user1.id}</code>"
+                await m.reply_text(
+                    text=f"""Original Chat - {orig_sender} ({orig_id})
+Forwarder - {fwd_sender} ({fwd_id})""",
+                    parse_mode=enums.ParseMode.HTML,
+                )
         else:
             try:
                 user = await c.get_users(user_id)
             except PeerIdInvalid:
                 await m.reply_text(
                     text="""Failed to get user
-      Peer ID invalid, I haven't seen this user anywhere earlier, maybe username would help to know them!"""
+Peer ID invalid, I haven't seen this user anywhere earlier, maybe username would help to know them!"""
                 )
                 return
-
             await m.reply_text(
                 f"{(await mention_html(user.first_name, user.id))}'s ID is <code>{user.id}</code>.",
                 parse_mode=enums.ParseMode.HTML,
             )
+
     elif m.chat.type == ChatType.PRIVATE:
         text = f"Your ID is <code>{m.chat.id}</code>."
-        if m.reply_to_message:
-            if m.forward_from:
-                text += f"Forwarded from user ID <code>{m.forward_from.id}</code>."
-            elif m.forward_from_chat:
-                text += f"Forwarded from user ID <code>{m.forward_from_chat.id}</code>."
+        if m.reply_to_message and m.reply_to_message.forward_origin:
+            if m.reply_to_message.forward_origin.sender_user:
+                text += f" Forwarded from user ID <code>{m.reply_to_message.forward_origin.sender_user.id}</code>."
+            elif m.reply_to_message.forward_origin.chat and m.reply_to_message.forward_origin.chat.sender_chat:
+                text += f" Forwarded from chat ID <code>{m.reply_to_message.forward_origin.chat.sender_chat.id}</code>."
         await m.reply_text(text)
+
     else:
         text = f"Chat ID <code>{m.chat.id}</code>\nYour ID <code>{m.from_user.id}</code>"
         await m.reply_text(text)
