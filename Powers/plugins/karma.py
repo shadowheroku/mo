@@ -1,83 +1,87 @@
-import sqlite3
+import json
 import time
+import asyncio
 from pyrogram import filters
 from Powers.bot_class import Gojo
 
 # ===== CONFIG =====
-DB_FILE = "karma.db"
+DB_FILE = "karma.json"
 COOLDOWN = 30  # seconds between votes to prevent spam
+lock = asyncio.Lock()  # prevent race conditions
 
-# ===== DATABASE SETUP =====
-conn = sqlite3.connect(DB_FILE, check_same_thread=False)
-c = conn.cursor()
-c.execute("""
-CREATE TABLE IF NOT EXISTS karma (
-    user_id INTEGER PRIMARY KEY,
-    karma INTEGER DEFAULT 0,
-    last_vote REAL DEFAULT 0
-)
-""")
-conn.commit()
+# ===== DATABASE HELPERS =====
+def load_karma():
+    try:
+        with open(DB_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {}
 
-# ===== HELPERS =====
-def get_karma(user_id):
-    c.execute("SELECT karma FROM karma WHERE user_id=?", (user_id,))
-    row = c.fetchone()
-    return row[0] if row else 0
+def save_karma(data):
+    with open(DB_FILE, "w") as f:
+        json.dump(data, f, indent=2)
 
-def update_karma(user_id, change):
-    c.execute("INSERT OR IGNORE INTO karma (user_id, karma, last_vote) VALUES (?, ?, ?)",
-              (user_id, 0, 0))
-    c.execute("UPDATE karma SET karma = karma + ? WHERE user_id=?", (change, user_id))
-    conn.commit()
-    return get_karma(user_id)
+async def get_karma(user_id: int):
+    async with lock:
+        data = load_karma()
+        return data.get(str(user_id), {}).get("karma", 0)
 
-def can_vote(user_id):
-    c.execute("SELECT last_vote FROM karma WHERE user_id=?", (user_id,))
-    row = c.fetchone()
-    now = time.time()
-    if not row:
-        c.execute("INSERT INTO karma (user_id, karma, last_vote) VALUES (?, ?, ?)", (user_id, 0, now))
-        conn.commit()
-        return True
-    last_vote = row[0]
-    if now - last_vote >= COOLDOWN:
-        return True
-    return False
+async def update_karma(user_id: int, change: int):
+    async with lock:
+        data = load_karma()
+        uid = str(user_id)
+        if uid not in data:
+            data[uid] = {"karma": 0, "last_vote": 0}
+        data[uid]["karma"] += change
+        save_karma(data)
+        return data[uid]["karma"]
 
-def set_last_vote(user_id):
-    now = time.time()
-    c.execute("UPDATE karma SET last_vote=? WHERE user_id=?", (now, user_id))
-    conn.commit()
+async def can_vote(user_id: int):
+    async with lock:
+        data = load_karma()
+        uid = str(user_id)
+        now = time.time()
+        if uid not in data:
+            data[uid] = {"karma": 0, "last_vote": now}
+            save_karma(data)
+            return True
+        last_vote = data[uid].get("last_vote", 0)
+        return now - last_vote >= COOLDOWN
+
+async def set_last_vote(user_id: int):
+    async with lock:
+        data = load_karma()
+        uid = str(user_id)
+        now = time.time()
+        if uid not in data:
+            data[uid] = {"karma": 0, "last_vote": now}
+        else:
+            data[uid]["last_vote"] = now
+        save_karma(data)
 
 # ===== COMMANDS =====
 @Gojo.on_message(filters.command("karma") & filters.group)
 async def karma_info(c, m):
-    if len(m.command) > 1:
-        try:
-            user = m.reply_to_message.from_user if not m.entities else await c.get_users(m.command[1])
-        except:
-            user = m.from_user
-    else:
-        user = m.reply_to_message.from_user if m.reply_to_message else m.from_user
-
-    karma = get_karma(user.id)
+    user = m.reply_to_message.from_user if m.reply_to_message else m.from_user
+    karma = await get_karma(user.id)
     await m.reply_text(f"💫 Karma of {user.mention}: **{karma}**")
 
 @Gojo.on_message(filters.command("topkarma") & filters.group)
 async def top_karma(c, m):
-    c.execute("SELECT user_id, karma FROM karma ORDER BY karma DESC LIMIT 10")
-    rows = c.fetchall()
-    if not rows:
+    async with lock:
+        data = load_karma()
+    if not data:
         await m.reply_text("No karma data yet.")
         return
+
+    top_users = sorted(data.items(), key=lambda x: x[1]["karma"], reverse=True)[:10]
     text = "🏆 **Top Karma Users:**\n\n"
-    for i, (user_id, karma) in enumerate(rows, start=1):
+    for i, (uid, info) in enumerate(top_users, start=1):
         try:
-            user = await c.get_users(user_id)
-            text += f"{i}. {user.first_name}: {karma}\n"
+            user = await c.get_users(int(uid))
+            text += f"{i}. {user.first_name}: {info['karma']}\n"
         except:
-            text += f"{i}. Unknown User ({user_id}): {karma}\n"
+            text += f"{i}. Unknown User ({uid}): {info['karma']}\n"
     await m.reply_text(text)
 
 # ===== KARMA VIA + / - REPLIES =====
@@ -89,36 +93,34 @@ async def karma_vote(c, m):
         return
     target_user = target_msg.from_user
 
-    # Prevent self-voting
     if voter.id == target_user.id:
         await m.reply_text("❌ You cannot vote for yourself!")
         return
 
-    # Cooldown check
-    if not can_vote(voter.id):
+    if not await can_vote(voter.id):
         await m.reply_text(f"⏱️ Wait {COOLDOWN} seconds before voting again.")
         return
 
-    # Determine vote
     if m.text.strip() == "+":
-        change = 1
-        karma = update_karma(target_user.id, change)
+        karma = await update_karma(target_user.id, 1)
         await m.reply_text(f"👍 {target_user.mention} gained 1 karma! Total: {karma}")
     elif m.text.strip() == "-":
-        change = -1
-        karma = update_karma(target_user.id, change)
+        karma = await update_karma(target_user.id, -1)
         await m.reply_text(f"👎 {target_user.mention} lost 1 karma! Total: {karma}")
+    else:
+        return  # ignore other messages
 
-    set_last_vote(voter.id)
+    await set_last_vote(voter.id)
 
 # ===== METADATA =====
-__PLUGIN__ = "Advanced Karma System (+/- Voting)"
+__PLUGIN__ = "Super Fast Karma System (+/- Voting)"
 __HELP__ = """
-💫 **Advanced Karma System**
+💫 **Super Fast Karma System**
 
 • Reply with `+` to give karma
 • Reply with `-` to remove karma
-• /karma [@user] → Check user's karma
+• /karma → Check user's karma
 • /topkarma → Show top 10 users
 • Anti-self-voting & cooldown prevents spam
+• Uses JSON for lightning-fast performance
 """
