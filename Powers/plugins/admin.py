@@ -484,56 +484,74 @@ async def set_user_title(c: Gojo, m: Message) -> None:
 @Gojo.on_message(command("setgpic") & admin_filter)
 async def setgpic(c: Gojo, m: Message) -> None:
     """Set group photo."""
+    # Check admin permissions
     user = await m.chat.get_member(m.from_user.id)
     if not user.privileges.can_change_info and user.status != CMS.OWNER:
-        await m.reply_text("You don't have permission to change group info!")
+        await m.reply_text("❌ You don't have permission to change group info!")
         return
 
+    # Check if replying to media
     if not m.reply_to_message:
-        await m.reply_text("Reply to a photo or video to set it as group photo!")
+        await m.reply_text("ℹ️ Reply to a photo or video to set as group photo!")
         return
 
-    supported_media = (
-        m.reply_to_message.photo or 
-        m.reply_to_message.video or 
-        (m.reply_to_message.document and 
-         m.reply_to_message.document.mime_type.split("/")[0] in ["image", "video"])
-    )
-    
-    if not supported_media:
-        await m.reply_text("Only photos and videos can be set as group photo!")
+    # Check media type
+    is_video = False
+    if m.reply_to_message.photo:
+        file_id = m.reply_to_message.photo.file_id
+    elif m.reply_to_message.video:
+        file_id = m.reply_to_message.video.file_id
+        is_video = True
+    elif m.reply_to_message.document:
+        mime_type = m.reply_to_message.document.mime_type or ""
+        if mime_type.startswith("image/"):
+            file_id = m.reply_to_message.document.file_id
+        elif mime_type.startswith("video/"):
+            file_id = m.reply_to_message.document.file_id
+            is_video = True
+        else:
+            await m.reply_text("❌ Only photos and videos can be set as group photo!")
+            return
+    else:
+        await m.reply_text("❌ Unsupported media type!")
         return
 
     try:
-        # Download the media file
-        photo_path = await m.reply_to_message.download(in_memory=False)
+        # Download the file directly as bytes
+        msg = await m.reply_text("⬇️ Downloading media...")
+        media_bytes = await c.download_media(file_id, in_memory=True)
         
-        # Determine if it's a video
-        is_video = bool(
-            m.reply_to_message.video or 
-            (m.reply_to_message.document and 
-             m.reply_to_message.document.mime_type.startswith("video/"))
-        )
+        if not media_bytes:
+            await msg.edit_text("❌ Failed to download media!")
+            return
 
-        # Open the file in binary mode
-        with open(photo_path, "rb") as photo_file:
+        await msg.edit_text("🖼️ Setting group photo...")
+        
+        # Create a temporary file
+        temp_file = f"temp_{m.chat.id}_{file_id}.{'mp4' if is_video else 'jpg'}"
+        with open(temp_file, "wb") as f:
+            f.write(media_bytes.getbuffer() if hasattr(media_bytes, 'getbuffer') else media_bytes)
+
+        # Set the group photo
+        with open(temp_file, "rb") as file_obj:
             await m.chat.set_photo(
-                photo=photo_file,
+                photo=file_obj,
                 video=is_video
             )
+
+        await msg.edit_text("✅ Group photo updated successfully!")
         
-        await m.reply_text("Group photo updated successfully!")
-    except ValueError as e:
-        await m.reply_text(f"Invalid file format: {e}")
     except RPCError as e:
-        await m.reply_text(f"Telegram error: {e}")
+        await msg.edit_text(f"❌ Telegram error: {e}")
+        LOGGER.error(f"Setgpic RPCError: {e}\n{format_exc()}")
     except Exception as e:
+        await msg.edit_text(f"❌ Failed to set group photo: {e}")
         LOGGER.error(f"Setgpic error: {e}\n{format_exc()}")
-        await m.reply_text(f"Failed to set group photo: {e}")
     finally:
+        # Clean up temporary file
         try:
-            if 'photo_path' in locals():
-                remove(photo_path)
+            if 'temp_file' in locals():
+                remove(temp_file)
         except Exception as e:
             LOGGER.error(f"Error removing temp file: {e}")
 
