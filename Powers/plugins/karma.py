@@ -267,4 +267,20 @@ async def karma_alias(_, m: Message):
     await karma_cmd(_, m)
 
 
+__PLUGIN__ = "Karma"
 
+__HELP__ = """
+**Karma System** ⚡
+
+Gain or lose karma by replying with positive or negative reactions!
+
+✅ **Increase Karma:**
+- Reply with `+`, `++`, `thanks`, `good`, `love`, `pro`, etc.
+
+❌ **Decrease Karma:**
+- Reply with `-`, `--`, `bad`, `noob`, `hate`, etc.
+
+📌 **Commands:**
+- `/karma` (reply to user) → Check their karma
+- `/topkarma` → Show top 10 users by karma
+"""
