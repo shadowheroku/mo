@@ -483,6 +483,10 @@ async def set_user_title(c: Gojo, m: Message) -> None:
 
 from pyrogram.errors import RPCError
 
+import os
+from pyrogram.errors import RPCError
+from tempfile import NamedTemporaryFile
+
 @Gojo.on_message(command("setgpic") & admin_filter)
 async def setgpic(c: Gojo, m: Message) -> None:
     """Set group photo (images only)."""
@@ -506,26 +510,39 @@ async def setgpic(c: Gojo, m: Message) -> None:
 
     try:
         msg = await m.reply_text("⬇️ Downloading media...")
-        media_bytesio = await c.download_media(file_id, in_memory=True)
+        media_bytes = await c.download_media(file_id, in_memory=True)
         
-        if not media_bytesio:
+        if not media_bytes:
             await msg.edit_text("❌ Failed to download media!")
             return
 
         await msg.edit_text("🖼️ Setting group photo...")
 
-        # Convert BytesIO to bytes
-        media_bytes = media_bytesio.getbuffer() if hasattr(media_bytesio, 'getbuffer') else media_bytesio
+        # Save to a temporary file
+        with NamedTemporaryFile(suffix=".jpg", delete=False) as temp_file:
+            temp_file.write(media_bytes.getbuffer() if hasattr(media_bytes, 'getbuffer') else media_bytes)
+            temp_path = temp_file.name
 
-        await m.chat.set_photo(photo=media_bytes)
+        # Open file in binary mode and set as group photo
+        with open(temp_path, "rb") as f:
+            await m.chat.set_photo(photo=f)
+
         await msg.edit_text("✅ Group photo updated successfully!")
 
     except RPCError as e:
         await msg.edit_text(f"❌ Telegram error: {e}")
-        LOGGER.error(f"Setgpic RPCError: {e}\n{format_exc()}")
+        LOGGER.error(f"Setgpic RPCError: {e}")
     except Exception as e:
         await msg.edit_text(f"❌ Failed to set group photo: {e}")
-        LOGGER.error(f"Setgpic error: {e}\n{format_exc()}")
+        LOGGER.error(f"Setgpic error: {e}")
+    finally:
+        # Clean up temp file
+        try:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except Exception as e:
+            LOGGER.error(f"Error removing temp file: {e}")
+
 
 
 
