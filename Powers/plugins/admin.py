@@ -68,28 +68,22 @@ async def adminlist_show(c: Gojo, m: Message) -> None:
             else:
                 user_admins.append(admin)
 
-        # Format admin mentions
+        # Format admin mentions - modified to not use await
         def format_admin(admin: Tuple[int, str, bool]) -> str:
             if admin[1].startswith("@"):
                 return admin[1]
-            try:
-                user = await c.get_users(admin[0])
-                return user.mention
-            except Exception:
-                return f"<a href='tg://user?id={admin[0]}'>{escape(admin[1])}</a>"
+            return f"<a href='tg://user?id={admin[0]}'>{escape(admin[1])}</a>"
 
         # Format user admins (non-bots)
         mention_users = []
         for admin in user_admins:
             if not admin[2]:  # Skip anonymous admins
-                formatted = await format_admin(admin)
-                mention_users.append(formatted)
+                mention_users.append(format_admin(admin))
 
         # Format bot admins
         mention_bots = []
         for admin in bot_admins:
-            formatted = await format_admin(admin)
-            mention_bots.append(formatted)
+            mention_bots.append(format_admin(admin))
 
         # Sort alphabetically (case-insensitive)
         mention_users.sort(key=lambda x: x.lower())
