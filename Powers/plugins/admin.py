@@ -146,25 +146,40 @@ async def reload_admins(c: Gojo, m: Message) -> None:
         )
 
 
-@Gojo.on_message(filters.regex(r"^(?i)@admin(s)?") & filters.group)
+import re
+from pyrogram.types import Message
+from pyrogram.utils import mention_html
+
+@Gojo.on_message(filters.regex(r"@admins?", flags=re.IGNORECASE) & filters.group)
 async def tag_admins(c: Gojo, m: Message) -> None:
     """Tag admins in the group."""
     db = Reporting(m.chat.id)
     if not db.get_settings():
         return
 
+    # Load admin cache
     try:
         admin_list = ADMIN_CACHE[m.chat.id]
     except KeyError:
         admin_list = await admin_cache_reload(m, "adminlist")
+        ADMIN_CACHE[m.chat.id] = admin_list  # Make sure cache is updated
 
+    # Filter out bots
     user_admins = [i for i in admin_list if not i[1].lower().endswith("bot")]
-    mention_users = [mention_html("\u2063", admin[0]) for admin in user_admins]
-    mention_str = "".join(mention_users)
     
+    if not user_admins:
+        await m.reply_text("❌ No admins found to tag!")
+        return
+
+    # Create mentions
+    mention_users = [mention_html(admin[1], admin[0]) for admin in user_admins]
+    mention_str = " ".join(mention_users)
+
+    # Reply
     await m.reply_text(
         f"{mention_html(m.from_user.first_name, m.from_user.id)} "
-        f"reported the message to admins!{mention_str}"
+        f"reported the message to admins! {mention_str}",
+        parse_mode="html"
     )
 
 
