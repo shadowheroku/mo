@@ -490,25 +490,52 @@ async def setgpic(c: Gojo, m: Message) -> None:
         return
 
     if not m.reply_to_message:
-        await m.reply_text("Reply to a photo to set it as group photo!")
+        await m.reply_text("Reply to a photo or video to set it as group photo!")
         return
 
-    if not (m.reply_to_message.photo or m.reply_to_message.document):
-        await m.reply_text("Only photos can be set as group photo!")
-        return
-
-    photo_path = await m.reply_to_message.download()
-    is_video = bool(m.reply_to_message.video)
+    supported_media = (
+        m.reply_to_message.photo or 
+        m.reply_to_message.video or 
+        (m.reply_to_message.document and 
+         m.reply_to_message.document.mime_type.split("/")[0] in ["image", "video"])
+    )
     
+    if not supported_media:
+        await m.reply_text("Only photos and videos can be set as group photo!")
+        return
+
     try:
-        await m.chat.set_photo(photo=photo_path, video=is_video)
+        # Download the media file
+        photo_path = await m.reply_to_message.download(in_memory=False)
+        
+        # Determine if it's a video
+        is_video = bool(
+            m.reply_to_message.video or 
+            (m.reply_to_message.document and 
+             m.reply_to_message.document.mime_type.startswith("video/"))
+        )
+
+        # Open the file in binary mode
+        with open(photo_path, "rb") as photo_file:
+            await m.chat.set_photo(
+                photo=photo_file,
+                video=is_video
+            )
+        
         await m.reply_text("Group photo updated successfully!")
+    except ValueError as e:
+        await m.reply_text(f"Invalid file format: {e}")
+    except RPCError as e:
+        await m.reply_text(f"Telegram error: {e}")
     except Exception as e:
         LOGGER.error(f"Setgpic error: {e}\n{format_exc()}")
         await m.reply_text(f"Failed to set group photo: {e}")
     finally:
-        remove(photo_path)
-
+        try:
+            if 'photo_path' in locals():
+                remove(photo_path)
+        except Exception as e:
+            LOGGER.error(f"Error removing temp file: {e}")
 
 __PLUGIN__ = "admin"
 __alt_name__ = [
