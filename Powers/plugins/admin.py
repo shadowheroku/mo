@@ -481,6 +481,8 @@ async def set_user_title(c: Gojo, m: Message) -> None:
         await m.reply_text(f"Failed to set title: {e}")
 
 
+from pyrogram.errors import RPCError
+
 @Gojo.on_message(command("setgpic") & admin_filter)
 async def setgpic(c: Gojo, m: Message) -> None:
     """Set group photo (images only)."""
@@ -493,6 +495,7 @@ async def setgpic(c: Gojo, m: Message) -> None:
         await m.reply_text("ℹ️ Reply to a photo to set as group photo!")
         return
 
+    # Only images
     if m.reply_to_message.photo:
         file_id = m.reply_to_message.photo.file_id
     elif m.reply_to_message.document and (m.reply_to_message.document.mime_type or "").startswith("image/"):
@@ -503,20 +506,18 @@ async def setgpic(c: Gojo, m: Message) -> None:
 
     try:
         msg = await m.reply_text("⬇️ Downloading media...")
-        media_bytes = await c.download_media(file_id, in_memory=True)
+        media_bytesio = await c.download_media(file_id, in_memory=True)
         
-        if not media_bytes:
+        if not media_bytesio:
             await msg.edit_text("❌ Failed to download media!")
             return
 
         await msg.edit_text("🖼️ Setting group photo...")
 
-        from io import BytesIO
-        bio = BytesIO(media_bytes)
-        bio.name = "group_photo.jpg"  # Pyrogram requires a filename attribute
-        bio.seek(0)
+        # Convert BytesIO to bytes
+        media_bytes = media_bytesio.getbuffer() if hasattr(media_bytesio, 'getbuffer') else media_bytesio
 
-        await m.chat.set_photo(photo=bio)
+        await m.chat.set_photo(photo=media_bytes)
         await msg.edit_text("✅ Group photo updated successfully!")
 
     except RPCError as e:
@@ -525,6 +526,7 @@ async def setgpic(c: Gojo, m: Message) -> None:
     except Exception as e:
         await msg.edit_text(f"❌ Failed to set group photo: {e}")
         LOGGER.error(f"Setgpic error: {e}\n{format_exc()}")
+
 
 
 __PLUGIN__ = "admin"
