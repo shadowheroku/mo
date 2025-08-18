@@ -31,15 +31,17 @@ ADMIN_STYLE = "🛡 **Admin Notification**\n\n{message}\n\n{mentions}"
 # ================================================
 
 async def format_user_mention(member) -> str:
-    """Format user mention with their name only (no username)"""
+    """Format user mention in 'Rep @username' style"""
     user = member.user
     if user.is_deleted:
         return f"🗑 Deleted Account ({user.id})"
     
-    first_name = user.first_name or ""
-    last_name = f" {user.last_name}" if user.last_name else ""
-    
-    return f"👤 {first_name}{last_name}"
+    if user.username:
+        return f"Rep @{user.username}"
+    else:
+        first_name = user.first_name or ""
+        last_name = f" {user.last_name}" if user.last_name else ""
+        return f"Rep {first_name}{last_name}"
 
 async def send_mentions_batch(
     client: Gojo,
@@ -50,7 +52,7 @@ async def send_mentions_batch(
     is_admin: bool = False
 ) -> bool:
     """Send a batch of mentions with proper formatting"""
-    mentions_text = "\n".join([f"• {m}" for m in mentions])
+    mentions_text = "\n".join(mentions)  # Changed from bullet points to simple newlines
     full_text = style.format(
         message=base_msg or ("📝 Notification" if not is_admin else "🛡 Admin Attention Needed"),
         mentions=mentions_text
@@ -76,7 +78,7 @@ async def send_mentions_batch(
 
 @Gojo.on_message(command(["tagall", "all", "callall"]) & filters.group)
 async def tag_all_members(c: Gojo, m: Message):
-    """Tagall command that mentions users by name only"""
+    """Tagall command that mentions users in 'Rep @username' style"""
     chat = m.chat
     ACTIVE_TAGS[chat.id] = True
     
@@ -134,7 +136,7 @@ async def tag_all_members(c: Gojo, m: Message):
 
 @Gojo.on_message(command(["admintag", "atag"]))
 async def tag_admins(c: Gojo, m: Message):
-    """Admin tag that mentions users by name only"""
+    """Admin tag that mentions users in 'Rep @username' style"""
     chat = m.chat
     ACTIVE_TAGS[chat.id] = True
     
@@ -197,22 +199,22 @@ async def cancel_tagging(c: Gojo, m: Message):
 #               MODULE METADATA
 # ================================================
 
-__PLUGIN__ = "name_tagging"
+__PLUGIN__ = "rep_tagging"
 __alt_name__ = ["tagall", "all", "admintag", "atag", "canceltag"]
 
 __HELP__ = """
-**🌟 Name-Based Tagging System**
+**🌟 Rep-Style Tagging System**
 
-• /tagall [message] - Mention all members by name
+• /tagall [message] - Mention all members (Rep @username style)
 • /tagall (reply) - Tag all with replied message
-• /atag [message] - Mention only admins by name  
+• /atag [message] - Mention only admins (Rep @username style)
 • /atag (reply) - Tag admins with replied message
 • /canceltag - Stop ongoing tagging process
 
 **Features:**
-- Tags users by their name only (no usernames)
-- Shows user's full name
-- Properly formatted mentions
+- Tags users in "Rep @username" format
+- Shows username if available, falls back to name
+- Clean, simple mention format
 - Progress indicators
 - Anti-flood protection
 - Smart batch processing
