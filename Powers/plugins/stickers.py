@@ -54,7 +54,7 @@ async def sticker_id_gib(c: Gojo, m: Message):
 
 
 from pyrogram import filters
-from pyrogram.types import Message, ChatAction, InlineKeyboardMarkup as IKM, InlineKeyboardButton as IKB
+from pyrogram.types import Message, InlineKeyboardMarkup as IKM, InlineKeyboardButton as IKB
 from pyrogram.errors import (
     PeerIdInvalid,
     UserIsBlocked,
