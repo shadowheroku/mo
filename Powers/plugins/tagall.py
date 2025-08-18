@@ -2,8 +2,8 @@ import asyncio
 from random import choice
 from pyrogram import filters
 from pyrogram.enums import ParseMode, ChatMemberStatus, ChatMembersFilter
-from pyrogram.types import Message
-from typing import List, Dict
+from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
+from typing import List, Dict, Optional
 
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
@@ -12,69 +12,72 @@ from Powers.utils.custom_filters import command
 #               CONSTANTS
 # ================================================
 
-ACTIVE_TAGS: Dict[int, bool] = {}  # Track active tagging sessions
-MAX_MESSAGE_LENGTH = 4096  # Telegram's maximum message length
-MENTIONS_PER_MESSAGE = 50  # Max mentions per message to avoid hitting length limit
+ACTIVE_TAGS: Dict[int, bool] = {}
+MAX_MENTIONS_PER_MESSAGE = 5  # Reduced from 50 to prevent flooding
+TAG_DELAY = 2.0  # Increased delay between messages
 
-TAG_STYLES = [
+TAGALL_STYLES = [
     "📢 **Attention everyone!**\n\n{message}\n\n{mentions}",
-    "👋 **Hello everyone!**\n\n{message}\n\n{mentions}",
-    "🌟 **Special mention!**\n\n{message}\n\n{mentions}",
-    "🔔 **Tag alert!**\n\n{message}\n\n{mentions}"
+    "👋 **Hey everyone!**\n\n{message}\n\n{mentions}",
+    "🚨 **Important Notice**\n\n{message}\n\n{mentions}",
+    "✨ **Summoning the group** ✨\n\n{message}\n\n{mentions}",
+    "🔔 **Tag Alert**\n\n{message}\n\n{mentions}"
 ]
 
-ADMIN_STYLE = "🛡 **Admin notice!**\n\n{message}\n\n{mentions}"
+ADMIN_STYLE = "🛡 **Admin Notification**\n\n{message}\n\n{mentions}"
 
 # ================================================
 #               HELPER FUNCTIONS
 # ================================================
 
-async def clean_mention(member) -> str:
-    """Generate clean mention without extra spaces"""
+async def format_user_mention(member) -> str:
+    """Format user mention with their first name"""
     user = member.user
     if user.is_deleted:
-        return f"@{user.id}"  # Fallback for deleted accounts
-    return user.mention
+        return f"🗑 Deleted Account ({user.id})"
+    
+    first_name = user.first_name or ""
+    last_name = f" {user.last_name}" if user.last_name else ""
+    username = f" (@{user.username})" if user.username else ""
+    
+    return f"👤 {first_name}{last_name}{username}"
 
-async def format_mentions(members: List) -> List[str]:
-    """Format mentions into chunks that won't exceed message limits"""
-    mentions_chunks = []
-    current_chunk = []
+async def send_mentions_batch(
+    client: Gojo,
+    chat_id: int,
+    mentions: List[str],
+    base_msg: str,
+    style: str,
+    is_admin: bool = False
+) -> bool:
+    """Send a batch of mentions with proper formatting"""
+    mentions_text = "\n".join([f"• {m}" for m in mentions])
+    full_text = style.format(
+        message=base_msg or ("📝 Notification" if not is_admin else "🛡 Admin Attention Needed"),
+        mentions=mentions_text
+    )
     
-    for member in members:
-        if not member.user.is_bot:  # Skip bots
-            mention = await clean_mention(member)
-            current_chunk.append(f"• {mention}")
-            
-            # Start new chunk when reaching limit
-            if len(current_chunk) >= MENTIONS_PER_MESSAGE:
-                mentions_chunks.append("\n".join(current_chunk))
-                current_chunk = []
-    
-    # Add any remaining mentions
-    if current_chunk:
-        mentions_chunks.append("\n".join(current_chunk))
-    
-    return mentions_chunks
-
-async def safe_send_message(client, chat_id, text):
-    """Send message with length checking"""
-    if len(text) > MAX_MESSAGE_LENGTH:
-        # Split message if too long
-        parts = [text[i:i+MAX_MESSAGE_LENGTH] for i in range(0, len(text), MAX_MESSAGE_LENGTH)]
-        for part in parts:
-            await client.send_message(chat_id, part, parse_mode=ParseMode.MARKDOWN)
-            await asyncio.sleep(1)  # Anti-flood delay
-    else:
-        await client.send_message(chat_id, text, parse_mode=ParseMode.MARKDOWN)
+    try:
+        await client.send_message(
+            chat_id,
+            full_text,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 Go Back", callback_data="tagall_back")
+            ]]) if len(mentions) > 5 else None
+        )
+        return True
+    except Exception as e:
+        LOGGER.error(f"Error sending tag batch: {e}")
+        return False
 
 # ================================================
 #               TAG COMMANDS
 # ================================================
 
-@Gojo.on_message(command(["tagall", "all"]) & filters.group)
+@Gojo.on_message(command(["tagall", "all", "callall"]) & filters.group)
 async def tag_all_members(c: Gojo, m: Message):
-    """Tag all group members with clean formatting and length checks"""
+    """Enhanced tagall command with better formatting"""
     chat = m.chat
     ACTIVE_TAGS[chat.id] = True
     
@@ -82,55 +85,68 @@ async def tag_all_members(c: Gojo, m: Message):
     base_msg = (
         m.reply_to_message.text if m.reply_to_message
         else m.text.split(None, 1)[1] if len(m.command) > 1
-        else "Hello everyone! 👋"
+        else "📢 Group Notification"
     )
 
     try:
-        # Get all non-bot members
+        # Get members with progress indicator
+        progress_msg = await m.reply_text("🔄 Collecting members...")
         members = [
             member async for member in c.get_chat_members(chat.id)
             if not member.user.is_bot
         ]
 
         if not members:
-            return await m.reply_text("No active members to tag!")
+            await progress_msg.edit_text("❌ No active members found!")
+            return
 
-        # Format mentions into manageable chunks
-        mentions_chunks = await format_mentions(members)
-        if not mentions_chunks:
-            return await m.reply_text("No valid members to tag!")
-
-        # Send initial message
-        style = choice(TAG_STYLES)
-        header = style.split("{mentions}")[0].format(message=base_msg)
-        await m.reply_text(header, parse_mode=ParseMode.MARKDOWN)
-
-        # Send mentions in chunks
-        for chunk in mentions_chunks:
+        await progress_msg.edit_text(f"✅ Found {len(members)} members. Starting tags...")
+        
+        # Prepare mentions in batches
+        mentions_batch = []
+        style = choice(TAGALL_STYLES)
+        
+        for i, member in enumerate(members, 1):
             if not ACTIVE_TAGS.get(chat.id, False):
-                break  # Stop if tagging was cancelled
+                break  # Cancellation check
             
-            await safe_send_message(c, chat.id, chunk)
-            await asyncio.sleep(1)  # Anti-flood delay
+            mention = await format_user_mention(member)
+            mentions_batch.append(mention)
+            
+            # Send batch when full or at end
+            if len(mentions_batch) >= MAX_MENTIONS_PER_MESSAGE or i == len(members):
+                if mentions_batch:
+                    success = await send_mentions_batch(c, chat.id, mentions_batch, base_msg, style)
+                    if not success:
+                        await m.reply_text("⚠️ Failed to send some tags. Trying again...")
+                        await asyncio.sleep(TAG_DELAY * 2)  # Longer delay on failure
+                        await send_mentions_batch(c, chat.id, mentions_batch, base_msg, style)
+                    
+                    mentions_batch = []
+                    await asyncio.sleep(TAG_DELAY)
+
+        await progress_msg.edit_text(f"✅ Tagging completed! {len(members)} members notified.")
 
     except Exception as e:
-        await m.reply_text(f"Error: {str(e)}")
+        await m.reply_text(f"❌ Error: {str(e)}")
+        LOGGER.error(f"Tagall error: {e}")
     finally:
         ACTIVE_TAGS.pop(chat.id, None)
 
-@Gojo.on_message(command(["admintag", "atag"]) & filters.group)
+@Gojo.on_message(command(["admintag", "atag"]))
 async def tag_admins(c: Gojo, m: Message):
-    """Tag only admins with clean formatting and length checks"""
+    """Enhanced admin tag with better formatting"""
     chat = m.chat
     ACTIVE_TAGS[chat.id] = True
     
     base_msg = (
         m.reply_to_message.text if m.reply_to_message
         else m.text.split(None, 1)[1] if len(m.command) > 1
-        else "Admin attention needed!"
+        else "🛡 Admin Attention Needed"
     )
 
     try:
+        progress_msg = await m.reply_text("🔄 Collecting admins...")
         admins = [
             member async for member in c.get_chat_members(
                 chat.id,
@@ -141,46 +157,63 @@ async def tag_admins(c: Gojo, m: Message):
         ]
 
         if not admins:
-            return await m.reply_text("No active admins to tag!")
+            await progress_msg.edit_text("❌ No active admins found!")
+            return
 
-        # Format mentions into manageable chunks
-        mentions_chunks = await format_mentions(admins)
+        await progress_msg.edit_text(f"✅ Found {len(admins)} admins. Starting tags...")
         
-        # Send initial message
-        header = ADMIN_STYLE.split("{mentions}")[0].format(message=base_msg)
-        await m.reply_text(header, parse_mode=ParseMode.MARKDOWN)
-
-        # Send mentions in chunks
-        for chunk in mentions_chunks:
-            if not ACTIVE_TAGS.get(chat.id, False):
-                break  # Stop if tagging was cancelled
-            
-            await safe_send_message(c, chat.id, chunk)
-            await asyncio.sleep(1)  # Anti-flood delay
+        # Admin mentions are sent all together (usually fewer)
+        admin_mentions = [await format_user_mention(admin) for admin in admins]
+        await send_mentions_batch(c, chat.id, admin_mentions, base_msg, ADMIN_STYLE, True)
+        
+        await progress_msg.edit_text(f"✅ Admin tagging completed! {len(admins)} admins notified.")
 
     except Exception as e:
-        await m.reply_text(f"Error: {str(e)}")
+        await m.reply_text(f"❌ Error: {str(e)}")
+        LOGGER.error(f"Admintag error: {e}")
     finally:
         ACTIVE_TAGS.pop(chat.id, None)
 
 # ================================================
-#               MODULE INFO
+#               OTHER COMMANDS
 # ================================================
 
-__PLUGIN__ = "tagging"
-__alt_name__ = ["tagall", "all", "admintag", "atag"]
+@Gojo.on_message(command(["canceltag", "cancel"]))
+async def cancel_tagging(c: Gojo, m: Message):
+    """Enhanced cancellation with confirmation"""
+    chat = m.chat
+    
+    if chat.id in ACTIVE_TAGS and ACTIVE_TAGS[chat.id]:
+        ACTIVE_TAGS[chat.id] = False
+        await m.reply_text(
+            "⏹ Tagging process cancelled!",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔄 Restart", callback_data="tagall_restart")
+            ]])
+        )
+    else:
+        await m.reply_text("ℹ️ No active tagging process to cancel.")
+
+# ================================================
+#               MODULE METADATA
+# ================================================
+
+__PLUGIN__ = "advanced_tagging"
+__alt_name__ = ["tagall", "all", "admintag", "atag", "canceltag"]
 
 __HELP__ = """
-**Improved Tagging Commands**
+**🌟 Advanced Tagging System**
 
-• /tagall [message] - Tag all members (with smart message splitting)
+• /tagall [message] - Mention all members with names
 • /tagall (reply) - Tag all with replied message
-• /atag [message] - Tag only admins  
+• /atag [message] - Mention only admins with names  
 • /atag (reply) - Tag admins with replied message
+• /canceltag - Stop ongoing tagging process
 
 **Features:**
-- Automatic handling of large groups
-- Clean, readable mentions
-- Message length protection
-- Rate limiting to prevent flooding
+- Shows user's full name and username
+- Properly formatted mentions
+- Progress indicators
+- Anti-flood protection
+- Smart batch processing
 """
