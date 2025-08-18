@@ -69,7 +69,7 @@ async def kang(c: Gojo, m: Message):
 
     # ✅ Check if user has started the bot
     try:
-        await c.send_chat_action(m.from_user.id, "typing")
+        await c.send_chat_action(m.from_user.id, ChatAction.TYPING)
     except (PeerIdInvalid, UserIsBlocked):
         keyboard = IKM(
             [[IKB("✨ Start Me in DM", url=f"https://t.me/{c.me.username}?start=start")]]
