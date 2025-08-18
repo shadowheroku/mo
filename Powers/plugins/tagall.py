@@ -31,16 +31,15 @@ ADMIN_STYLE = "🛡 **Admin Notification**\n\n{message}\n\n{mentions}"
 # ================================================
 
 async def format_user_mention(member) -> str:
-    """Format user mention with their first name"""
+    """Format user mention with their name only (no username)"""
     user = member.user
     if user.is_deleted:
         return f"🗑 Deleted Account ({user.id})"
     
     first_name = user.first_name or ""
     last_name = f" {user.last_name}" if user.last_name else ""
-    username = f" (@{user.username})" if user.username else ""
     
-    return f"👤 {first_name}{last_name}{username}"
+    return f"👤 {first_name}{last_name}"
 
 async def send_mentions_batch(
     client: Gojo,
@@ -77,7 +76,7 @@ async def send_mentions_batch(
 
 @Gojo.on_message(command(["tagall", "all", "callall"]) & filters.group)
 async def tag_all_members(c: Gojo, m: Message):
-    """Enhanced tagall command with better formatting"""
+    """Tagall command that mentions users by name only"""
     chat = m.chat
     ACTIVE_TAGS[chat.id] = True
     
@@ -135,7 +134,7 @@ async def tag_all_members(c: Gojo, m: Message):
 
 @Gojo.on_message(command(["admintag", "atag"]))
 async def tag_admins(c: Gojo, m: Message):
-    """Enhanced admin tag with better formatting"""
+    """Admin tag that mentions users by name only"""
     chat = m.chat
     ACTIVE_TAGS[chat.id] = True
     
@@ -180,7 +179,7 @@ async def tag_admins(c: Gojo, m: Message):
 
 @Gojo.on_message(command(["canceltag", "cancel"]))
 async def cancel_tagging(c: Gojo, m: Message):
-    """Enhanced cancellation with confirmation"""
+    """Cancel ongoing tagging process"""
     chat = m.chat
     
     if chat.id in ACTIVE_TAGS and ACTIVE_TAGS[chat.id]:
@@ -198,20 +197,21 @@ async def cancel_tagging(c: Gojo, m: Message):
 #               MODULE METADATA
 # ================================================
 
-__PLUGIN__ = "advanced_tagging"
+__PLUGIN__ = "name_tagging"
 __alt_name__ = ["tagall", "all", "admintag", "atag", "canceltag"]
 
 __HELP__ = """
-**🌟 Advanced Tagging System**
+**🌟 Name-Based Tagging System**
 
-• /tagall [message] - Mention all members with names
+• /tagall [message] - Mention all members by name
 • /tagall (reply) - Tag all with replied message
-• /atag [message] - Mention only admins with names  
+• /atag [message] - Mention only admins by name  
 • /atag (reply) - Tag admins with replied message
 • /canceltag - Stop ongoing tagging process
 
 **Features:**
-- Shows user's full name and username
+- Tags users by their name only (no usernames)
+- Shows user's full name
 - Properly formatted mentions
 - Progress indicators
 - Anti-flood protection
