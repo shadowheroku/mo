@@ -53,140 +53,137 @@ async def sticker_id_gib(c: Gojo, m: Message):
     return
 
 
-from pyrogram.errors import PeerIdInvalid, UserIsBlocked
-from pyrogram.types import InlineKeyboardMarkup as IKM, InlineKeyboardButton as IKB
+from pyrogram import filters
+from pyrogram.types import Message, ChatAction, InlineKeyboardMarkup as IKM, InlineKeyboardButton as IKB
+from pyrogram.errors import (
+    PeerIdInvalid,
+    UserIsBlocked,
+    ShortnameOccupyFailed,
+    StickerEmojiInvalid,
+    StickersetInvalid,
+    StickerPngNopng,
+    StickerPngDimensions,
+    StickerTgsNotgs,
+    StickerVideoNowebm,
+)
+from random import choice
+import os
+from traceback import format_exc
+
+from Powers.bot_class import Gojo
+from Powers.helpers.kang import (
+    resize_file_to_sticker_size,
+    create_sticker,
+    create_sticker_set,
+    add_sticker_to_set,
+    get_sticker_set_by_name,
+    upload_document,
+    get_document_from_file_id,
+    get_file_size,
+    Vsticker,
+)
+from Powers.logging import LOGGER
 
 
-@Gojo.on_message(command(["kang", "steal"]))
+@Gojo.on_message(filters.command(["kang", "steal"]))
 async def kang(c: Gojo, m: Message):
+    # Ensure valid reply
     if not m.reply_to_message:
-        return await m.reply_text("Reply to a sticker or image to kang it.")
-    elif not (m.reply_to_message.animation or m.reply_to_message.sticker or m.reply_to_message.photo or (
-            m.reply_to_message.document and m.reply_to_message.document.mime_type.split("/")[0] in ["image", "video"])):  
-        return await m.reply_text("Reply to a sticker or image to kang it.")
-    if not m.from_user:
-        return await m.reply_text("You are anon admin, kang stickers in my pm.")
+        return await m.reply_text("Reply to a sticker, image, or video to kang it.")
 
-    # ✅ Check if user has started the bot
+    if not (
+        m.reply_to_message.sticker
+        or m.reply_to_message.photo
+        or m.reply_to_message.animation
+        or (m.reply_to_message.document and m.reply_to_message.document.mime_type.split("/")[0] in ["image", "video"])
+        or m.reply_to_message.video
+    ):
+        return await m.reply_text("Reply to a sticker, image, or video to kang it.")
+
+    if not m.from_user:
+        return await m.reply_text("You are anon admin. Kang stickers in my PM instead.")
+
+    # ✅ Ensure user started bot
     try:
         await c.send_chat_action(m.from_user.id, ChatAction.TYPING)
     except (PeerIdInvalid, UserIsBlocked):
-        keyboard = IKM(
-            [[IKB("✨ Start Me in DM", url=f"https://t.me/{c.me.username}?start=start")]]
-        )
+        keyboard = IKM([[IKB("✨ Start Me in DM", url=f"https://t.me/{c.me.username}?start=start")]])
         return await m.reply_text(
             "⚠️ You need to start me in private chat first before using this command.",
             reply_markup=keyboard,
         )
 
-    msg = await m.reply_text("Kanging Sticker..")
+    msg = await m.reply_text("⏳ Processing...")
 
-    is_requ = bool(
-        m.reply_to_message.sticker
-        and (
-            m.reply_to_message.sticker.is_animated
-            or m.reply_to_message.sticker.is_video
-        )
-    )
-    # Find the proper emoji
+    # Determine emoji
     args = m.text.split()
     if len(args) > 1:
-        sticker_emoji = str(args[1])
-    elif m.reply_to_message.sticker:
-        try:
-            sticker_emoji = m.reply_to_message.sticker.emoji
-            if not sticker_emoji:
-                ran = ["🤣", "😑", "😁", "👍", "🔥", "🙈", "🙏", "😍", "😘", "😱", "☺️", "🙃", "😌", "🤧", "😐", "😬", "🤩", "😀", "🙂",
-                       "🥹", "🥺", "🫥", "🙄", "🫡", "🫠", "🤫", "😓", "🥵", "🥶", "😤", "😡", "🤬", "🤯", "🥴", "🤢", "🤮", "💀", "🗿",
-                       "💩", "🤡", "🫶", "🙌", "👐", "✊", "👎", "🫰", "🤌", "👌", "👀", "💃", "🕺", "👩‍❤️‍💋‍👩", "👩‍❤️‍💋‍👨",
-                       "👨‍❤️‍👨", "💑", "👩‍❤️‍👩", "👩‍❤️‍👨", "💏", "👨‍❤️‍💋‍👨", "😪", "😴", "😭", "🥸", "🤓", "🫤", "😮", "😧", "😲",
-                       "🥱", "😈", "👿", "🤖", "👾", "🙌", "🥴", "🥰", "😇", "🤣", "😂", "😜", "😎"]
-                sticker_emoji = choice(ran)
-        except Exception:
-            ran = ["🤣", "😑", "😁", "👍", "🔥", "🙈", "🙏", "😍", "😘", "😱", "☺️", "🙃", "😌", "🤧", "😐", "😬", "🤩", "😀", "🙂", "🥹",
-                   "🥺", "🫥", "🙄", "🫡", "🫠", "🤫", "😓", "🥵", "🥶", "😤", "😡", "🤬", "🤯", "🥴", "🤢", "🤮", "💀", "🗿", "💩", "🤡",
-                   "🫶", "🙌", "👐", "✊", "👎", "🫰", "🤌", "👌", "👀", "💃", "🕺", "👩‍❤️‍💋‍👩", "👩‍❤️‍💋‍👨", "👨‍❤️‍👨", "💑",
-                   "👩‍❤️‍👩", "👩‍❤️‍👨", "💏", "👨‍❤️‍💋‍👨", "😪", "😴", "😭", "🥸", "🤓", "🫤", "😮", "😧", "😲", "🥱", "😈", "👿", "🤖",
-                   "👾", "🙌", "🥴", "🥰", "😇", "🤣", "😂", "😜", "😎"]
-            sticker_emoji = choice(ran)
+        sticker_emoji = args[1]
+    elif m.reply_to_message.sticker and m.reply_to_message.sticker.emoji:
+        sticker_emoji = m.reply_to_message.sticker.emoji
     else:
-        edit = await msg.reply_text("No emoji provided choosing a random emoji")
-        ran = ["🤣", "😑", "😁", "👍", "🔥", "🙈", "🙏", "😍", "😘", "😱", "☺️", "🙃", "😌", "🤧", "😐", "😬", "🤩", "😀", "🙂", "🥹", "🥺",
-               "🫥", "🙄", "🫡", "🫠", "🤫", "😓", "🥵", "🥶", "😤", "😡", "🤬", "🤯", "🥴", "🤢", "🤮", "💀", "🗿", "💩", "🤡", "🫶", "🙌",
-               "👐", "✊", "👎", "🫰", "🤌", "👌", "👀", "💃", "🕺", "👩‍❤️‍💋‍👩", "👩‍❤️‍💋‍👨", "👨‍❤️‍👨", "💑", "👩‍❤️‍👩", "👩‍❤️‍👨",
-               "💏", "👨‍❤️‍💋‍👨", "😪", "😴", "😭", "🥸", "🤓", "🫤", "😮", "😧", "😲", "🥱", "😈", "👿", "🤖", "👾", "🙌", "🥴", "🥰",
-               "😇", "🤣", "😂", "😜", "😎"]
+        ran = ["🤣", "😑", "😁", "👍", "🔥", "😍", "😱", "🤖", "👀", "💀", "🫶", "🙌", "😎", "🥶", "🥵"]
         sticker_emoji = choice(ran)
-        await edit.delete()
-    await msg.edit_text(f"Makeing a sticker with {sticker_emoji} emoji")
 
-    # Get the corresponding fileid, resize the file if necessary
+    await msg.edit_text(f"Making a sticker with {sticker_emoji} emoji")
+
+    # Handle file download & sticker creation
     try:
-        if is_requ or m.reply_to_message.animation or m.reply_to_message.video or m.reply_to_message.photo or (
-                m.reply_to_message.document and m.reply_to_message.document.mime_type.split("/")[0] in ["video",
-                                                                                                        "image"]):
-            # telegram doesn't allow animated and video sticker to be kanged as we do for normal stickers
-            if m.reply_to_message.animation or m.reply_to_message.video or (
-                    m.reply_to_message.document and m.reply_to_message.document.mime_type.split("/")[0] == "video"):
-                path = await Vsticker(c, m.reply_to_message)
-                SIZE = os.path.getsize(path)
-                if SIZE > 261120:
-                    await m.reply_text("File is too big")
-                    os.remove(path)
-                    return
-            elif is_requ:
-                path = await m.reply_to_message.download()
-            else:
-                sizee = (await get_file_size(m.reply_to_message)).split()
-                if (sizee[1] == "mb" and int(sizee[0]) > 10) or sizee[1] == "gb":
-                    await m.reply_text("File size is too big")
-                    return
-                path = await m.reply_to_message.download()
-                path = await resize_file_to_sticker_size(path)
-            sticker = await create_sticker(
-                await upload_document(
-                    c, path, m.chat.id
-                ),
-                sticker_emoji
-            )
-            os.remove(path)
+        if (
+            m.reply_to_message.animation
+            or m.reply_to_message.video
+            or (m.reply_to_message.document and m.reply_to_message.document.mime_type.split("/")[0] == "video")
+        ):
+            path = await Vsticker(c, m.reply_to_message)
+            if os.path.getsize(path) > 261120:
+                await m.reply_text("❌ File too big to make sticker.")
+                os.remove(path)
+                return
+        elif m.reply_to_message.photo or (m.reply_to_message.document and m.reply_to_message.document.mime_type.split("/")[0] == "image"):
+            sizee = (await get_file_size(m.reply_to_message)).split()
+            if (sizee[1] == "mb" and int(sizee[0]) > 10) or sizee[1] == "gb":
+                await m.reply_text("❌ File size is too big.")
+                return
+            path = await m.reply_to_message.download()
+            path = await resize_file_to_sticker_size(path)
         elif m.reply_to_message.sticker:
-            sticker = await create_sticker(
-                await get_document_from_file_id(
-                    m.reply_to_message.sticker.file_id
-                ),
-                sticker_emoji
-            )
+            sticker = await create_sticker(await get_document_from_file_id(m.reply_to_message.sticker.file_id), sticker_emoji)
+            path = None
         else:
-            await m.reply_text("Unsupported media file...")
-            return
+            return await m.reply_text("Unsupported media type.")
+
+        if path:
+            sticker = await create_sticker(await upload_document(c, path, m.chat.id), sticker_emoji)
+            os.remove(path)
+
     except ShortnameOccupyFailed:
-        await m.reply_text("Change Your Name Or Username")
+        return await m.reply_text("❌ Change your Telegram username or try again.")
+    except Exception as e:
+        await m.reply_text(f"⚠️ Error: {e}")
+        LOGGER.error(format_exc())
         return
 
-    except Exception as e:
-        await m.reply_text(str(e))
-        e = format_exc()
-        LOGGER.error(e)
-        LOGGER.error(format_exc())
-
-    # Find an available pack & add the sticker to the pack; create a new pack if needed
-    # Would be a good idea to cache the number instead of searching it every single time...
+    # Sticker pack management
     kang_lim = 120
-    packnum = 0
-    limit = 0
-    volume = 0
+    packnum, limit, volume = 0, 0, 0
     packname_found = False
 
     try:
         while not packname_found:
             packname = f"CE{m.from_user.id}{packnum}_by_{c.me.username}"
-            kangpack = f"{f'@{m.from_user.username}' if m.from_user.username else m.from_user.first_name[:10]} {f'vOl {str(volume)}' if volume else ''} by @{c.me.username}"
-            if limit >= 50:  # To prevent this loop from running forever
-                await m.reply_text(
-                    "Failed to kang\nMay be you have made more than 50 sticker packs with me try deleting some")
-                return
-            sticker_set = await get_sticker_set_by_name(c, packname)
+            kangpack = (
+                f"{('@' + m.from_user.username) if m.from_user.username else m.from_user.first_name[:10]}"
+                f" {f'Vol {volume}' if volume else ''} by @{c.me.username}"
+            )
+
+            if limit >= 50:
+                return await m.reply_text("❌ You have too many packs. Try deleting some.")
+
+            try:
+                sticker_set = await get_sticker_set_by_name(c, packname)
+            except StickersetInvalid:
+                sticker_set = None
+
             if not sticker_set:
                 try:
                     sticker_set = await create_sticker_set(
@@ -194,61 +191,41 @@ async def kang(c: Gojo, m: Message):
                         owner=m.from_user.id,
                         title=kangpack,
                         short_name=packname,
-                        stickers=[sticker]
+                        stickers=[sticker],
                     )
                 except StickerEmojiInvalid:
-                    return await msg.edit("[ERROR]: INVALID_EMOJI_IN_ARGUMENT")
+                    return await msg.edit("[ERROR]: Invalid emoji in argument.")
             elif sticker_set.set.count >= kang_lim:
                 packnum += 1
                 limit += 1
                 volume += 1
                 continue
+
             try:
                 await add_sticker_to_set(c, sticker_set, sticker)
                 packname_found = True
             except StickerEmojiInvalid:
-                return await msg.edit("[ERROR]: INVALID_EMOJI_IN_ARGUMENT")
-        kb = IKM(
-            [
-                [
-                    IKB("➕ Add Pack ➕", url=f"t.me/addstickers/{packname}")
-                ]
-            ]
-        )
+                return await msg.edit("[ERROR]: Invalid emoji in argument.")
+
+        kb = IKM([[IKB("➕ Add Pack ➕", url=f"t.me/addstickers/{packname}")]])
         await msg.delete()
-        await m.reply_text(
-            f"Kanged the sticker\nPack name: `{kangpack}`\nEmoji: {sticker_emoji}",
-            reply_markup=kb
-        )
+        await m.reply_text(f"✅ Kanged!\nPack: `{kangpack}`\nEmoji: {sticker_emoji}", reply_markup=kb)
+
     except (PeerIdInvalid, UserIsBlocked):
-        keyboard = IKM(
-            [[IKB("Start me first", url=f"t.me/{c.me.username}")]]
-        )
+        kb = IKM([[IKB("✨ Start Me in DM", url=f"t.me/{c.me.username}?start=start")]])
         await msg.delete()
-        await m.reply_text(
-            "You Need To Start A Private Chat With Me.",
-            reply_markup=keyboard,
-        )
+        await m.reply_text("⚠️ Start me in private chat first.", reply_markup=kb)
     except StickerPngNopng:
-        await msg.delete()
-        await m.reply_text(
-            "Stickers must be png files but the provided image was not a png"
-        )
+        await msg.edit("❌ Stickers must be PNG files.")
     except StickerPngDimensions:
-        await msg.delete()
-        await m.reply_text("The sticker png dimensions are invalid.")
+        await msg.edit("❌ Invalid PNG dimensions for sticker.")
     except StickerTgsNotgs:
-        await msg.delete()
-        await m.reply_text("Sticker must be tgs file but the provided file was not tgs")
+        await msg.edit("❌ Sticker must be a TGS file.")
     except StickerVideoNowebm:
-        await msg.delete()
-        await m.reply_text("Sticker must be webm file but the provided file was not webm")
+        await msg.edit("❌ Sticker must be a WEBM file.")
     except Exception as e:
-        await msg.delete()
-        await m.reply_text(f"Error occured\n{e}")
-        LOGGER.error(e)
+        await msg.edit(f"⚠️ Error: {e}")
         LOGGER.error(format_exc())
-    return
 
 
 
