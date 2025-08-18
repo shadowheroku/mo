@@ -1,5 +1,5 @@
 import asyncio
-from pyrogram.types import Message, Chat
+from pyrogram.types import Message
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 from pyrogram.errors import PeerIdInvalid, ChannelInvalid
@@ -8,13 +8,17 @@ from pyrogram.errors import PeerIdInvalid, ChannelInvalid
 async def tag_all_members(c: Gojo, m: Message):
     """Tag all members in batches of 5 every 1.5 seconds"""
     try:
-        if not m.chat or m.chat.type not in (Chat.Type.GROUP, Chat.Type.SUPERGROUP):
+        # Check if in group/supergroup
+        if not m.chat or m.chat.type not in ("group", "supergroup"):
             return await m.reply_text("❌ This command only works in groups/supergroups!")
 
         # Check if bot has permissions
-        bot_member = await m.chat.get_member("me")
-        if not bot_member.privileges or not bot_member.privileges.can_mention:
-            return await m.reply_text("⚠️ I don't have permission to mention members here!")
+        try:
+            bot_member = await m.chat.get_member("me")
+            if not getattr(bot_member, "privileges", None) or not bot_member.privileges.can_mention:
+                return await m.reply_text("⚠️ I don't have permission to mention members here!")
+        except Exception as e:
+            return await m.reply_text(f"⚠️ Failed to check permissions: {e}")
 
         msg = await m.reply_text("🔍 Fetching members...")
         
@@ -50,13 +54,17 @@ async def tag_all_members(c: Gojo, m: Message):
 async def tag_admins(c: Gojo, m: Message):
     """Tag all admins in batches of 5 every 1.5 seconds"""
     try:
-        if not m.chat or m.chat.type not in (Chat.Type.GROUP, Chat.Type.SUPERGROUP):
+        # Check if in group/supergroup
+        if not m.chat or m.chat.type not in ("group", "supergroup"):
             return await m.reply_text("❌ This command only works in groups/supergroups!")
 
         # Check if bot has permissions
-        bot_member = await m.chat.get_member("me")
-        if not bot_member.privileges or not bot_member.privileges.can_mention:
-            return await m.reply_text("⚠️ I don't have permission to mention members here!")
+        try:
+            bot_member = await m.chat.get_member("me")
+            if not getattr(bot_member, "privileges", None) or not bot_member.privileges.can_mention:
+                return await m.reply_text("⚠️ I don't have permission to mention members here!")
+        except Exception as e:
+            return await m.reply_text(f"⚠️ Failed to check permissions: {e}")
 
         msg = await m.reply_text("🔍 Fetching admins...")
         
