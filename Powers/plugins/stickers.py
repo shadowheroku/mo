@@ -55,6 +55,18 @@ async def sticker_id_gib(c: Gojo, m: Message):
 
 @Gojo.on_message(command(["kang", "steal"]))
 async def kang(c: Gojo, m: Message):
+    # Check if user has started the bot first
+    try:
+        # Try sending a small message to user's PM to verify access
+        await c.send_chat_action(m.from_user.id, "typing")
+    except (PeerIdInvalid, UserIsBlocked):
+        keyboard = IKM(
+            [[IKB("Start me first", url=f"t.me/{c.me.username}")]]
+        )
+        return await m.reply_text(
+            "You need to start me in private chat first to use this command!",
+            reply_markup=keyboard,
+        )
     if not m.reply_to_message:
         return await m.reply_text("Reply to a sticker or image to kang it.")
     elif not (m.reply_to_message.animation or m.reply_to_message.sticker or m.reply_to_message.photo or (
