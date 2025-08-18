@@ -9,7 +9,7 @@ async def tag_all_members(c: Gojo, m: Message):
     """Tag all members in batches of 5 every 1.5 seconds"""
     try:
         # Check if in group/supergroup
-        if not m.chat or m.chat.type not in ("group", "supergroup"):
+        if not m.chat or m.chat.type not in (Chat.Type.GROUP, Chat.Type.SUPERGROUP):
             return await m.reply_text("❌ This command only works in groups/supergroups!")
 
         # Check if bot has permissions
