@@ -1,116 +1,101 @@
 from random import choice
 from traceback import format_exc
+import os
 from pyrogram.enums import ChatAction
 from pyrogram import filters
-from pyrogram.errors import (PeerIdInvalid, ShortnameOccupyFailed,
-                             StickerEmojiInvalid, StickerPngDimensions,
-                             StickerPngNopng, StickerTgsNotgs,
-                             StickerVideoNowebm, UserIsBlocked)
-from pyrogram.types import CallbackQuery
-from pyrogram.types import InlineKeyboardButton as IKB
-from pyrogram.types import InlineKeyboardMarkup as IKM
-from pyrogram.types import Message
+from pyrogram.errors import (
+    PeerIdInvalid, ShortnameOccupyFailed, StickerEmojiInvalid,
+    StickerPngDimensions, StickerPngNopng, StickerTgsNotgs,
+    StickerVideoNowebm, UserIsBlocked, StickersetInvalid
+)
+from pyrogram.types import (
+    InlineKeyboardButton as IKB,
+    InlineKeyboardMarkup as IKM,
+    Message,
+    CallbackQuery
+)
 
 from Powers import LOGGER
+from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 from Powers.utils.sticker_help import *
 from Powers.utils.string import encode_decode
 from Powers.utils.web_helpers import get_file_size
 
+# ================================================
+#               STICKER INFORMATION
+# ================================================
 
 @Gojo.on_message(command(["stickerinfo", "stinfo"]))
 async def give_st_info(c: Gojo, m: Message):
+    """Get information about a sticker"""
     if not m.reply_to_message or not m.reply_to_message.sticker:
-        await m.reply_text("Reply to a sticker")
-        return
+        return await m.reply_text("Reply to a sticker")
+    
     st_in = m.reply_to_message.sticker
     st_type = "Normal"
     if st_in.is_animated:
         st_type = "Animated"
     elif st_in.is_video:
         st_type = "Video"
-    st_to_gib = f"""[Sticker]({m.reply_to_message.link}) info:
-File ID : `{st_in.file_id}`
-File name : {st_in.file_name}
-File unique ID : `{st_in.file_unique_id}`
-Date and time sticker created : `{st_in.date}`
-Sticker type : `{st_type}`
-Emoji : {st_in.emoji}
-Pack name : {st_in.set_name}
+    
+    st_to_gib = f"""📌 [Sticker]({m.reply_to_message.link}) info:
+🆔 File ID: `{st_in.file_id}`
+📛 File name: {st_in.file_name}
+🔐 Unique ID: `{st_in.file_unique_id}`
+📅 Created: `{st_in.date}`
+🎨 Type: `{st_type}`
+😀 Emoji: {st_in.emoji}
+📦 Pack: {st_in.set_name}
 """
-    kb = IKM([[IKB("➕ Add sticker to pack", url=f"https://t.me/addstickers/{st_in.set_name}")]])
+    kb = IKM([[IKB("➕ Add to Pack", url=f"https://t.me/addstickers/{st_in.set_name}")]])
     await m.reply_text(st_to_gib, reply_markup=kb)
-    return
-
 
 @Gojo.on_message(command(["stickerid", "stid"]))
 async def sticker_id_gib(c: Gojo, m: Message):
+    """Get sticker ID"""
     if not m.reply_to_message or not m.reply_to_message.sticker:
-        await m.reply_text("Reply to a sticker")
-        return
+        return await m.reply_text("Reply to a sticker")
+    
     st_in = m.reply_to_message.sticker
-    await m.reply_text(f"Sticker id: `{st_in.file_id}`\nSticker unique ID : `{st_in.file_unique_id}`")
-    return
+    await m.reply_text(
+        f"🆔 Sticker ID: `{st_in.file_id}`\n"
+        f"🔐 Unique ID: `{st_in.file_unique_id}`"
+    )
 
+# ================================================
+#               STICKER KANGING
+# ================================================
 
-from pyrogram import filters
-from pyrogram.types import Message, InlineKeyboardMarkup as IKM, InlineKeyboardButton as IKB
-from pyrogram.errors import (
-    PeerIdInvalid,
-    UserIsBlocked,
-    ShortnameOccupyFailed,
-    StickerEmojiInvalid,
-    StickersetInvalid,
-    StickerPngNopng,
-    StickerPngDimensions,
-    StickerTgsNotgs,
-    StickerVideoNowebm,
-)
-from random import choice
-import os
-from traceback import format_exc
-
-from Powers.bot_class import Gojo
-from Powers.helpers.kang import (
-    resize_file_to_sticker_size,
-    create_sticker,
-    create_sticker_set,
-    add_sticker_to_set,
-    get_sticker_set_by_name,
-    upload_document,
-    get_document_from_file_id,
-    get_file_size,
-    Vsticker,
-)
-from Powers.logging import LOGGER
-
-
-@Gojo.on_message(filters.command(["kang", "steal"]))
-async def kang(c: Gojo, m: Message):
-    # Ensure valid reply
+@Gojo.on_message(command(["kang", "steal"]))
+async def kang_sticker(c: Gojo, m: Message):
+    """Kang a sticker into your pack"""
+    # Validate input
     if not m.reply_to_message:
-        return await m.reply_text("Reply to a sticker, image, or video to kang it.")
+        return await m.reply_text("❌ Reply to a sticker/image/video to kang it.")
 
-    if not (
-        m.reply_to_message.sticker
-        or m.reply_to_message.photo
-        or m.reply_to_message.animation
-        or (m.reply_to_message.document and m.reply_to_message.document.mime_type.split("/")[0] in ["image", "video"])
-        or m.reply_to_message.video
-    ):
-        return await m.reply_text("Reply to a sticker, image, or video to kang it.")
+    valid_media = (
+        m.reply_to_message.sticker or
+        m.reply_to_message.photo or
+        m.reply_to_message.animation or
+        m.reply_to_message.video or
+        (m.reply_to_message.document and m.reply_to_message.document.mime_type.split("/")[0] in ["image", "video"])
+    )
+    
+    if not valid_media:
+        return await m.reply_text("❌ Unsupported media type.")
 
     if not m.from_user:
-        return await m.reply_text("You are anon admin. Kang stickers in my PM instead.")
+        return await m.reply_text("⚠️ Anonymous admins can't kang stickers.")
 
-    # ✅ Ensure user started bot
+    # Check if user started bot
     try:
         await c.send_chat_action(m.from_user.id, ChatAction.TYPING)
     except (PeerIdInvalid, UserIsBlocked):
-        keyboard = IKM([[IKB("✨ Start Me in DM", url=f"https://t.me/{c.me.username}?start=start")]])
+        kb = IKM([[IKB("✨ Start Me", url=f"https://t.me/{c.me.username}")]])
         return await m.reply_text(
-            "⚠️ You need to start me in private chat first before using this command.",
-            reply_markup=keyboard,
+            "⚠️ Please start me in PM first!",
+            reply_markup=kb
         )
 
     msg = await m.reply_text("⏳ Processing...")
@@ -122,50 +107,59 @@ async def kang(c: Gojo, m: Message):
     elif m.reply_to_message.sticker and m.reply_to_message.sticker.emoji:
         sticker_emoji = m.reply_to_message.sticker.emoji
     else:
-        ran = ["🤣", "😑", "😁", "👍", "🔥", "😍", "😱", "🤖", "👀", "💀", "🫶", "🙌", "😎", "🥶", "🥵"]
+        ran = ["🤣", "😁", "👍", "🔥", "😍", "😱", "🤖", "👀", "💀", "🫶", "🙌", "😎"]
         sticker_emoji = choice(ran)
 
-    await msg.edit_text(f"Making a sticker with {sticker_emoji} emoji")
+    await msg.edit_text(f"🖌️ Creating sticker with {sticker_emoji} emoji...")
 
-    # Handle file download & sticker creation
+    # Process media
     try:
-        if (
-            m.reply_to_message.animation
-            or m.reply_to_message.video
-            or (m.reply_to_message.document and m.reply_to_message.document.mime_type.split("/")[0] == "video")
-        ):
+        is_video = (
+            m.reply_to_message.animation or
+            m.reply_to_message.video or
+            (m.reply_to_message.document and m.reply_to_message.document.mime_type.split("/")[0] == "video")
+        )
+        
+        if is_video:
             path = await Vsticker(c, m.reply_to_message)
-            if os.path.getsize(path) > 261120:
-                await m.reply_text("❌ File too big to make sticker.")
+            if os.path.getsize(path) > 261120:  # 255KB limit
+                await msg.edit_text("❌ File too large for sticker.")
                 os.remove(path)
                 return
-        elif m.reply_to_message.photo or (m.reply_to_message.document and m.reply_to_message.document.mime_type.split("/")[0] == "image"):
-            sizee = (await get_file_size(m.reply_to_message)).split()
-            if (sizee[1] == "mb" and int(sizee[0]) > 10) or sizee[1] == "gb":
-                await m.reply_text("❌ File size is too big.")
-                return
+        elif m.reply_to_message.photo or (
+            m.reply_to_message.document and m.reply_to_message.document.mime_type.split("/")[0] == "image"
+        ):
+            size_info = (await get_file_size(m.reply_to_message)).split()
+            if (size_info[1] == "mb" and int(size_info[0]) > 10) or size_info[1] == "gb":
+                return await msg.edit_text("❌ File too large.")
             path = await m.reply_to_message.download()
             path = await resize_file_to_sticker_size(path)
         elif m.reply_to_message.sticker:
-            sticker = await create_sticker(await get_document_from_file_id(m.reply_to_message.sticker.file_id), sticker_emoji)
+            sticker = await create_sticker(
+                await get_document_from_file_id(m.reply_to_message.sticker.file_id),
+                sticker_emoji
+            )
             path = None
         else:
-            return await m.reply_text("Unsupported media type.")
+            return await msg.edit_text("❌ Unsupported media type.")
 
         if path:
-            sticker = await create_sticker(await upload_document(c, path, m.chat.id), sticker_emoji)
+            sticker = await create_sticker(
+                await upload_document(c, path, m.chat.id),
+                sticker_emoji
+            )
             os.remove(path)
 
     except ShortnameOccupyFailed:
-        return await m.reply_text("❌ Change your Telegram username or try again.")
+        return await msg.edit_text("❌ Change your Telegram username and try again.")
     except Exception as e:
-        await m.reply_text(f"⚠️ Error: {e}")
+        await msg.edit_text(f"⚠️ Error: {str(e)}")
         LOGGER.error(format_exc())
         return
 
-    # Sticker pack management
-    kang_lim = 120
-    packnum, limit, volume = 0, 0, 0
+    # Manage sticker packs
+    kang_lim = 120  # Max stickers per pack
+    packnum = limit = volume = 0
     packname_found = False
 
     try:
@@ -177,7 +171,7 @@ async def kang(c: Gojo, m: Message):
             )
 
             if limit >= 50:
-                return await m.reply_text("❌ You have too many packs. Try deleting some.")
+                return await msg.edit_text("❌ You've reached the 50 pack limit.")
 
             try:
                 sticker_set = await get_sticker_set_by_name(c, packname)
@@ -194,7 +188,7 @@ async def kang(c: Gojo, m: Message):
                         stickers=[sticker],
                     )
                 except StickerEmojiInvalid:
-                    return await msg.edit("[ERROR]: Invalid emoji in argument.")
+                    return await msg.edit_text("❌ Invalid emoji provided.")
             elif sticker_set.set.count >= kang_lim:
                 packnum += 1
                 limit += 1
@@ -205,27 +199,31 @@ async def kang(c: Gojo, m: Message):
                 await add_sticker_to_set(c, sticker_set, sticker)
                 packname_found = True
             except StickerEmojiInvalid:
-                return await msg.edit("[ERROR]: Invalid emoji in argument.")
+                return await msg.edit_text("❌ Invalid emoji provided.")
 
-        kb = IKM([[IKB("➕ Add Pack ➕", url=f"t.me/addstickers/{packname}")]])
+        kb = IKM([[IKB("➕ Add Pack", url=f"t.me/addstickers/{packname}")]])
         await msg.delete()
-        await m.reply_text(f"✅ Kanged!\nPack: `{kangpack}`\nEmoji: {sticker_emoji}", reply_markup=kb)
+        await m.reply_text(
+            f"✅ Sticker added!\n📦 Pack: `{kangpack}`\n😀 Emoji: {sticker_emoji}",
+            reply_markup=kb
+        )
 
     except (PeerIdInvalid, UserIsBlocked):
-        kb = IKM([[IKB("✨ Start Me in DM", url=f"t.me/{c.me.username}?start=start")]])
+        kb = IKM([[IKB("✨ Start Me", url=f"t.me/{c.me.username}")]])
         await msg.delete()
-        await m.reply_text("⚠️ Start me in private chat first.", reply_markup=kb)
+        await m.reply_text("⚠️ Please start me in PM first!", reply_markup=kb)
     except StickerPngNopng:
-        await msg.edit("❌ Stickers must be PNG files.")
+        await msg.edit_text("❌ Stickers must be PNG files.")
     except StickerPngDimensions:
-        await msg.edit("❌ Invalid PNG dimensions for sticker.")
+        await msg.edit_text("❌ Invalid PNG dimensions.")
     except StickerTgsNotgs:
-        await msg.edit("❌ Sticker must be a TGS file.")
+        await msg.edit_text("❌ Requires TGS file.")
     except StickerVideoNowebm:
-        await msg.edit("❌ Sticker must be a WEBM file.")
+        await msg.edit_text("❌ Requires WEBM file.")
     except Exception as e:
-        await msg.edit(f"⚠️ Error: {e}")
+        await msg.edit_text(f"⚠️ Error: {str(e)}")
         LOGGER.error(format_exc())
+
 
 
 
