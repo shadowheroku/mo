@@ -1,153 +1,137 @@
 import asyncio
 from random import choice
+from typing import List, Optional
+
 from pyrogram import filters
-from pyrogram.enums import ParseMode, ChatMemberStatus, ChatMembersFilter
-from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
-from typing import List, Dict, Optional
+from pyrogram.enums import ParseMode as PM, ChatMemberStatus, ChatMembersFilter
+from pyrogram.types import Message, ChatMember
 
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
-# ================================================
-#               CONSTANTS
-# ================================================
+# Track ongoing tagging sessions
+ACTIVE_TAGS = {}
 
-ACTIVE_TAGS: Dict[int, bool] = {}
-MAX_MENTIONS_PER_MESSAGE = 5  # Reduced from 50 to prevent flooding
-TAG_DELAY = 2.0  # Increased delay between messages
-
+# Tagging styles with more variety
 TAGALL_STYLES = [
-    "📢 **Attention everyone!**\n\n{message}\n\n{mentions}",
-    "👋 **Hey everyone!**\n\n{message}\n\n{mentions}",
-    "🚨 **Important Notice**\n\n{message}\n\n{mentions}",
-    "✨ **Summoning the group** ✨\n\n{message}\n\n{mentions}",
-    "🔔 **Tag Alert**\n\n{message}\n\n{mentions}"
+    "🔥 Attention everyone!\n\n{msg}\n\n{mentions}",
+    "👋 Hey everyone! Check this out:\n\n{msg}\n\n{mentions}",
+    "🚨 IMPORTANT NOTICE 🚨\n\n{msg}\n\n{mentions}",
+    "✨ Summoning all members ✨\n\n{msg}\n\n{mentions}",
+    "📢 Announcement for everyone:\n\n{msg}\n\n{mentions}",
+    "🌟 Special mention for:\n\n{msg}\n\n{mentions}",
+    "📣 Group notification:\n\n{msg}\n\n{mentions}",
+    "👀 Heads up everyone!\n\n{msg}\n\n{mentions}",
+    "💬 Group message:\n\n{msg}\n\n{mentions}",
+    "🎉 Let's all see this!\n\n{msg}\n\n{mentions}"
 ]
 
-ADMIN_STYLE = "🛡 **Admin Notification**\n\n{message}\n\n{mentions}"
+ADMIN_STYLES = [
+    "🛡 Admin attention needed:\n\n{msg}\n\n{mentions}",
+    "🔐 Admin notification:\n\n{msg}\n\n{mentions}",
+    "⚙️ Admin team assemble:\n\n{msg}\n\n{mentions}",
+    "👨‍💻 Calling all admins:\n\n{msg}\n\n{mentions}",
+    "🛠 Admin assistance required:\n\n{msg}\n\n{mentions}"
+]
 
-# ================================================
-#               HELPER FUNCTIONS
-# ================================================
+class TaggingSession:
+    """Class to manage tagging sessions with more control"""
+    def __init__(self, chat_id: int):
+        self.chat_id = chat_id
+        self.is_active = True
+        self.last_batch_sent = 0
+        
+    def cancel(self):
+        """Cancel the tagging session"""
+        self.is_active = False
+        
+    def should_continue(self) -> bool:
+        """Check if tagging should continue"""
+        return self.is_active
 
-async def format_user_mention(member) -> str:
-    """Format user mention in 'Rep @username' style"""
-    user = member.user
-    if user.is_deleted:
-        return f"🗑 Deleted Account ({user.id})"
-    
-    if user.username:
-        return f"Rep @{user.username}"
-    else:
-        first_name = user.first_name or ""
-        last_name = f" {user.last_name}" if user.last_name else ""
-        return f"Rep {first_name}{last_name}"
+async def get_mentions(members: List[ChatMember]) -> str:
+    """Generate mentions string from chat members"""
+    return " ".join(
+        member.user.mention for member in members 
+        if not member.user.is_bot 
+        and not member.user.is_deleted
+    )
 
-async def send_mentions_batch(
+async def send_tag_batch(
     client: Gojo,
     chat_id: int,
-    mentions: List[str],
+    members: List[ChatMember],
     base_msg: str,
     style: str,
-    is_admin: bool = False
-) -> bool:
-    """Send a batch of mentions with proper formatting"""
-    mentions_text = "\n".join(mentions)  # Changed from bullet points to simple newlines
-    full_text = style.format(
-        message=base_msg or ("📝 Notification" if not is_admin else "🛡 Admin Attention Needed"),
-        mentions=mentions_text
-    )
-    
-    try:
+    batch_size: int = 5,
+    delay: float = 1.5
+) -> None:
+    """
+    Send mentions in batches with delay
+    Args:
+        batch_size: Number of users per batch
+        delay: Seconds to wait between batches
+    """
+    for i in range(0, len(members), batch_size):
+        batch = members[i:i + batch_size]
+        
+        # Check if tagging was cancelled
+        if chat_id not in ACTIVE_TAGS or not ACTIVE_TAGS[chat_id].should_continue():
+            break
+            
+        mentions = await get_mentions(batch)
+        if not mentions:
+            continue
+            
+        text = style.format(msg=base_msg, mentions=mentions)
         await client.send_message(
             chat_id,
-            full_text,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🔙 Go Back", callback_data="tagall_back")
-            ]]) if len(mentions) > 5 else None
+            text,
+            parse_mode=PM.MARKDOWN,
+            disable_web_page_preview=True
         )
-        return True
-    except Exception as e:
-        LOGGER.error(f"Error sending tag batch: {e}")
-        return False
+        await asyncio.sleep(delay)
 
-# ================================================
-#               TAG COMMANDS
-# ================================================
+async def get_message_content(m: Message) -> str:
+    """Extract message content from command or reply"""
+    if m.reply_to_message:
+        return m.reply_to_message.text or m.reply_to_message.caption or ""
+    return m.text.split(None, 1)[1] if len(m.command) > 1 else ""
 
 @Gojo.on_message(command(["tagall", "all", "callall"]) & filters.group)
 async def tag_all_members(c: Gojo, m: Message):
-    """Tagall command that mentions users in 'Rep @username' style"""
+    """Tag all members in the group with stylish message"""
     chat = m.chat
-    ACTIVE_TAGS[chat.id] = True
+    ACTIVE_TAGS[chat.id] = TaggingSession(chat.id)
     
-    # Get message content
-    base_msg = (
-        m.reply_to_message.text if m.reply_to_message
-        else m.text.split(None, 1)[1] if len(m.command) > 1
-        else "📢 Group Notification"
-    )
-
     try:
-        # Get members with progress indicator
-        progress_msg = await m.reply_text("🔄 Collecting members...")
+        base_msg = await get_message_content(m)
         members = [
             member async for member in c.get_chat_members(chat.id)
             if not member.user.is_bot
+            and not member.user.is_deleted
         ]
-
+        
         if not members:
-            await progress_msg.edit_text("❌ No active members found!")
-            return
-
-        await progress_msg.edit_text(f"✅ Found {len(members)} members. Starting tags...")
-        
-        # Prepare mentions in batches
-        mentions_batch = []
+            return await m.reply_text("No valid members found to tag.")
+            
         style = choice(TAGALL_STYLES)
+        await m.reply_text(f"🚀 Starting to tag {len(members)} members...")
+        await send_tag_batch(c, chat.id, members, base_msg, style)
         
-        for i, member in enumerate(members, 1):
-            if not ACTIVE_TAGS.get(chat.id, False):
-                break  # Cancellation check
-            
-            mention = await format_user_mention(member)
-            mentions_batch.append(mention)
-            
-            # Send batch when full or at end
-            if len(mentions_batch) >= MAX_MENTIONS_PER_MESSAGE or i == len(members):
-                if mentions_batch:
-                    success = await send_mentions_batch(c, chat.id, mentions_batch, base_msg, style)
-                    if not success:
-                        await m.reply_text("⚠️ Failed to send some tags. Trying again...")
-                        await asyncio.sleep(TAG_DELAY * 2)  # Longer delay on failure
-                        await send_mentions_batch(c, chat.id, mentions_batch, base_msg, style)
-                    
-                    mentions_batch = []
-                    await asyncio.sleep(TAG_DELAY)
-
-        await progress_msg.edit_text(f"✅ Tagging completed! {len(members)} members notified.")
-
     except Exception as e:
-        await m.reply_text(f"❌ Error: {str(e)}")
-        LOGGER.error(f"Tagall error: {e}")
+        await m.reply_text(f"⚠️ Error: {str(e)}")
     finally:
         ACTIVE_TAGS.pop(chat.id, None)
 
-@Gojo.on_message(command(["admintag", "atag"]))
-async def tag_admins(c: Gojo, m: Message):
-    """Admin tag that mentions users in 'Rep @username' style"""
+@Gojo.on_message(command(["atag", "admincall", "admins"]) & filters.group)
+async def tag_admins_only(c: Gojo, m: Message):
+    """Tag only admins in the group"""
     chat = m.chat
-    ACTIVE_TAGS[chat.id] = True
+    ACTIVE_TAGS[chat.id] = TaggingSession(chat.id)
     
-    base_msg = (
-        m.reply_to_message.text if m.reply_to_message
-        else m.text.split(None, 1)[1] if len(m.command) > 1
-        else "🛡 Admin Attention Needed"
-    )
-
     try:
-        progress_msg = await m.reply_text("🔄 Collecting admins...")
+        base_msg = await get_message_content(m)
         admins = [
             member async for member in c.get_chat_members(
                 chat.id,
@@ -155,67 +139,56 @@ async def tag_admins(c: Gojo, m: Message):
             )
             if member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
             and not member.user.is_bot
+            and not member.user.is_deleted
         ]
-
+        
         if not admins:
-            await progress_msg.edit_text("❌ No active admins found!")
-            return
-
-        await progress_msg.edit_text(f"✅ Found {len(admins)} admins. Starting tags...")
+            return await m.reply_text("No active admins found to tag.")
+            
+        style = choice(ADMIN_STYLES)
+        await m.reply_text(f"🛡 Starting to tag {len(admins)} admins...")
+        await send_tag_batch(c, chat.id, admins, base_msg, style)
         
-        # Admin mentions are sent all together (usually fewer)
-        admin_mentions = [await format_user_mention(admin) for admin in admins]
-        await send_mentions_batch(c, chat.id, admin_mentions, base_msg, ADMIN_STYLE, True)
-        
-        await progress_msg.edit_text(f"✅ Admin tagging completed! {len(admins)} admins notified.")
-
     except Exception as e:
-        await m.reply_text(f"❌ Error: {str(e)}")
-        LOGGER.error(f"Admintag error: {e}")
+        await m.reply_text(f"⚠️ Error: {str(e)}")
     finally:
         ACTIVE_TAGS.pop(chat.id, None)
 
-# ================================================
-#               OTHER COMMANDS
-# ================================================
-
-@Gojo.on_message(command(["canceltag", "cancel"]))
-async def cancel_tagging(c: Gojo, m: Message):
+@Gojo.on_message(command(["ctag", "canceltag", "stop"]) & filters.group)
+async def cancel_tagging_process(c: Gojo, m: Message):
     """Cancel ongoing tagging process"""
     chat = m.chat
-    
-    if chat.id in ACTIVE_TAGS and ACTIVE_TAGS[chat.id]:
-        ACTIVE_TAGS[chat.id] = False
-        await m.reply_text(
-            "⏹ Tagging process cancelled!",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🔄 Restart", callback_data="tagall_restart")
-            ]])
-        )
+    if chat.id in ACTIVE_TAGS:
+        ACTIVE_TAGS[chat.id].cancel()
+        await m.reply_text("⏹ Tagging process cancelled successfully.")
     else:
-        await m.reply_text("ℹ️ No active tagging process to cancel.")
+        await m.reply_text("❌ No active tagging process to cancel.")
 
-# ================================================
-#               MODULE METADATA
-# ================================================
-
-__PLUGIN__ = "rep_tagging"
-__alt_name__ = ["tagall", "all", "admintag", "atag", "canceltag"]
-
+__PLUGIN__ = "tagging_tools"
 __HELP__ = """
-**🌟 Rep-Style Tagging System**
+✪ **Tagging Tools** ✪
 
-• /tagall [message] - Mention all members (Rep @username style)
-• /tagall (reply) - Tag all with replied message
-• /atag [message] - Mention only admins (Rep @username style)
-• /atag (reply) - Tag admins with replied message
-• /canceltag - Stop ongoing tagging process
+• `/tagall` [text] - Tag all members (reply to a message to use its content)
+• `/atag` [text] - Tag only admins
+• `/ctag` - Cancel ongoing tagging process
 
-**Features:**
-- Tags users in "Rep @username" format
-- Shows username if available, falls back to name
-- Clean, simple mention format
-- Progress indicators
-- Anti-flood protection
-- Smart batch processing
+⚙️ **Features:**
+- Mentions in batches to avoid flooding
+- Stylish notification templates
+- Safe mentions (skips bots/deleted accounts)
+- Cancellable operations
 """
+
+__alt_name__ = [
+    "tagall", 
+    "all", 
+    "callall", 
+    "atag", 
+    "admincall", 
+    "admins",
+    "ctag",
+    "canceltag",
+    "stop"
+]
+
+_DISABLE_CMDS_ = __alt_name__
