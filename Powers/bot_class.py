@@ -92,12 +92,9 @@ class Gojo(Client):
         # Send Logs to MESSAGE_DUMP and LOG_CHANNEL
         scheduler.remove_all_jobs()
         target = MESSAGE_DUMP or OWNER_ID
-        await self.send_document(
+        await self.send_message(
             target,
-            document=LOGFILE,
-            caption=(
                 "Bot Stopped!\n\n" f"Uptime: {runtime}\n" f"<code>{LOG_DATETIME}</code>"
-            ),
         )
         await super().stop()
         MongoDB.close()
