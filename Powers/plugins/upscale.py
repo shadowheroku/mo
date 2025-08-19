@@ -27,8 +27,25 @@ def enhance_image(input_path, output_path):
                        [0, -1, 0]])
     sharp = cv2.filter2D(smooth, -1, kernel)
 
+    # --- Brightness & Color Enhancement ---
+    # Convert to HSV for better color control
+    hsv = cv2.cvtColor(sharp, cv2.COLOR_BGR2HSV).astype("float32")
+
+    # Increase brightness (value channel)
+    hsv[:, :, 2] = hsv[:, :, 2] * 1.1   # +10% brightness
+
+    # Increase saturation slightly
+    hsv[:, :, 1] = hsv[:, :, 1] * 1.15  # +15% color richness
+
+    # Clip values to avoid overflow
+    hsv = np.clip(hsv, 0, 255)
+
+    # Convert back to BGR
+    final = cv2.cvtColor(hsv.astype("uint8"), cv2.COLOR_HSV2BGR)
+
     # Save result
-    cv2.imwrite(output_path, sharp)
+    cv2.imwrite(output_path, final)
+
 
 
 @Gojo.on_message(filters.command(["upscale", "hd"], prefixes=["/", "!", "."]))
