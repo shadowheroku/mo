@@ -1,77 +1,80 @@
 import os
-import httpx
-import asyncio
+import requests
+import tempfile
 from pyrogram import filters
 from pyrogram.types import Message
 from Powers.bot_class import Gojo
 
-REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN") or "r8_X3wOWH9rYTC5JllHIgh3OfnS1HTgnhN1pK7v4"
-API_URL = "https://api.replicate.com/v1/predictions"
+# ESRGAN model ID (Replicate)
+MODEL_ID = "nightmareai/real-esrgan"  
 
-HEADERS = {
-    "Authorization": f"Token {REPLICATE_API_TOKEN}",
-    "Content-Type": "application/json"
-}
+API_TOKEN = "r8_X3wOWH9rYTC5JllHIgh3OfnS1HTgnhN1pK7v4"  # must be set in VPS env
 
-@Gojo.on_message(filters.command("upscale"))
-async def upscale_image(c: Gojo, m: Message):
-    if not m.reply_to_message.photo:
-        return await m.reply_text("❌ Reply to a photo to upscale it.")
+@Gojo.on_message(filters.command(["upscale", "hd"]))
+async def upscale(c: Gojo, m: Message):
+    if not m.reply_to_message or not m.reply_to_message.photo:
+        return await m.reply_text("⚠️ Reply to an image to upscale it.")
 
-    msg = await m.reply_text("🔄 Upscaling image... please wait")
+    msg = await m.reply_text("🔄 Upscaling... Please wait.")
 
-    # Get photo file path
-    photo = await m.reply_to_message.download()
+    # Download the photo temporarily
+    input_path = await c.download_media(m.reply_to_message.photo.file_id, file_name=tempfile.mktemp(suffix=".jpg"))
 
-    # Upload photo to Replicate's hosted file service
-    async with httpx.AsyncClient() as client:
-        with open(photo, "rb") as f:
-            upload = await client.post(
-                "https://api.replicate.com/v1/files",
-                headers={"Authorization": f"Token {REPLICATE_API_TOKEN}"},
+    try:
+        # Upload image to a temporary file host (Replicate needs URL input)
+        with open(input_path, "rb") as f:
+            upload = requests.post(
+                "https://api.anonfiles.com/upload",
                 files={"file": f}
-            )
-        upload.raise_for_status()
-        uploaded_url = upload.json()["urls"]["get"]
+            ).json()
+        image_url = upload["data"]["file"]["url"]["full"]
 
-        # Request upscale (factor 2)
-        data = {
-            "version": "8a1f2e5b1b4dbfdfa2b5a146dd0dfd5c2e018e1d98f9a9dbf17d91e4b6fb4ec8",  # Real-ESRGAN model
-            "input": {"image": uploaded_url, "scale": 2}
-        }
-        r = await client.post(API_URL, headers=HEADERS, json=data)
-        r.raise_for_status()
-        prediction = r.json()
-        prediction_url = prediction["urls"]["get"]
+        # Call Replicate ESRGAN API
+        response = requests.post(
+            "https://api.replicate.com/v1/predictions",
+            headers={"Authorization": f"Token {API_TOKEN}", "Content-Type": "application/json"},
+            json={
+                "version": "9936d9b908052e2dd55c3d43578a1b8e986ba4655c0c15dc1b6ee3a1df26c3f1",
+                "input": {"img": image_url, "scale": 2}
+            }
+        )
+        prediction = response.json()
+        if "id" not in prediction:
+            return await msg.edit_text("❌ Failed to upscale (API Error).")
 
         # Poll until finished
-        result = None
-        for _ in range(30):
-            status = await client.get(prediction_url, headers=HEADERS)
-            status.raise_for_status()
-            status_data = status.json()
-            if status_data["status"] == "succeeded":
-                result = status_data["output"]
+        status = prediction["status"]
+        output_url = None
+        while status not in ["succeeded", "failed", "canceled"]:
+            r = requests.get(f"https://api.replicate.com/v1/predictions/{prediction['id']}",
+                             headers={"Authorization": f"Token {API_TOKEN}"})
+            data = r.json()
+            status = data["status"]
+            if status == "succeeded":
+                output_url = data["output"][0]
                 break
-            elif status_data["status"] == "failed":
-                return await msg.edit("❌ Upscaling failed.")
-            await asyncio.sleep(5)
 
-    if not result:
-        return await msg.edit("❌ Upscaling timed out.")
+        if not output_url:
+            return await msg.edit_text("❌ Upscaling failed - no output received")
 
-    # Download final upscaled image
-    out_file = "upscaled.png"
-    async with httpx.AsyncClient() as client:
-        res = await client.get(result[0])
-        with open(out_file, "wb") as f:
-            f.write(res.content)
+        # Save result as file
+        output_path = tempfile.mktemp(suffix=".png")
+        with open(output_path, "wb") as f:
+            f.write(requests.get(output_url).content)
 
-    # Send and delete local file
-    await m.reply_photo(out_file, caption="✨ Here’s your upscaled image")
-    os.remove(out_file)
-    os.remove(photo)
-    await msg.delete()
+        # Send as file
+        await m.reply_document(output_path, caption="✨ Upscaled with ESRGAN")
+
+        await msg.delete()
+
+        # Cleanup
+        os.remove(input_path)
+        os.remove(output_path)
+
+    except Exception as e:
+        await msg.edit_text(f"❌ Error: {e}")
+        if os.path.exists(input_path):
+            os.remove(input_path)
 
 
 __PLUGIN__ = "upscale"
