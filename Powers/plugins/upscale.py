@@ -8,33 +8,27 @@ from PIL import Image, ImageFilter
 from Powers.bot_class import Gojo
 
 
+
+
 def enhance_image(input_path, output_path):
-    # Read image
+    # Read image with OpenCV
     img = cv2.imread(input_path)
 
-    # Upscale with Lanczos
+    # Upscale using OpenCV's super-resize (Lanczos)
     upscale_factor = 2
     upscaled = cv2.resize(img, None, fx=upscale_factor, fy=upscale_factor, interpolation=cv2.INTER_LANCZOS4)
 
-    # Denoise (smooth colors, keep structure)
+    # Denoise (smooth colors without blurring edges too much)
     smooth = cv2.fastNlMeansDenoisingColored(upscaled, None, 10, 10, 7, 21)
 
-    # Unsharp mask (more controlled sharpening)
-    gaussian = cv2.GaussianBlur(smooth, (0, 0), 2)
-    unsharp = cv2.addWeighted(smooth, 1.4, gaussian, -0.4, 0)
-
-    # Extra sharpening kernel (a bit stronger than before)
-    kernel = np.array([[0, -0.5, 0],
-                       [-0.5, 3.0, -0.5],
-                       [0, -0.5, 0]])
-    sharpened = cv2.filter2D(unsharp, -1, kernel)
-
-    # Blend to avoid overkill (keep 80% sharpen, 20% smooth)
-    final = cv2.addWeighted(unsharp, 0.8, sharpened, 0.2, 0)
+    # Sharpen lines
+    kernel = np.array([[0, -1, 0],
+                       [-1,  5,-1],
+                       [0, -1, 0]])
+    sharp = cv2.filter2D(smooth, -1, kernel)
 
     # Save result
-    cv2.imwrite(output_path, final)
-
+    cv2.imwrite(output_path, sharp)
 
 
 @Gojo.on_message(filters.command(["upscale", "hd"], prefixes=["/", "!", "."]))
