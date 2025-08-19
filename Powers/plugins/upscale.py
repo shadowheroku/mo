@@ -9,24 +9,28 @@ from Powers.bot_class import Gojo
 
 
 def enhance_image(input_path, output_path):
-    # Read image with OpenCV
+    # Read image
     img = cv2.imread(input_path)
 
-    # Upscale using Lanczos (best quality for art/photos)
+    # Upscale with Lanczos
     upscale_factor = 2
     upscaled = cv2.resize(img, None, fx=upscale_factor, fy=upscale_factor, interpolation=cv2.INTER_LANCZOS4)
 
-    # Denoise (smooth colors without blurring edges too much)
+    # Denoise (smooth colors, keep structure)
     smooth = cv2.fastNlMeansDenoisingColored(upscaled, None, 10, 10, 7, 21)
 
-    # Gentle sharpening kernel (reduced strength)
-    kernel = np.array([[0, -0.25, 0],
-                       [-0.25, 2.0, -0.25],
-                       [0, -0.25, 0]])
-    sharpened = cv2.filter2D(smooth, -1, kernel)
+    # Unsharp mask (more controlled sharpening)
+    gaussian = cv2.GaussianBlur(smooth, (0, 0), 2)
+    unsharp = cv2.addWeighted(smooth, 1.4, gaussian, -0.4, 0)
 
-    # Blend sharpened with smooth to avoid harshness
-    final = cv2.addWeighted(smooth, 0.7, sharpened, 0.3, 0)
+    # Extra sharpening kernel (a bit stronger than before)
+    kernel = np.array([[0, -0.5, 0],
+                       [-0.5, 3.0, -0.5],
+                       [0, -0.5, 0]])
+    sharpened = cv2.filter2D(unsharp, -1, kernel)
+
+    # Blend to avoid overkill (keep 80% sharpen, 20% smooth)
+    final = cv2.addWeighted(unsharp, 0.8, sharpened, 0.2, 0)
 
     # Save result
     cv2.imwrite(output_path, final)
