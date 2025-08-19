@@ -408,30 +408,64 @@ async def tr(_, message):
     )
 
 
+from pyrogram import enums, filters
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+
 @Gojo.on_message(command("bug"))
 async def reporting_query(c: Gojo, m: Message):
+    # Ensure the command is used in reply to a text message
     repl = m.reply_to_message
     if not repl:
-        await m.reply_text("Please reply to a message to report it as bug")
-        return
+        return await m.reply_text("⚠️ Please reply to a message to report it as a bug.")
     if not repl.text:
-        await m.reply_text("Please reply to a text message.")
-        return
-    txt = "#BUG\n"
-    txt += repl.text.html
-    txt += f"\nReported by: {m.from_user.id} ({m.from_user.mention})"
-    kb = InlineKeyboardMarkup([InlineKeyboardButton("Update channel", url=f"https://t.me/{SUPPORT_GROUP}")])
+        return await m.reply_text("⚠️ Only text messages can be reported as bugs.")
+
+    # Prepare bug report text
+    bug_report = (
+        f"#BUG\n"
+        f"{repl.text.html}\n\n"
+        f"📝 Reported by: {m.from_user.mention} (`{m.from_user.id}`)"
+    )
+
+    # Inline keyboard with support link
+    kb = InlineKeyboardMarkup(
+        [[InlineKeyboardButton("📢 Update Channel", url=f"https://t.me/{SUPPORT_GROUP}")]]
+    )
+
     try:
-        z = await c.send_message(MESSAGE_DUMP, txt, parse_mode=enums.ParseMode.HTML)
+        # Try sending the full bug report
+        bug_msg = await c.send_message(
+            MESSAGE_DUMP,
+            bug_report,
+            parse_mode=enums.ParseMode.HTML
+        )
     except Exception:
-        txt = repl.text.html
-        z = await c.send_message(MESSAGE_DUMP, txt, parse_mode=enums.ParseMode.HTML)
-        await z.reply_text(f"#BUG\nReported by: {m.from_user.id} ({m.from_user.mention})")
+        # If failed (e.g., message too long), send separately
+        bug_msg = await c.send_message(
+            MESSAGE_DUMP,
+            repl.text.html,
+            parse_mode=enums.ParseMode.HTML
+        )
+        await bug_msg.reply_text(
+            f"#BUG\n📝 Reported by: {m.from_user.mention} (`{m.from_user.id}`)"
+        )
+
+    # Delete original replied message
     await repl.delete()
-    await m.reply_photo(photo="./extras/Fire.jpg", caption="Successfully reported your bug", reply_markup=kb)
-    ppost = z.link
-    await c.send_message(OWNER_ID, f"New bug report\n{ppost}", disable_web_page_preview=True)
-    return
+
+    # Confirm to user
+    await m.reply_photo(
+        photo="./extras/Fire.jpg",
+        caption="✅ Successfully reported your bug.",
+        reply_markup=kb
+    )
+
+    # Notify owner with link to the bug report
+    await c.send_message(
+        OWNER_ID,
+        f"🐞 New bug report:\n{bug_msg.link}",
+        disable_web_page_preview=True
+    )
 
 
 @Gojo.on_message(command("botstaffs"))
