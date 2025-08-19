@@ -12,21 +12,25 @@ def enhance_image(input_path, output_path):
     # Read image with OpenCV
     img = cv2.imread(input_path)
 
-    # Upscale using OpenCV's super-resize (Lanczos)
+    # Upscale using Lanczos (best quality for art/photos)
     upscale_factor = 2
     upscaled = cv2.resize(img, None, fx=upscale_factor, fy=upscale_factor, interpolation=cv2.INTER_LANCZOS4)
 
     # Denoise (smooth colors without blurring edges too much)
     smooth = cv2.fastNlMeansDenoisingColored(upscaled, None, 10, 10, 7, 21)
 
-    # Sharpen lines
-    kernel = np.array([[0, -1, 0],
-                       [-1,  5,-1],
-                       [0, -1, 0]])
-    sharp = cv2.filter2D(smooth, -1, kernel)
+    # Gentle sharpening kernel (reduced strength)
+    kernel = np.array([[0, -0.25, 0],
+                       [-0.25, 2.0, -0.25],
+                       [0, -0.25, 0]])
+    sharpened = cv2.filter2D(smooth, -1, kernel)
+
+    # Blend sharpened with smooth to avoid harshness
+    final = cv2.addWeighted(smooth, 0.7, sharpened, 0.3, 0)
 
     # Save result
-    cv2.imwrite(output_path, sharp)
+    cv2.imwrite(output_path, final)
+
 
 
 @Gojo.on_message(filters.command(["upscale", "hd"], prefixes=["/", "!", "."]))
