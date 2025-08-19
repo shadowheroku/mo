@@ -1,86 +1,78 @@
 import os
-import requests
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+import httpx
+import asyncio
+from pyrogram import filters
+from pyrogram.types import Message
 from Powers.bot_class import Gojo
-from Powers.utils.custom_filters import command
-from pyrogram.errors import BadRequest
 
-# Picsart configuration
-PICSART_API_URL = "https://api.picsart.io/tools/1.0/upscale"
-PICSART_API_KEY = "eyJraWQiOiI5NzIxYmUzNi1iMjcwLTQ5ZDUtOTc1Ni05ZDU5N2M4NmIwNTEiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJhdXRoLXNlcnZpY2UtOGQ0ZGQyMTEtZTUyNy00NWQ4LWI2NDItMjRlZTBhOGM2NThiIiwiYXVkIjoiNDI5NDQzMDk2MDE0MTAxIiwibmJmIjoxNzQ3NzU2MTU0LCJzY29wZSI6WyJiMmItYXBpLmltYWdlX2FwaSJdLCJpc3MiOiJodHRwczovL2FwaS5waWNzYXJ0LmNvbS90b2tlbi1zZXJ2aWNlIiwib3duZXJJZCI6IjQyOTQ0MzA5NjAxNDEwMSIsImlhdCI6MTc0Nzc1NjE1NCwianRpIjoiYzI1NTUyNjQtYzM4Yy00MjlmLWE5ZTEtNGI1MWQ1YzljMzE4In0.bbn1xeZQkWV2LUr-R6c1eKmK1Q8Bh3xZrVuh9-trLwsE3226ywEkQux3EjmnQLoq7V5_hy132oFOsDlLoVMSF16WinCqtNcF9AdlAu950-Uc8snl11EsrYc5BXxOVmOPhZT_ba1Op3oA8CM2fVmCoOJgB65mHX5UiuRL3bs3PhXPUVmFPNKnkxAr7D1uZcis0YM3enTqcQGIzTDudAlDfe3mD8TSy7b3aTe9XLzYRMEsZCT6RNOcRK4vNRzgdtNKnZ4KsgOjCPyTZAVKAADllJQ-totdI07O0vAsrdXtigU-oWz1x8e3T98D7FmctC7-kyLWu99XiMcO2I-_N5v_Tg"  # Replace with your actual API key
-MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
-SUPPORTED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"]
+REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN") or "r8_X3wOWH9rYTC5JllHIgh3OfnS1HTgnhN1pK7v4"
+API_URL = "https://api.replicate.com/v1/predictions"
 
-@Gojo.on_message(command("upscale"))
-async def upscale_with_picsart(c: Gojo, m: Message):
-    if not m.reply_to_message or not (m.reply_to_message.photo or m.reply_to_message.document):
-        return await m.reply_text("❌ Please reply to an image file to upscale it!")
+HEADERS = {
+    "Authorization": f"Token {REPLICATE_API_TOKEN}",
+    "Content-Type": "application/json"
+}
 
-    msg = await m.reply_text("📥 Downloading image...")
-    try:
-        # Download the file
-        img_path = await m.reply_to_message.download()
-        
-        # Check file size
-        file_size = os.path.getsize(img_path)
-        if file_size > MAX_FILE_SIZE:
-            os.remove(img_path)
-            return await msg.edit_text(f"🚫 File is too large! Max allowed is {MAX_FILE_SIZE//(1024*1024)} MB")
-        
-        # Check file extension
-        ext = os.path.splitext(img_path)[1].lower()
-        if ext not in SUPPORTED_EXTENSIONS:
-            os.remove(img_path)
-            return await msg.edit_text("⚠️ Unsupported file format! Only JPG, PNG, WEBP allowed.")
-        
-        await msg.edit_text("⚙️ Upscaling image with Picsart AI...")
-        
-        # Prepare the request with correct parameter name
-        with open(img_path, "rb") as image_file:
-            files = {"image": image_file}
-            data = {"upscale_factor": 2}  # Correct parameter name (can be 2, 4, 6, or 8)
-            
-            headers = {
-                "accept": "application/json",
-                "X-Picsart-API-Key": PICSART_API_KEY
-            }
-            
-            response = requests.post(
-                PICSART_API_URL,
-                headers=headers,
-                files=files,
-                data=data
+@Gojo.on_message(filters.command("upscale") & filters.reply)
+async def upscale_image(c: Gojo, m: Message):
+    if not m.reply_to_message.photo:
+        return await m.reply_text("❌ Reply to a photo to upscale it.")
+
+    msg = await m.reply_text("🔄 Upscaling image... please wait")
+
+    # Get photo file path
+    photo = await m.reply_to_message.download()
+
+    # Upload photo to Replicate's hosted file service
+    async with httpx.AsyncClient() as client:
+        with open(photo, "rb") as f:
+            upload = await client.post(
+                "https://api.replicate.com/v1/files",
+                headers={"Authorization": f"Token {REPLICATE_API_TOKEN}"},
+                files={"file": f}
             )
-        
-        # Clean up the downloaded file
-        os.remove(img_path)
-        
-        # Process the response
-        if response.status_code == 200:
-            result = response.json()
-            if "output_url" in result:
-                await msg.edit_text(
-                    "✅ Image upscaled successfully!",
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("View Image", url=result["output_url"])],
-                        [InlineKeyboardButton("Share", url=f"https://t.me/share/url?url={result['output_url']}")]
-                    ])
-                )
-            else:
-                await msg.edit_text("❌ Upscaling failed - no output URL received")
-        else:
-            await msg.edit_text(f"❌ Upscaling failed with status {response.status_code}: {response.text}")
-    
-    except BadRequest as e:
-        await msg.edit_text(f"❌ Telegram error: {e}")
-    except requests.exceptions.RequestException as e:
-        await msg.edit_text(f"❌ Network error: {str(e)}")
-    except Exception as e:
-        await msg.edit_text(f"❌ An error occurred: {str(e)}")
-    finally:
-        # Ensure the file is deleted even if an error occurs
-        if "img_path" in locals() and os.path.exists(img_path):
-            os.remove(img_path)
+        upload.raise_for_status()
+        uploaded_url = upload.json()["urls"]["get"]
+
+        # Request upscale (factor 2)
+        data = {
+            "version": "8a1f2e5b1b4dbfdfa2b5a146dd0dfd5c2e018e1d98f9a9dbf17d91e4b6fb4ec8",  # Real-ESRGAN model
+            "input": {"image": uploaded_url, "scale": 2}
+        }
+        r = await client.post(API_URL, headers=HEADERS, json=data)
+        r.raise_for_status()
+        prediction = r.json()
+        prediction_url = prediction["urls"]["get"]
+
+        # Poll until finished
+        result = None
+        for _ in range(30):
+            status = await client.get(prediction_url, headers=HEADERS)
+            status.raise_for_status()
+            status_data = status.json()
+            if status_data["status"] == "succeeded":
+                result = status_data["output"]
+                break
+            elif status_data["status"] == "failed":
+                return await msg.edit("❌ Upscaling failed.")
+            await asyncio.sleep(5)
+
+    if not result:
+        return await msg.edit("❌ Upscaling timed out.")
+
+    # Download final upscaled image
+    out_file = "upscaled.png"
+    async with httpx.AsyncClient() as client:
+        res = await client.get(result[0])
+        with open(out_file, "wb") as f:
+            f.write(res.content)
+
+    # Send and delete local file
+    await m.reply_photo(out_file, caption="✨ Here’s your upscaled image")
+    os.remove(out_file)
+    os.remove(photo)
+    await msg.delete()
+
 
 __PLUGIN__ = "upscale"
 __HELP__ = """
