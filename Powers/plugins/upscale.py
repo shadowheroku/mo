@@ -1,85 +1,140 @@
-import os, mimetypes
-from PIL import Image, ImageFilter
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+import os
+import requests
+import tempfile
+from pyrogram import filters
+from pyrogram.types import Message
 from Powers.bot_class import Gojo
-from Powers.utils.custom_filters import command
 
-# Settings
-MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
-SUPPORTED_MIME_TYPES = {
-    "image/jpeg": ".jpg",
-    "image/png": ".png",
-    "image/webp": ".webp"
+REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN", "r8_X3wOWH9rYTC5JllHIgh3OfnS1HTgnhN1pK7v4")
+
+HEADERS = {
+    "Authorization": f"Token {REPLICATE_API_TOKEN}",
+    "Content-Type": "application/json"
 }
 
-def upscale_sharp_smooth(img_path: str, scale: int = 2) -> str:
-    """Upscale image, sharpen edges, smooth colors"""
-    with Image.open(img_path).convert("RGB") as img:
-        # Step 1: upscale with LANCZOS for best detail
-        new_size = (img.width * scale, img.height * scale)
-        upscaled = img.resize(new_size, Image.LANCZOS)
+# Upload file to Replicate first
+def upload_to_replicate(file_path):
+    with open(file_path, "rb") as f:
+        resp = requests.post(
+            "https://api.replicate.com/v1/files",
+            headers={"Authorization": f"Token {REPLICATE_API_TOKEN}"},
+            files={"file": f}
+        )
+    resp.raise_for_status()
+    return resp.json()["id"]  # Replicate returns file ID
 
-        # Step 2: sharpen edges/lines
-        sharpened = upscaled.filter(ImageFilter.UnsharpMask(radius=2, percent=180, threshold=2))
 
-        # Step 3: smooth colors (reduce harsh noise / gradients)
-        smoothed = sharpened.filter(ImageFilter.SMOOTH_MORE)
+@Gojo.on_message(filters.command(["upscale", "hd"], prefixes=["/", "!", "."]))
+async def upscale_image(client: Gojo, m: Message):
+    if not REPLICATE_API_TOKEN:
+        return await m.reply_text("❌ API Token missing! Please set REPLICATE_API_TOKEN.")
 
-        # Save output
-        out_path = os.path.splitext(img_path)[0] + "_upscaled.png"
-        smoothed.save(out_path, "PNG", quality=95)
-        return out_path
+    if not m.reply_to_message or not (m.reply_to_message.photo or m.reply_to_message.sticker or m.reply_to_message.document):
+        return await m.reply_text("⚠️ Reply to an image or sticker to upscale.")
 
-@Gojo.on_message(command("upscale"))
-async def upscale_image(c: Gojo, m: Message):
-    if not m.reply_to_message or not m.reply_to_message.photo:
-        return await m.reply_text("❌ **Reply to a photo to upscale it!**")
+    msg = await m.reply_text("🔄 Uploading image to Replicate...")
 
-    msg = await m.reply_text("📥 **Step 1:** Downloading image...")
+    # Download image to temp file
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    await m.reply_to_message.download(temp_file.name)
+
     try:
-        # Download
-        img_path = await m.reply_to_message.download()
-        if os.path.getsize(img_path) > MAX_FILE_SIZE:
-            os.remove(img_path)
-            return await msg.edit_text(f"🚫 **Image too large!** Max {MAX_FILE_SIZE//(1024*1024)}MB")
+        # Upload image to replicate
+        file_id = upload_to_replicate(temp_file.name)
 
-        # Validate type
-        mime_type, _ = mimetypes.guess_type(img_path)
-        if not mime_type or mime_type not in SUPPORTED_MIME_TYPES:
-            os.remove(img_path)
-            return await msg.edit_text("⚠️ **Unsupported format!** Only JPG, PNG, WEBP allowed.")
+        # Run advanced ESRGAN model with better parameters
+        model_payload = {
+            "version": "nightmareai/real-esrgan:42fed1c4974146d4d2414e2be2c5277c7fcf05fcc3a73abf41610695738c1d7b",
+            "input": {
+                "image": f"file-{file_id}",
+                "scale": 4,  # Higher scale factor
+                "face_enhance": True,  # Better for portraits
+                "tile": 0,  # No tiling for better quality
+                "tile_pad": 10,
+                "pre_pad": 0,
+                "half": False,  # Full precision
+                "denoise_strength": 0.5,  # Moderate denoising
+                "suffix": "out"  # Output suffix
+            }
+        }
 
-        # Upscale + enhance
-        await msg.edit_text("🔄 **Step 2:** Upscaling (sharp lines + smooth colors)...")
-        out_path = upscale_sharp_smooth(img_path, scale=2)
+        r = requests.post(
+            "https://api.replicate.com/v1/predictions",
+            headers=HEADERS,
+            json=model_payload
+        )
+        r.raise_for_status()
+        prediction = r.json()
 
-        # Send result
-        await m.reply_photo(
-            out_path,
-            caption="✅ **Upscaled with sharper lines & smoother colors.**",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔄 Upscale Again", callback_data="upscale_again")]
-            ])
+        # Poll until finished with timeout
+        status = prediction["status"]
+        attempts = 0
+        max_attempts = 30  # ~3 minutes timeout
+        while status not in ["succeeded", "failed", "canceled"] and attempts < max_attempts:
+            r = requests.get(
+                f"https://api.replicate.com/v1/predictions/{prediction['id']}",
+                headers=HEADERS
+            )
+            r.raise_for_status()
+            prediction = r.json()
+            status = prediction["status"]
+            attempts += 1
+            await asyncio.sleep(6)  # Check every 6 seconds
+
+        if status != "succeeded":
+            return await msg.edit_text(f"❌ Upscaling failed! Status: {status}")
+
+        output_url = prediction["output"]
+        if not output_url:
+            return await msg.edit_text("❌ Upscaling failed - no output received.")
+
+        # Download upscaled result
+        out_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        with requests.get(output_url, stream=True) as r:
+            r.raise_for_status()
+            with open(out_file.name, "wb") as f:
+                for chunk in r.iter_content(8192):
+                    f.write(chunk)
+
+        # Send file with better compression
+        await m.reply_document(
+            out_file.name,
+            caption="✨ Upscaled with Advanced ESRGAN\n🔍 Sharpened lines & smoothed colors",
+            force_document=True
         )
 
-        os.remove(out_path)
         await msg.delete()
 
     except Exception as e:
-        await msg.edit_text(f"⚠️ **Error:** `{e}`")
+        await msg.edit_text(f"❌ Error: {str(e)}")
+
     finally:
-        if "img_path" in locals() and os.path.exists(img_path):
-            os.remove(img_path)
+        try:
+            os.remove(temp_file.name)
+        except:
+            pass
+        try:
+            os.remove(out_file.name)
+        except:
+            pass
+
 
 __PLUGIN__ = "upscale"
 __HELP__ = """
-**🔍 Image Upscaler**
-`/upscale` — Reply to a photo to upscale it.  
+**🖼 AI Image Upscaler**
+`/upscale` or `/hd` - Reply to an image to enhance its quality using AI
 
-✨ **Enhancements:**  
-- Sharper edges/lines  
-- Smoother colors & gradients  
+**Features:**
+- Increases resolution up to 4x
+- Sharpens lines while maintaining smooth edges
+- Smart color smoothing without oversaturation
+- Advanced face enhancement for portraits
+- Noise reduction while preserving details
+- Supports JPG, PNG, WEBP
+- Returns high-quality PNG file directly in Telegram
 
-⚠️ **Supported formats:** JPG, PNG, WEBP  
-📦 **Max size:** 20MB
+**Tips:**
+- Works best with clear source images
+- For anime/artwork, use higher scale factors
+- Portraits benefit from face enhancement
 """
