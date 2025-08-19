@@ -63,7 +63,7 @@ async def upscale(c: Gojo, m: Message):
             f.write(requests.get(output_url).content)
 
         # Send as file
-        await m.reply_document(output_path, caption="✨ Upscaled with ESRGAN")
+        await m.reply_photo(upscaled_path, caption="✅ Upscaled & Sharpened")
 
         await msg.delete()
 
