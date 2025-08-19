@@ -4,26 +4,29 @@ import tempfile
 import numpy as np
 from pyrogram import filters
 from pyrogram.types import Message
+from PIL import Image, ImageFilter
 from Powers.bot_class import Gojo
 
 
 def enhance_image(input_path, output_path):
-    # Read image
+    # Read image with OpenCV
     img = cv2.imread(input_path)
 
-    # Upscale using Lanczos
+    # Upscale using OpenCV's super-resize (Lanczos)
     upscale_factor = 2
     upscaled = cv2.resize(img, None, fx=upscale_factor, fy=upscale_factor, interpolation=cv2.INTER_LANCZOS4)
 
-    # Smooth colors but keep edges (bilateral filter is softer than denoise)
-    smooth = cv2.bilateralFilter(upscaled, d=9, sigmaColor=75, sigmaSpace=75)
+    # Denoise (smooth colors without blurring edges too much)
+    smooth = cv2.fastNlMeansDenoisingColored(upscaled, None, 10, 10, 7, 21)
 
-    # Gentle Unsharp Mask
-    gaussian = cv2.GaussianBlur(smooth, (0, 0), 2)  # blur base
-    sharpened = cv2.addWeighted(smooth, 1.25, gaussian, -0.25, 0)  # soft sharpening
+    # Sharpen lines
+    kernel = np.array([[0, -1, 0],
+                       [-1,  5,-1],
+                       [0, -1, 0]])
+    sharp = cv2.filter2D(smooth, -1, kernel)
 
-    # Save final result
-    cv2.imwrite(output_path, sharpened)
+    # Save result
+    cv2.imwrite(output_path, sharp)
 
 
 @Gojo.on_message(filters.command(["upscale", "hd"], prefixes=["/", "!", "."]))
@@ -33,34 +36,41 @@ async def upscale_image(client: Gojo, m: Message):
 
     msg = await m.reply_text("🔄 Processing image...")
 
+    # Download image to temp
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
     await m.reply_to_message.download(temp_file.name)
 
     out_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
 
     try:
+        # Enhance image locally
         enhance_image(temp_file.name, out_file.name)
 
-        await m.reply_document(out_file.name, caption="✨ Upscaled (Sharp but Smooth)")
+        # Send back result as file
+        await m.reply_document(out_file.name, caption="✨ Upscaled (Sharpened + Smoothed)")
 
         await msg.delete()
     except Exception as e:
         await msg.edit_text(f"❌ Error: {e}")
     finally:
-        try: os.remove(temp_file.name)
-        except: pass
-        try: os.remove(out_file.name)
-        except: pass
+        try:
+            os.remove(temp_file.name)
+        except:
+            pass
+        try:
+            os.remove(out_file.name)
+        except:
+            pass
 
 
 __PLUGIN__ = "upscale"
 __HELP__ = """
-**🖼 Local Image Enhancer**
+**🖼 AI Image Enhancer (Local)**
 `/upscale` or `/hd` - Reply to an image to upscale & enhance
 
 **Features:**
-- 2x resolution boost (offline)
-- Soft sharpening (no harsh destruction)
-- Smooth colors while keeping line clarity
-- Works well for anime, art & photos
+- 2x resolution boost (offline, no API needed)
+- Sharpens lines & fixes edges
+- Smooths colors (no harsh noise)
+- Returns file directly in Telegram
 """
