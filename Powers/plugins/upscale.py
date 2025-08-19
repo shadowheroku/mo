@@ -1,5 +1,4 @@
 import os
-import mimetypes
 import requests
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from Powers.bot_class import Gojo
@@ -36,10 +35,10 @@ async def upscale_with_picsart(c: Gojo, m: Message):
         
         await msg.edit_text("⚙️ Upscaling image with Picsart AI...")
         
-        # Prepare the request
+        # Prepare the request with correct parameter name
         with open(img_path, "rb") as image_file:
             files = {"image": image_file}
-            data = {"scale": 2}  # You can change this to 4, 6, or 8 for higher upscaling
+            data = {"upscale_factor": 2}  # Correct parameter name (can be 2, 4, 6, or 8)
             
             headers = {
                 "accept": "application/json",
