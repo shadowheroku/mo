@@ -1,91 +1,104 @@
 import os
 import requests
 import tempfile
-import time
 from pyrogram import filters
 from pyrogram.types import Message
 from Powers.bot_class import Gojo
 
-# Replicate ESRGAN model version ID (Real-ESRGAN 4x)
-MODEL_VERSION = "9936d9b908052e2dd55c3d43578a1b8e986ba4655c0c15dc1b6ee3a1df26c3f1"
-
-# API Token (store in VPS env)
-API_TOKEN = os.getenv("REPLICATE_API_TOKEN", "r8_X3wOWH9rYTC5JllHIgh3OfnS1HTgnhN1pK7v4")
+REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN" , "r8_X3wOWH9rYTC5JllHIgh3OfnS1HTgnhN1pK7v4")
 
 HEADERS = {
-    "Authorization": f"Token {API_TOKEN}",
+    "Authorization": f"Token {REPLICATE_API_TOKEN}",
     "Content-Type": "application/json"
 }
 
-@Gojo.on_message(filters.command(["upscale", "hd"]))
-async def upscale(c: Gojo, m: Message):
-    if not m.reply_to_message or not m.reply_to_message.photo:
-        return await m.reply_text("⚠️ Reply to an image to upscale it.")
+# Upload file to Replicate first
+def upload_to_replicate(file_path):
+    with open(file_path, "rb") as f:
+        resp = requests.post(
+            "https://api.replicate.com/v1/files",
+            headers={"Authorization": f"Token {REPLICATE_API_TOKEN}"},
+            files={"file": f}
+        )
+    resp.raise_for_status()
+    return resp.json()["id"]  # Replicate returns file ID
 
-    msg = await m.reply_text("🔄 Upscaling... Please wait.")
 
-    # Download input image to a temp file
-    input_path = await c.download_media(
-        m.reply_to_message.photo.file_id,
-        file_name=tempfile.mktemp(suffix=".jpg")
-    )
+@Gojo.on_message(filters.command("upscale", prefixes=["/", "!", "."]))
+async def upscale_image(client: Gojo, m: Message):
+    if not REPLICATE_API_TOKEN:
+        return await m.reply_text("❌ API Token missing! Please set REPLICATE_API_TOKEN.")
+
+    if not m.reply_to_message or not (m.reply_to_message.photo or m.reply_to_message.sticker):
+        return await m.reply_text("⚠️ Reply to an image or sticker to upscale.")
+
+    msg = await m.reply_text("🔄 Uploading image to Replicate...")
+
+    # Download image to temp file
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    await m.reply_to_message.download(temp_file.name)
 
     try:
-        # Step 1: Upload image to Replicate's file storage
-        with open(input_path, "rb") as f:
-            upload = requests.post(
-                "https://api.replicate.com/v1/files",
-                headers={"Authorization": f"Token {API_TOKEN}"},
-                files={"file": f}
-            )
-        upload.raise_for_status()
-        image_url = upload.json()["urls"]["get"]
+        # Upload image to replicate
+        file_id = upload_to_replicate(temp_file.name)
 
-        # Step 2: Create upscale prediction
+        # Run ESRGAN model
+        model_payload = {
+            "version": "nightmareai/real-esrgan:7de2ea26c616d5bf2245ad0d5e24f0c8db15e21db8f3d46e5718b0d33bdc4e6a",
+            "input": {"image": f"file-{file_id}", "scale": 2}  # upscale factor
+        }
+
         r = requests.post(
             "https://api.replicate.com/v1/predictions",
             headers=HEADERS,
-            json={
-                "version": MODEL_VERSION,
-                "input": {"image": image_url, "scale": 2}
-            }
+            json=model_payload
         )
         r.raise_for_status()
         prediction = r.json()
-        prediction_url = prediction["urls"]["get"]
 
-        # Step 3: Poll until finished
-        output_url = None
-        for _ in range(40):  # ~200s max wait
-            status = requests.get(prediction_url, headers=HEADERS).json()
-            if status["status"] == "succeeded":
-                output_url = status["output"][0]
-                break
-            elif status["status"] in ["failed", "canceled"]:
-                return await msg.edit("❌ Upscaling failed.")
-            time.sleep(5)
+        # Poll until finished
+        status = prediction["status"]
+        while status not in ["succeeded", "failed", "canceled"]:
+            r = requests.get(
+                f"https://api.replicate.com/v1/predictions/{prediction['id']}",
+                headers=HEADERS
+            )
+            r.raise_for_status()
+            prediction = r.json()
+            status = prediction["status"]
 
+        if status != "succeeded":
+            return await msg.edit_text(f"❌ Upscaling failed! Status: {status}")
+
+        output_url = prediction["output"]
         if not output_url:
-            return await msg.edit("❌ Upscaling timed out - no result.")
+            return await msg.edit_text("❌ Upscaling failed - no output received.")
 
-        # Step 4: Download final image
-        output_path = tempfile.mktemp(suffix=".png")
-        with open(output_path, "wb") as f:
-            f.write(requests.get(output_url).content)
+        # Download upscaled result
+        out_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        with requests.get(output_url, stream=True) as r:
+            r.raise_for_status()
+            with open(out_file.name, "wb") as f:
+                for chunk in r.iter_content(8192):
+                    f.write(chunk)
 
-        # Step 5: Send file back
-        await m.reply_photo(output_path, caption="✅ Upscaled & Sharpened")
+        # Send file
+        await m.reply_document(out_file.name, caption="✨ Upscaled with ESRGAN")
+
         await msg.delete()
 
     except Exception as e:
         await msg.edit_text(f"❌ Error: {e}")
 
     finally:
-        # Cleanup files
-        if os.path.exists(input_path):
-            os.remove(input_path)
-        if "output_path" in locals() and os.path.exists(output_path):
-            os.remove(output_path)
+        try:
+            os.remove(temp_file.name)
+        except:
+            pass
+        try:
+            os.remove(out_file.name)
+        except:
+            pass
 
 
 __PLUGIN__ = "upscale"
