@@ -13,7 +13,7 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-@Gojo.on_message(filters.command("upscale") & filters.reply)
+@Gojo.on_message(filters.command("upscale"))
 async def upscale_image(c: Gojo, m: Message):
     if not m.reply_to_message.photo:
         return await m.reply_text("❌ Reply to a photo to upscale it.")
