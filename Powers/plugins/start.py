@@ -167,6 +167,12 @@ Join my [News Channel](https://t.me/ShadowBotsHQ) to get information on all the 
                                 url="https://t.me/ShadowBotsHQ"
                             ),
                         ],
+                        [
+                            InlineKeyboardButton(
+                                "Add me to chat", 
+                                url=f"https://t.me/{c.me.username}?startgroup=true"
+                            ),
+                        ],
                     ]
                 )
                 await m.reply_photo(
@@ -186,6 +192,12 @@ Join my [News Channel](https://t.me/ShadowBotsHQ) to get information on all the 
                         url=f"https://{c.me.username}.t.me/",
                     ),
                 ],
+                [
+                    InlineKeyboardButton(
+                        "Add me to chat", 
+                        url=f"https://t.me/{c.me.username}?startgroup=true"
+                    ),
+                ],
             ],
         )
 
@@ -196,6 +208,7 @@ Join my [News Channel](https://t.me/ShadowBotsHQ) to get information on all the 
             quote=True,
         )
     return
+
 
 @Gojo.on_callback_query(filters.regex("^start_back$"))
 async def start_back(c: Gojo, q: CallbackQuery):
