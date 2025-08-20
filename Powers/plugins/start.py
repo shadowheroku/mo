@@ -46,14 +46,18 @@ async def close_admin_callback(_, q: CallbackQuery):
     command("start") & (filters.group | filters.private),
 )
 async def start(c: Gojo, m: Message):
+    # Send immediate response first
+    try:
+        await m.reply_sticker("CAACAgUAAxkBAAIBOWgAAWl0KxLk8vVXQv2vN8YyFvL2rAACrBQAAp7OCVfLJgUAAXh0AAJkNAQ")  # Heart/love sticker
+    except:
+        pass  # Continue even if sticker fails
+    
     if m.chat.type == ChatType.PRIVATE:
         if len(m.text.strip().split()) > 1:
             arg = m.text.split(None, 1)[1]
             help_option = arg.lower()
 
-            if help_option.startswith("note") and (
-                    help_option not in ("note", "notes")
-            ):
+            if help_option.startswith("note") and (help_option not in ("note", "notes")):
                 await get_private_note(c, m, help_option)
                 return
 
@@ -73,9 +77,6 @@ async def start(c: Gojo, m: Message):
                         quote=True,
                     )
                 except ButtonUserPrivacyRestricted:
-                    # Handle the case where user profile buttons are restricted
-                    LOGGER.warning(f"User privacy restricted for button creation in help command")
-                    # Try sending without the problematic keyboard or with a modified one
                     await m.reply_photo(
                         photo=str(choice(StartPic)),
                         caption=help_msg,
@@ -83,6 +84,7 @@ async def start(c: Gojo, m: Message):
                         quote=True,
                     )
                 return
+            
             if len(arg.split("_", 1)) >= 2:
                 if arg.split("_")[1] == "help":
                     try:
@@ -94,7 +96,6 @@ async def start(c: Gojo, m: Message):
                             quote=True,
                         )
                     except ButtonUserPrivacyRestricted:
-                        LOGGER.warning(f"User privacy restricted for button creation in help command")
                         await m.reply_photo(
                             photo=str(choice(StartPic)),
                             caption=help_msg,
@@ -103,32 +104,22 @@ async def start(c: Gojo, m: Message):
                         )
                     return
                 elif arg.split("_", 1)[0] == "qr":
-                    decoded = encode_decode(
-                        arg.split("_", 1)[1], "decode")
+                    decoded = encode_decode(arg.split("_", 1)[1], "decode")
                     decode = decoded.split(":")
                     chat = decode[0]
                     user = decode[1]
                     if m.from_user.id != int(user):
-                        await m.reply_text("Not for you Baka")
+                        await m.reply_text("❌ Not for you!")
                         return
                     try:
                         await c.unban_chat_member(int(chat), int(user))
                         msg = CAPTCHA_DATA().del_message_id(chat, user)
                         try:
                             chat_ = await c.get_chat(chat)
-                            kb = ikb(
-                                [
-                                    [
-                                        "Link to chat",
-                                        f"{chat_.invite_link}",
-                                        "url"
-                                    ]
-                                ]
-                            )
+                            kb = ikb([[("🚀 Join Chat", f"{chat_.invite_link}", "url")]])
                         except Exception:
-                            chat_ = False
                             kb = None
-                        await m.reply_text("You can now talk in the chat", reply_markup=kb)
+                        await m.reply_text("🎉 Access granted! You can chat now!", reply_markup=kb)
                         try:
                             await c.delete_messages(chat, msg)
                         except Exception:
@@ -137,73 +128,56 @@ async def start(c: Gojo, m: Message):
                     except Exception:
                         return
 
+        # Main start message
+        cpt = f"""💖 **Hey {m.from_user.first_name}!** 💖
+
+⚡ **I'm {c.me.first_name} - Blazing Fast Group Manager!** ⚡
+
+✨ **Features:**
+• 🚀 Instant moderation
+• 🛡️ Advanced protection
+• 🎮 Fun activities
+• 📊 Smart analytics
+• 💫 Auto services
+
+💡 **Quick start:** `/help` for commands!
+
+📢 **Updates:** @ShadowBotsHQ
+
+🔥 **Add me now and experience lightning-fast management!**"""
+
         try:
-            cpt = f"""
-Hey [{m.from_user.first_name}](http://t.me/{m.from_user.username})! I am {c.me.first_name} ✨.
-I'm here to help you manage your group(s)!
-Hit /help to find out more about how to use me in my full potential!
-
-Join my [News Channel](https://t.me/ShadowBotsHQ) to get information on all the latest updates."""
-
-            try:
-                await m.reply_photo(
-                    photo=str(choice(StartPic)),
-                    caption=cpt,
-                    reply_markup=(await gen_start_kb(m)),
-                    quote=True,
-                )
-            except ButtonUserPrivacyRestricted:
-                LOGGER.warning(f"User privacy restricted for button creation in start command")
-                # Fallback without keyboard or with a safe keyboard
-                safe_kb = InlineKeyboardMarkup(
-                    [
-                        [
-                            InlineKeyboardButton(
-                                "Help", 
-                                callback_data="commands"
-                            ),
-                            InlineKeyboardButton(
-                                "Support", 
-                                url="https://t.me/ShadowBotsHQ"
-                            ),
-                        ],
-                        [
-                            InlineKeyboardButton(
-                                "Add me to chat", 
-                                url=f"https://t.me/{c.me.username}?startgroup=true"
-                            ),
-                        ],
-                    ]
-                )
-                await m.reply_photo(
-                    photo=str(choice(StartPic)),
-                    caption=cpt,
-                    reply_markup=safe_kb,
-                    quote=True,
-                )
-        except UserIsBlocked:
-            LOGGER.warning(f"Bot blocked by {m.from_user.id}")
+            await m.reply_photo(
+                photo=str(choice(StartPic)),
+                caption=cpt,
+                reply_markup=(await gen_start_kb(m)),
+                quote=True,
+            )
+        except ButtonUserPrivacyRestricted:
+            safe_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("📚 Commands", callback_data="commands"),
+                 InlineKeyboardButton("🌟 Support", url="https://t.me/ShadowBotsHQ")],
+                [InlineKeyboardButton("🚀 Add to Group", url=f"https://t.me/{c.me.username}?startgroup=true")],
+                [InlineKeyboardButton("⚡ Stats", callback_data="bot_curr_info"),
+                 InlineKeyboardButton("💫 Community", url="https://t.me/ShadowBotsHQ")]
+            ])
+            await m.reply_photo(
+                photo=str(choice(StartPic)),
+                caption=cpt,
+                reply_markup=safe_kb,
+                quote=True,
+            )
     else:
-        kb = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton(
-                        "Connect me to pm",
-                        url=f"https://{c.me.username}.t.me/",
-                    ),
-                ],
-                [
-                    InlineKeyboardButton(
-                        "Add me to chat", 
-                        url=f"https://t.me/{c.me.username}?startgroup=true"
-                    ),
-                ],
-            ],
-        )
+        # Group message
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("💖 PM Me", url=f"https://{c.me.username}.t.me/")],
+            [InlineKeyboardButton("⚡ Add to Group", url=f"https://t.me/{c.me.username}?startgroup=true")],
+            [InlineKeyboardButton("✨ Features", callback_data="commands")]
+        ])
 
         await m.reply_photo(
             photo=str(choice(StartPic)),
-            caption="I'm alive :3",
+            caption="💖 **I'm here!** ⚡\n\nNeed lightning-fast group management? Add me for instant moderation!",
             reply_markup=kb,
             quote=True,
         )
