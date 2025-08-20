@@ -638,7 +638,7 @@ NO       NO   NONONO            NONO
 """
 ]
 
-StartPic = ["https://files.catbox.moe/kpbfrm.jpg"]
+StartPic = ["photuu.jpg"]
 
 birthday_wish = [
     "Wishing you a happy birthday filled with love and joy.",
