@@ -4,8 +4,8 @@ from time import gmtime, strftime, time
 from pyrogram import enums, filters
 from pyrogram.enums import ChatMemberStatus as CMS
 from pyrogram.enums import ChatType
-from pyrogram.errors import (MediaCaptionTooLong, MessageNotModified,
-                             QueryIdInvalid, RPCError, UserIsBlocked)
+from pyrogram.errors import (ButtonUserPrivacyRestricted, MediaCaptionTooLong, 
+                             MessageNotModified, QueryIdInvalid, RPCError, UserIsBlocked)
 from pyrogram.types import (CallbackQuery, InlineKeyboardButton,
                             InlineKeyboardMarkup, Message)
 
@@ -21,9 +21,6 @@ from Powers.utils.parser import mention_html
 from Powers.utils.start_utils import (gen_cmds_kb, gen_start_kb, get_help_msg,
                                       get_private_note, get_private_rules)
 from Powers.utils.string import encode_decode
-
-
-
 
 @Gojo.on_callback_query(filters.regex("^close_admin$"))
 async def close_admin_callback(_, q: CallbackQuery):
@@ -44,7 +41,6 @@ async def close_admin_callback(_, q: CallbackQuery):
     await q.message.edit_text("Closed!")
     await q.answer("Closed menu!", show_alert=True)
     return
-
 
 @Gojo.on_message(
     command("start") & (filters.group | filters.private),
@@ -68,16 +64,7 @@ async def start(c: Gojo, m: Message):
             help_msg, help_kb = await get_help_msg(c, m, help_option)
 
             if help_msg:
-                await m.reply_photo(
-                    photo=str(choice(StartPic)),
-                    caption=help_msg,
-                    parse_mode=enums.ParseMode.MARKDOWN,
-                    reply_markup=help_kb,
-                    quote=True,
-                )
-                return
-            if len(arg.split("_", 1)) >= 2:
-                if arg.split("_")[1] == "help":
+                try:
                     await m.reply_photo(
                         photo=str(choice(StartPic)),
                         caption=help_msg,
@@ -85,6 +72,35 @@ async def start(c: Gojo, m: Message):
                         reply_markup=help_kb,
                         quote=True,
                     )
+                except ButtonUserPrivacyRestricted:
+                    # Handle the case where user profile buttons are restricted
+                    LOGGER.warning(f"User privacy restricted for button creation in help command")
+                    # Try sending without the problematic keyboard or with a modified one
+                    await m.reply_photo(
+                        photo=str(choice(StartPic)),
+                        caption=help_msg,
+                        parse_mode=enums.ParseMode.MARKDOWN,
+                        quote=True,
+                    )
+                return
+            if len(arg.split("_", 1)) >= 2:
+                if arg.split("_")[1] == "help":
+                    try:
+                        await m.reply_photo(
+                            photo=str(choice(StartPic)),
+                            caption=help_msg,
+                            parse_mode=enums.ParseMode.MARKDOWN,
+                            reply_markup=help_kb,
+                            quote=True,
+                        )
+                    except ButtonUserPrivacyRestricted:
+                        LOGGER.warning(f"User privacy restricted for button creation in help command")
+                        await m.reply_photo(
+                            photo=str(choice(StartPic)),
+                            caption=help_msg,
+                            parse_mode=enums.ParseMode.MARKDOWN,
+                            quote=True,
+                        )
                     return
                 elif arg.split("_", 1)[0] == "qr":
                     decoded = encode_decode(
@@ -129,12 +145,36 @@ Hit /help to find out more about how to use me in my full potential!
 
 Join my [News Channel](https://t.me/ShadowBotsHQ) to get information on all the latest updates."""
 
-            await m.reply_photo(
-                photo=str(choice(StartPic)),
-                caption=cpt,
-                reply_markup=(await gen_start_kb(m)),
-                quote=True,
-            )
+            try:
+                await m.reply_photo(
+                    photo=str(choice(StartPic)),
+                    caption=cpt,
+                    reply_markup=(await gen_start_kb(m)),
+                    quote=True,
+                )
+            except ButtonUserPrivacyRestricted:
+                LOGGER.warning(f"User privacy restricted for button creation in start command")
+                # Fallback without keyboard or with a safe keyboard
+                safe_kb = InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "Help", 
+                                callback_data="commands"
+                            ),
+                            InlineKeyboardButton(
+                                "Support", 
+                                url="https://t.me/ShadowBotsHQ"
+                            ),
+                        ],
+                    ]
+                )
+                await m.reply_photo(
+                    photo=str(choice(StartPic)),
+                    caption=cpt,
+                    reply_markup=safe_kb,
+                    quote=True,
+                )
         except UserIsBlocked:
             LOGGER.warning(f"Bot blocked by {m.from_user.id}")
     else:
@@ -157,7 +197,6 @@ Join my [News Channel](https://t.me/ShadowBotsHQ) to get information on all the 
         )
     return
 
-
 @Gojo.on_callback_query(filters.regex("^start_back$"))
 async def start_back(c: Gojo, q: CallbackQuery):
     try:
@@ -168,15 +207,42 @@ Hit /help to find out more about how to use me in my full potential!
 
 Join my [News Channel](http://t.me/shadowbotshq) to get information on all the latest updates."""
 
-        await q.edit_message_caption(
-            caption=cpt,
-            reply_markup=(await gen_start_kb(q.message)),
-        )
+        try:
+            await q.edit_message_caption(
+                caption=cpt,
+                reply_markup=(await gen_start_kb(q.message)),
+            )
+        except ButtonUserPrivacyRestricted:
+            LOGGER.warning(f"User privacy restricted for button creation in start_back")
+            # Create a safe keyboard without user profile buttons
+            safe_kb = InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            "Help", 
+                            callback_data="commands"
+                        ),
+                        InlineKeyboardButton(
+                            "Support", 
+                            url="https://t.me/ShadowBotsHQ"
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "Bot Info", 
+                            callback_data="bot_curr_info"
+                        ),
+                    ],
+                ]
+            )
+            await q.edit_message_caption(
+                caption=cpt,
+                reply_markup=safe_kb,
+            )
     except MessageNotModified:
         pass
     await q.answer()
     return
-
 
 @Gojo.on_callback_query(filters.regex("^commands$"))
 async def commands_menu(c: Gojo, q: CallbackQuery):
@@ -203,10 +269,26 @@ You can use {", ".join(PREFIX_HANDLER)} as your prefix handler
         await q.message.reply_photo(
             photo=str(choice(StartPic)), caption=cpt, reply_markup=keyboard
         )
+    except ButtonUserPrivacyRestricted:
+        LOGGER.warning(f"User privacy restricted for button creation in commands menu")
+        # Create a simplified keyboard without problematic buttons
+        safe_kb = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "« Back", 
+                        callback_data="start_back"
+                    ),
+                ],
+            ]
+        )
+        await q.edit_message_caption(
+            caption=cpt,
+            reply_markup=safe_kb,
+        )
 
     await q.answer()
     return
-
 
 @Gojo.on_message(command("help"))
 async def help_menu(c: Gojo, m: Message):
@@ -225,15 +307,23 @@ async def help_menu(c: Gojo, m: Message):
                 await m.reply_text(
                     help_msg, parse_mode=enums.ParseMode.MARKDOWN, quote=True
                 )
-            await m.reply_photo(
-                photo=str(choice(StartPic)),
-                caption=help_msg,
-                parse_mode=enums.ParseMode.MARKDOWN,
-                reply_markup=help_kb,
-                quote=True,
-            )
+            try:
+                await m.reply_photo(
+                    photo=str(choice(StartPic)),
+                    caption=help_msg,
+                    parse_mode=enums.ParseMode.MARKDOWN,
+                    reply_markup=help_kb,
+                    quote=True,
+                )
+            except ButtonUserPrivacyRestricted:
+                LOGGER.warning(f"User privacy restricted for button creation in help menu")
+                await m.reply_photo(
+                    photo=str(choice(StartPic)),
+                    caption=help_msg,
+                    parse_mode=enums.ParseMode.MARKDOWN,
+                    quote=True,
+                )
         else:
-
             await m.reply_photo(
                 photo=str(choice(StartPic)),
                 caption=f"Press the button below to get help for <i>{help_option}</i>",
@@ -249,7 +339,6 @@ async def help_menu(c: Gojo, m: Message):
                 ),
             )
     else:
-
         if m.chat.type == ChatType.PRIVATE:
             ou = await gen_cmds_kb(m)
             keyboard = ikb(ou, True)
@@ -272,14 +361,21 @@ Commands available:
             )
             msg = "Contact me in PM to get the list of possible commands."
 
-        await m.reply_photo(
-            photo=str(choice(StartPic)),
-            caption=msg,
-            reply_markup=keyboard,
-        )
+        try:
+            await m.reply_photo(
+                photo=str(choice(StartPic)),
+                caption=msg,
+                reply_markup=keyboard,
+            )
+        except ButtonUserPrivacyRestricted:
+            LOGGER.warning(f"User privacy restricted for button creation in help command")
+            # Send without keyboard if there are privacy issues
+            await m.reply_photo(
+                photo=str(choice(StartPic)),
+                caption=msg,
+            )
 
     return
-
 
 async def get_divided_msg(plugin_name: str, page: int = 1, back_to_do=None):
     msg = HELP_COMMANDS[plugin_name]["help_msg"]
@@ -332,7 +428,6 @@ async def get_divided_msg(plugin_name: str, page: int = 1, back_to_do=None):
     kb = ikb(kb, True, back_to_do) if back_to_do else ikb(kb)
     return new_msg, kb
 
-
 @Gojo.on_callback_query(filters.regex(r"^iter_page_.*[0-9]$"))
 async def helppp_page_iter(c: Gojo, q: CallbackQuery):
     data = q.data.split("_")
@@ -346,7 +441,6 @@ async def helppp_page_iter(c: Gojo, q: CallbackQuery):
 
     await q.edit_message_caption(msg, reply_markup=kb)
     return
-
 
 @Gojo.on_callback_query(filters.regex("^bot_curr_info$"))
 async def give_curr_info(c: Gojo, q: CallbackQuery):
@@ -365,7 +459,6 @@ async def give_curr_info(c: Gojo, q: CallbackQuery):
     await q.answer(txt, show_alert=True)
     return
 
-
 @Gojo.on_callback_query(filters.regex("^plugins."))
 async def get_module_info(c: Gojo, q: CallbackQuery):
     module = q.data.split(".", 1)[1]
@@ -383,12 +476,29 @@ async def get_module_info(c: Gojo, q: CallbackQuery):
         caption, kb = await get_divided_msg(f"plugins.{module}", back_to_do="commands")
         await q.edit_message_caption(
             caption,
-            enums.ParseMode.MARKDOWN,
-            kb
+            parse_mode=enums.ParseMode.MARKDOWN,
+            reply_markup=kb
+        )
+    except ButtonUserPrivacyRestricted:
+        LOGGER.warning(f"User privacy restricted for button creation in plugin info")
+        # Create a simplified keyboard
+        safe_kb = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "« Back", 
+                        callback_data="commands"
+                    ),
+                ],
+            ]
+        )
+        await q.edit_message_caption(
+            caption=help_msg,
+            parse_mode=enums.ParseMode.MARKDOWN,
+            reply_markup=safe_kb,
         )
     await q.answer()
     return
-
 
 @Gojo.on_callback_query(filters.regex("^give_bot_staffs$"))
 async def give_bot_staffs(c: Gojo, q: CallbackQuery):
@@ -396,7 +506,8 @@ async def give_bot_staffs(c: Gojo, q: CallbackQuery):
         owner = await c.get_users(OWNER_ID)
         reply = f"<b>🌟 Owner:</b> {(await mention_html(owner.first_name, OWNER_ID))} (<code>{OWNER_ID}</code>)\n"
     except RPCError:
-        pass
+        reply = f"<b>🌟 Owner:</b> <code>{OWNER_ID}</code>\n"
+    
     true_dev = get_support_staff("dev")
     reply += "\n<b>Developers ⚡️:</b>\n"
     if not true_dev:
@@ -408,7 +519,8 @@ async def give_bot_staffs(c: Gojo, q: CallbackQuery):
                 user = await c.get_users(user_id)
                 reply += f"• {(await mention_html(user.first_name, user_id))} (<code>{user_id}</code>)\n"
             except RPCError:
-                pass
+                reply += f"• <code>{user_id}</code>\n"
+    
     true_sudo = get_support_staff("sudo")
     reply += "\n<b>Sudo Users 🐉:</b>\n"
     if not true_sudo:
@@ -420,23 +532,26 @@ async def give_bot_staffs(c: Gojo, q: CallbackQuery):
                 user = await c.get_users(user_id)
                 reply += f"• {(await mention_html(user.first_name, user_id))} (<code>{user_id}</code>)\n"
             except RPCError:
-                pass
+                reply += f"• <code>{user_id}</code>\n"
+    
     reply += "\n<b>Whitelisted Users 🐺:</b>\n"
-    if not get_support_staff("whitelist"):
+    whitelist = get_support_staff("whitelist")
+    if not whitelist:
         reply += "No additional whitelisted users\n"
     else:
-        for each_user in get_support_staff("whitelist"):
+        for each_user in whitelist:
             user_id = int(each_user)
             try:
                 user = await c.get_users(user_id)
                 reply += f"• {(await mention_html(user.first_name, user_id))} (<code>{user_id}</code>)\n"
             except RPCError:
-                pass
+                reply += f"• <code>{user_id}</code>\n"
 
-    await q.edit_message_caption(reply,
-                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back", "start_back")]]))
+    await q.edit_message_caption(
+        reply,
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back", "start_back")]])
+    )
     return
-
 
 @Gojo.on_callback_query(filters.regex("^DELETEEEE$"))
 async def delete_back(_, q: CallbackQuery):
