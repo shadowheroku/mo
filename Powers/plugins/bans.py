@@ -70,14 +70,15 @@ async def tban_usr(c: Gojo, m: Message):
     if not bantime:
         return
 
+        # ✅ Check if target is admin/creator (live, not just from cache)
     try:
-        admins_group = {i[0] for i in ADMIN_CACHE[m.chat.id]}
-    except KeyError:
-        admins_group = await admin_cache_reload(m, "ban")
+        member = await c.get_chat_member(m.chat.id, user_id)
+        if member.status in ("administrator", "creator"):
+            await m.reply_text("This user is an admin/owner, I cannot ban them!")
+            await m.stop_propagation()
+    except Exception:
+        pass
 
-    if user_id in admins_group:
-        await m.reply_text(text="This user is an admin, I cannot ban them!")
-        await m.stop_propagation()
 
     try:
         admin = await mention_html(m.from_user.first_name, m.from_user.id)
@@ -200,14 +201,15 @@ async def stban_usr(c: Gojo, m: Message):
     if not bantime:
         return
 
+        # ✅ Check if target is admin/creator (live, not just from cache)
     try:
-        admins_group = {i[0] for i in ADMIN_CACHE[m.chat.id]}
-    except KeyError:
-        admins_group = await admin_cache_reload(m, "ban")
+        member = await c.get_chat_member(m.chat.id, user_id)
+        if member.status in ("administrator", "creator"):
+            await m.reply_text("This user is an admin/owner, I cannot ban them!")
+            await m.stop_propagation()
+    except Exception:
+        pass
 
-    if user_id in admins_group:
-        await m.reply_text(text="This user is an admin, I cannot ban them!")
-        await m.stop_propagation()
 
     try:
         await m.chat.ban_member(user_id, until_date=bantime)
@@ -291,14 +293,15 @@ async def dtban_usr(c: Gojo, m: Message):
     if not bantime:
         return
 
+        # ✅ Check if target is admin/creator (live, not just from cache)
     try:
-        admins_group = {i[0] for i in ADMIN_CACHE[m.chat.id]}
-    except KeyError:
-        admins_group = await admin_cache_reload(m, "ban")
+        member = await c.get_chat_member(m.chat.id, user_id)
+        if member.status in ("administrator", "creator"):
+            await m.reply_text("This user is an admin/owner, I cannot ban them!")
+            await m.stop_propagation()
+    except Exception:
+        pass
 
-    if user_id in admins_group:
-        await m.reply_text(text="This user is an admin, I cannot ban them!")
-        await m.stop_propagation()
 
     try:
         admin = await mention_html(m.from_user.first_name, m.from_user.id)
@@ -399,14 +402,15 @@ async def kick_usr(c: Gojo, m: Message):
 
         await m.stop_propagation()
 
+        # ✅ Check if target is admin/creator (live, not just from cache)
     try:
-        admins_group = {i[0] for i in ADMIN_CACHE[m.chat.id]}
-    except KeyError:
-        admins_group = await admin_cache_reload(m, "kick")
+        member = await c.get_chat_member(m.chat.id, user_id)
+        if member.status in ("administrator", "creator"):
+            await m.reply_text("This user is an admin/owner, I cannot kick them!")
+            await m.stop_propagation()
+    except Exception:
+        pass
 
-    if user_id in admins_group:
-        await m.reply_text(text="This user is an admin, I cannot kick them!")
-        await m.stop_propagation()
 
     try:
         admin = await mention_html(m.from_user.first_name, m.from_user.id)
@@ -487,14 +491,15 @@ async def skick_usr(c: Gojo, m: Message):
 
         await m.stop_propagation()
 
+        # ✅ Check if target is admin/creator (live, not just from cache)
     try:
-        admins_group = {i[0] for i in ADMIN_CACHE[m.chat.id]}
-    except KeyError:
-        admins_group = await admin_cache_reload(m, "kick")
+        member = await c.get_chat_member(m.chat.id, user_id)
+        if member.status in ("administrator", "creator"):
+            await m.reply_text("This user is an admin/owner, I cannot ban them!")
+            await m.stop_propagation()
+    except Exception:
+        pass
 
-    if user_id in admins_group:
-        await m.reply_text(text="This user is an admin, I cannot kick them!")
-        await m.stop_propagation()
 
     try:
         await m.chat.ban_member(user_id)
@@ -558,14 +563,15 @@ async def dkick_usr(c: Gojo, m: Message):
 
         await m.stop_propagation()
 
+        # ✅ Check if target is admin/creator (live, not just from cache)
     try:
-        admins_group = {i[0] for i in ADMIN_CACHE[m.chat.id]}
-    except KeyError:
-        admins_group = await admin_cache_reload(m, "kick")
+        member = await c.get_chat_member(m.chat.id, user_id)
+        if member.status in ("administrator", "creator"):
+            await m.reply_text("This user is an admin/owner, I cannot ban them!")
+            await m.stop_propagation()
+    except Exception:
+        pass
 
-    if user_id in admins_group:
-        await m.reply_text(text="This user is an admin, I cannot kick them!")
-        await m.stop_propagation()
 
     try:
         await m.reply_to_message.delete()
@@ -705,14 +711,15 @@ async def sban_usr(c: Gojo, m: Message):
         )
         await m.stop_propagation()
 
+        # ✅ Check if target is admin/creator (live, not just from cache)
     try:
-        admins_group = {i[0] for i in ADMIN_CACHE[m.chat.id]}
-    except KeyError:
-        admins_group = await admin_cache_reload(m, "ban")
+        member = await c.get_chat_member(m.chat.id, user_id)
+        if member.status in ("administrator", "creator"):
+            await m.reply_text("This user is an admin/owner, I cannot ban them!")
+            await m.stop_propagation()
+    except Exception:
+        pass
 
-    if user_id in admins_group:
-        await m.reply_text(text="This user is an admin, I cannot ban them!")
-        await m.stop_propagation()
 
     try:
         await m.chat.ban_member(user_id)
@@ -782,14 +789,14 @@ async def dban_usr(c: Gojo, m: Message):
         )
         await m.stop_propagation()
 
+        # ✅ Check if target is admin/creator (live, not just from cache)
     try:
-        admins_group = {i[0] for i in ADMIN_CACHE[m.chat.id]}
-    except KeyError:
-        admins_group = await admin_cache_reload(m, "ban")
-
-    if user_id in admins_group:
-        await m.reply_text(text="This user is an admin, I cannot ban them!")
-        await m.stop_propagation()
+        member = await c.get_chat_member(m.chat.id, user_id)
+        if member.status in ("administrator", "creator"):
+            await m.reply_text("This user is an admin/owner, I cannot ban them!")
+            await m.stop_propagation()
+    except Exception:
+        pass
 
     reason = m.text.split(None, 1)[1] if len(m.text.split()) >= 2 else None
     try:
