@@ -5,21 +5,17 @@ from pyrogram import enums, filters
 from pyrogram.enums import ChatMemberStatus as CMS
 from pyrogram.enums import ChatType
 from pyrogram.errors import (
-    ButtonUserPrivacyRestricted,
-    MediaCaptionTooLong,
-    MessageNotModified,
-    QueryIdInvalid,
-    RPCError,
+    MediaCaptionTooLong, MessageNotModified,
+    QueryIdInvalid, RPCError, UserIsBlocked
 )
-from pyrogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from pyrogram.types import (
+    CallbackQuery, InlineKeyboardButton,
+    InlineKeyboardMarkup, Message
+)
 
 from Powers import (
-    HELP_COMMANDS,
-    OWNER_ID,
-    PYROGRAM_VERSION,
-    PYTHON_VERSION,
-    UPTIME,
-    VERSION,
+    HELP_COMMANDS, LOGGER, OWNER_ID, PREFIX_HANDLER,
+    PYROGRAM_VERSION, PYTHON_VERSION, UPTIME, VERSION
 )
 from Powers.bot_class import Gojo
 from Powers.database.captcha_db import CAPTCHA_DATA
@@ -28,309 +24,321 @@ from Powers.utils.custom_filters import command
 from Powers.utils.extras import StartPic
 from Powers.utils.kbhelpers import ikb
 from Powers.utils.parser import mention_html
-from Powers.utils.start_utils import gen_start_kb, get_help_msg, get_private_note, get_private_rules
+from Powers.utils.start_utils import (
+    gen_cmds_kb, gen_start_kb, get_help_msg,
+    get_private_note, get_private_rules
+)
 from Powers.utils.string import encode_decode
 
-# Store pagination state
-help_pages = {}
 
-# ---------------------- START ----------------------
+# ─── Pagination helper ───
+def paginate_buttons(buttons: list, page: int = 1, per_page: int = 9):
+    """
+    Split buttons into pages of `per_page` (default 9) arranged in 3x3 grid.
+    """
+    total_pages = (len(buttons) + per_page - 1) // per_page
+    start = (page - 1) * per_page
+    end = start + per_page
+    page_buttons = buttons[start:end]
 
+    # reshape into 3x3 grid
+    rows = [page_buttons[i:i + 3] for i in range(0, len(page_buttons), 3)]
+
+    # navigation row
+    nav = []
+    if page > 1:
+        nav.append(InlineKeyboardButton("◀️ Prev", callback_data=f"help_page_{page-1}"))
+    if page < total_pages:
+        nav.append(InlineKeyboardButton("Next ▶️", callback_data=f"help_page_{page+1}"))
+    if nav:
+        rows.append(nav)
+
+    return InlineKeyboardMarkup(rows)
+
+
+# ─── Admin Close ───
+@Gojo.on_callback_query(filters.regex("^close_admin$"))
+async def close_admin_callback(_, q: CallbackQuery):
+    user_id = q.from_user.id
+    user_status = (await q.message.chat.get_member(user_id)).status
+    if user_status not in {CMS.OWNER, CMS.ADMINISTRATOR}:
+        await q.answer("You're not even an admin, don't try this explosive shit!", show_alert=True)
+        return
+    if user_status != CMS.OWNER:
+        await q.answer("You're just an admin, not owner\nStay in your limits!", show_alert=True)
+        return
+    await q.message.edit_text("Closed!")
+    await q.answer("Closed menu!", show_alert=True)
+
+
+# ─── Start ───
 @Gojo.on_message(command("start") & (filters.group | filters.private))
 async def start(c: Gojo, m: Message):
     if m.chat.type == ChatType.PRIVATE:
-        # Handle args like notes/rules/help
         if len(m.text.strip().split()) > 1:
-            arg = m.text.split(None, 1)[1].lower()
+            arg = m.text.split(None, 1)[1]
+            help_option = arg.lower()
 
-            if arg.startswith("note") and arg not in ("note", "notes"):
-                return await get_private_note(c, m, arg)
-
-            if arg.startswith("rules"):
-                return await get_private_rules(c, m, arg)
-
-            help_msg, help_kb = await get_help_msg(c, m, arg)
-            if help_msg:
-                try:
-                    return await m.reply_photo(
-                        photo=str(choice(StartPic)),
-                        caption=help_msg,
-                        parse_mode=enums.ParseMode.MARKDOWN,
-                        reply_markup=help_kb,
-                        quote=True,
-                    )
-                except ButtonUserPrivacyRestricted:
-                    return await m.reply_photo(
-                        photo=str(choice(StartPic)),
-                        caption=help_msg,
-                        parse_mode=enums.ParseMode.MARKDOWN,
-                        quote=True,
-                    )
-
-            if arg.startswith("qr_"):
-                decoded = encode_decode(arg.split("_", 1)[1], "decode")
-                chat, user = decoded.split(":")
-                if m.from_user.id != int(user):
-                    return await m.reply_text("Not authorized!")
-                try:
-                    await c.unban_chat_member(int(chat), int(user))
-                    msg = CAPTCHA_DATA().del_message_id(chat, user)
-                    try:
-                        chat_ = await c.get_chat(chat)
-                        kb = ikb([[ ("Join Chat", f"{chat_.invite_link}", "url") ]])
-                    except Exception:
-                        kb = None
-                    await m.reply_text("Access granted!", reply_markup=kb)
-                    try:
-                        await c.delete_messages(chat, msg)
-                    except Exception:
-                        pass
-                except Exception:
-                    pass
+            if help_option.startswith("note") and (help_option not in ("note", "notes")):
+                await get_private_note(c, m, help_option)
                 return
 
-        # Default start message
-        cpt = f"""Hey, {m.from_user.first_name} 💬
+            if help_option.startswith("rules"):
+                await get_private_rules(c, m, help_option)
+                return
 
-I am {c.me.first_name}, your versatile management bot, designed to help you manage your groups easily!
-
-+ What I Can Do:
-- Seamless management of your groups
-- Powerful moderation tools
-- Fun and engaging features
-
-📌 Need Help?
-Click the Help button below to view my modules and commands."""
-        try:
-            await m.reply_photo(
-                photo=str(choice(StartPic)),
-                caption=cpt,
-                reply_markup=await gen_start_kb(m),
-                quote=True,
-            )
-        except ButtonUserPrivacyRestricted:
-            safe_kb = InlineKeyboardMarkup([
-                [InlineKeyboardButton("Help", callback_data="commands")],
-                [InlineKeyboardButton("Add to Group", url=f"https://t.me/{c.me.username}?startgroup=true")],
-                [InlineKeyboardButton("Support", url="https://t.me/ShadowBotsHQ")],
-            ])
-            await m.reply_photo(
-                photo=str(choice(StartPic)),
-                caption=cpt,
-                reply_markup=safe_kb,
-                quote=True,
-            )
-    else:
-        # Group message → redirect to PM
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Start in PM", url=f"https://t.me/{c.me.username}?start=start")],
-            [InlineKeyboardButton("Add to Group", url=f"https://t.me/{c.me.username}?startgroup=true")],
-        ])
-        await m.reply_photo(
-            photo=str(choice(StartPic)),
-            caption="Hello! Click below to explore my features in private chat.",
-            reply_markup=kb,
-            quote=True,
-        )
-
-
-# ---------------------- HELP ----------------------
-
-@Gojo.on_message(command("help"))
-async def help_menu(c: Gojo, m: Message):
-    if m.chat.type != ChatType.PRIVATE:
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Open Help in PM", url=f"https://t.me/{c.me.username}?start=help")],
-            [InlineKeyboardButton("Add to Group", url=f"https://t.me/{c.me.username}?startgroup=true")],
-        ])
-        return await m.reply_photo(
-            photo=str(choice(StartPic)),
-            caption="Help is available in private only!",
-            reply_markup=kb,
-            quote=True,
-        )
-
-    # if /help module
-    if len(m.text.split()) >= 2:
-        help_option = m.text.split()[1].lower()
-        help_msg, help_kb = await get_help_msg(c, m, help_option)
-        if help_msg:
-            try:
-                return await m.reply_photo(
+            help_msg, help_kb = await get_help_msg(c, m, help_option)
+            if help_msg:
+                await m.reply_photo(
                     photo=str(choice(StartPic)),
                     caption=help_msg,
                     parse_mode=enums.ParseMode.MARKDOWN,
                     reply_markup=help_kb,
                     quote=True,
                 )
-            except ButtonUserPrivacyRestricted:
-                return await m.reply_photo(
-                    photo=str(choice(StartPic)),
-                    caption=help_msg,
-                    parse_mode=enums.ParseMode.MARKDOWN,
-                    quote=True,
-                )
+                return
 
-    # Default → paginated menu
-    all_commands = list(HELP_COMMANDS.keys())
-    total_pages = (len(all_commands) + 8) // 9
-    help_pages[m.from_user.id] = {"commands": all_commands, "page": 1, "total_pages": total_pages}
-    await show_help_page(c, m.from_user.id, 1, m)
+            # captcha QR handling
+            if len(arg.split("_", 1)) >= 2 and arg.split("_", 1)[0] == "qr":
+                decoded = encode_decode(arg.split("_", 1)[1], "decode")
+                chat, user = decoded.split(":")
+                if m.from_user.id != int(user):
+                    await m.reply_text("Not for you Baka")
+                    return
+                try:
+                    await c.unban_chat_member(int(chat), int(user))
+                    msg = CAPTCHA_DATA().del_message_id(chat, user)
+                    try:
+                        chat_ = await c.get_chat(chat)
+                        kb = ikb([["Link to chat", f"{chat_.invite_link}", "url"]])
+                    except Exception:
+                        kb = None
+                    await m.reply_text("You can now talk in the chat", reply_markup=kb)
+                    try:
+                        await c.delete_messages(chat, msg)
+                    except Exception:
+                        pass
+                except Exception:
+                    return
 
+        try:
+            cpt = f"""
+Hey [{m.from_user.first_name}](http://t.me/{m.from_user.username})! I am {c.me.first_name} ✨.
+I'm here to help you manage your group(s)!
+Hit /help to find out more about how to use me in my full potential!
 
-@Gojo.on_callback_query(filters.regex("^commands$"))
-async def commands_menu(c: Gojo, q: CallbackQuery):
-    if q.message.chat.type != ChatType.PRIVATE:
-        return await q.answer("Open commands in PM!", show_alert=True)
-
-    all_commands = list(HELP_COMMANDS.keys())
-    total_pages = (len(all_commands) + 8) // 9
-    help_pages[q.from_user.id] = {"commands": all_commands, "page": 1, "total_pages": total_pages}
-    await show_help_page(c, q.from_user.id, 1, q)
-
-
-async def show_help_page(c: Gojo, user_id: int, page: int, target):
-    if user_id not in help_pages:
-        return
-    all_commands = help_pages[user_id]["commands"]
-    total_pages = help_pages[user_id]["total_pages"]
-
-    start, end = (page - 1) * 9, min((page - 1) * 9 + 9, len(all_commands))
-    current_commands = all_commands[start:end]
-
-    keyboard_buttons = [
-        [InlineKeyboardButton(HELP_COMMANDS[cmd].get("name", cmd.replace("plugins.", "").title()), callback_data=f"help_{cmd}")]
-        for cmd in current_commands
-    ]
-
-    nav = []
-    if page > 1:
-        nav.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"help_page_{page-1}"))
-    if page < total_pages:
-        nav.append(InlineKeyboardButton("Next ➡️", callback_data=f"help_page_{page+1}"))
-    if nav:
-        keyboard_buttons.append(nav)
-
-    keyboard_buttons.append([InlineKeyboardButton("🔙 Back", callback_data="start_back")])
-    keyboard = InlineKeyboardMarkup(keyboard_buttons)
-
-    caption = f"**📖 Command Center - Page {page}/{total_pages}**\n\nSelect a module to view detailed commands:"
-    help_pages[user_id]["page"] = page
-
-    try:
-        if isinstance(target, CallbackQuery):
-            await target.edit_message_caption(caption=caption, reply_markup=keyboard)
-            await target.answer()
-        else:
-            await target.reply_photo(photo=str(choice(StartPic)), caption=caption, reply_markup=keyboard)
-    except MessageNotModified:
-        pass
-
-
-@Gojo.on_callback_query(filters.regex("^help_page_(\\d+)$"))
-async def help_page_nav(c: Gojo, q: CallbackQuery):
-    page = int(q.matches[0].group(1))
-    await show_help_page(c, q.from_user.id, page, q)
-
-
-@Gojo.on_callback_query(filters.regex("^help_(.*)"))
-async def help_command_detail(c: Gojo, q: CallbackQuery):
-    module = q.data.split("help_")[1]
-    if module not in HELP_COMMANDS:
-        return await q.answer("Unknown module!", show_alert=True)
-
-    help_msg = HELP_COMMANDS[module].get("help_msg", "No description available.")
-    help_buttons = list(HELP_COMMANDS[module].get("buttons", []))
-
-    if q.from_user.id in help_pages:
-        page = help_pages[q.from_user.id]["page"]
-        help_buttons.append(("🔙 Back", f"help_page_{page}"))
-
-    try:
-        await q.edit_message_caption(
-            caption=help_msg,
-            parse_mode=enums.ParseMode.MARKDOWN,
-            reply_markup=ikb(help_buttons) if help_buttons else None,
+Join my [News Channel](https://t.me/ShadowBotsHQ) to get information on all the latest updates."""
+            await m.reply_photo(
+                photo=str(choice(StartPic)),
+                caption=cpt,
+                reply_markup=(await gen_start_kb(m)),
+                quote=True,
+            )
+        except UserIsBlocked:
+            LOGGER.warning(f"Bot blocked by {m.from_user.id}")
+    else:
+        kb = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("Connect me to pm", url=f"https://{c.me.username}.t.me/")]]
         )
-    except MediaCaptionTooLong:
-        parts = [help_msg[i:i+4000] for i in range(0, len(help_msg), 4000)]
-        for part in parts[:-1]:
-            await q.message.reply_text(part, parse_mode=enums.ParseMode.MARKDOWN)
-        await q.edit_message_caption(
-            caption=parts[-1],
-            parse_mode=enums.ParseMode.MARKDOWN,
-            reply_markup=ikb(help_buttons) if help_buttons else None,
+        await m.reply_photo(
+            photo=str(choice(StartPic)),
+            caption="I'm alive :3",
+            reply_markup=kb,
+            quote=True,
         )
 
 
-# ---------------------- EXTRA CALLBACKS ----------------------
-
+# ─── Start Back ───
 @Gojo.on_callback_query(filters.regex("^start_back$"))
 async def start_back(c: Gojo, q: CallbackQuery):
-    cpt = f"""Hey, {q.from_user.first_name} 💬
-
-I am {c.me.first_name}, your versatile management bot, designed to help you manage your groups easily!"""
     try:
-        await q.edit_message_caption(caption=cpt, reply_markup=await gen_start_kb(q.message))
-    except ButtonUserPrivacyRestricted:
-        safe_kb = InlineKeyboardMarkup([[InlineKeyboardButton("Help", callback_data="commands")]])
-        await q.edit_message_caption(caption=cpt, reply_markup=safe_kb)
+        cpt = f"""
+Hey [{q.from_user.first_name}](http://t.me/{q.from_user.username})! I am {c.me.first_name} ✨.
+I'm here to help you manage your group(s)!
+Hit /help to find out more about how to use me in my full potential!
+
+Join my [News Channel](http://t.me/shadowbotshq) to get information on all the latest updates."""
+        await q.edit_message_caption(caption=cpt, reply_markup=(await gen_start_kb(q.message)))
+    except MessageNotModified:
+        pass
     await q.answer()
 
 
+# ─── Commands ───
+@Gojo.on_callback_query(filters.regex("^commands$"))
+async def commands_menu(c: Gojo, q: CallbackQuery):
+    ou = await gen_cmds_kb(q.message)
+    keyboard = ikb(ou, True)
+    cpt = f"""
+Hey **[{q.from_user.first_name}](http://t.me/{q.from_user.username})**! I am {c.me.first_name}✨.
+I'm here to help you manage your group(s)!
+Commands available:
+× /start: Start the bot
+× /help: Give's you this message.
+
+You can use {", ".join(PREFIX_HANDLER)} as your prefix handler
+"""
+    try:
+        await q.edit_message_caption(caption=cpt, reply_markup=keyboard)
+    except MessageNotModified:
+        pass
+    except QueryIdInvalid:
+        await q.message.reply_photo(photo=str(choice(StartPic)), caption=cpt, reply_markup=keyboard)
+    await q.answer()
+
+
+# ─── Help ───
+@Gojo.on_message(command("help"))
+async def help_menu(c: Gojo, m: Message):
+    if len(m.text.split()) >= 2:
+        textt = m.text.replace(" ", "_").replace("_", " ", 1)
+        help_option = (textt.split(None)[1]).lower()
+        help_msg, help_kb = await get_help_msg(c, m, help_option)
+
+        if not help_msg:
+            LOGGER.error(f"No help_msg found for help_option - {help_option}!!")
+            return
+
+        if m.chat.type == ChatType.PRIVATE:
+            if len(help_msg) >= 1026:
+                await m.reply_text(help_msg, parse_mode=enums.ParseMode.MARKDOWN, quote=True)
+            await m.reply_photo(
+                photo=str(choice(StartPic)),
+                caption=help_msg,
+                parse_mode=enums.ParseMode.MARKDOWN,
+                reply_markup=help_kb,
+                quote=True,
+            )
+        else:
+            await m.reply_photo(
+                photo=str(choice(StartPic)),
+                caption=f"Press the button below to get help for <i>{help_option}</i>",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("Help", url=f"t.me/{c.me.username}?start={help_option}")]]
+                ),
+            )
+    else:
+        if m.chat.type == ChatType.PRIVATE:
+            modules = sorted(list(HELP_COMMANDS.keys()))
+            buttons = [
+                InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}")
+                for x in modules
+            ]
+            keyboard = paginate_buttons(buttons, page=1)
+            msg = f"""
+Hey **[{m.from_user.first_name}](http://t.me/{m.from_user.username})**! I am {c.me.first_name}✨.
+I'm here to help you manage your group(s)!
+Commands available:
+× /start: Start the bot
+× /help: Give's you this message."""
+        else:
+            keyboard = InlineKeyboardMarkup(
+                [[InlineKeyboardButton("Help", url=f"t.me/{c.me.username}?start=start_help")]]
+            )
+            msg = "Contact me in PM to get the list of possible commands."
+
+        await m.reply_photo(photo=str(choice(StartPic)), caption=msg, reply_markup=keyboard)
+
+
+# ─── Pagination Handler ───
+@Gojo.on_callback_query(filters.regex(r"^help_page_[0-9]+$"))
+async def paginate_help(c: Gojo, q: CallbackQuery):
+    page = int(q.data.split("_")[-1])
+    modules = sorted(list(HELP_COMMANDS.keys()))
+    buttons = [InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}") for x in modules]
+    keyboard = paginate_buttons(buttons, page=page)
+    await q.edit_message_reply_markup(reply_markup=keyboard)
+    await q.answer()
+
+
+# ─── Current Info ───
 @Gojo.on_callback_query(filters.regex("^bot_curr_info$"))
 async def give_curr_info(c: Gojo, q: CallbackQuery):
     start = time()
     up = strftime("%Hh %Mm %Ss", gmtime(time() - UPTIME))
     x = await c.send_message(q.message.chat.id, "Pinging..")
-    delta = time() - start
+    delta_ping = time() - start
     await x.delete()
     txt = f"""
-**📊 System Status:**
-**🏓 Ping:** {delta*1000:.3f} ms
-**⏰ Uptime:** {up}
-**🤖 Version:** {VERSION}
-**🐍 Python:** {PYTHON_VERSION}
-**🔥 Pyrogram:** {PYROGRAM_VERSION}"""
+🏓 Ping : {delta_ping * 1000:.3f} ms
+📈 Uptime : {up}
+🤖 Bot's version: {VERSION}
+🐍 Python's version: {PYTHON_VERSION}
+🔥 Pyrogram's version : {PYROGRAM_VERSION}
+    """
     await q.answer(txt, show_alert=True)
 
 
+# ─── Module Info ───
+@Gojo.on_callback_query(filters.regex("^plugins."))
+async def get_module_info(c: Gojo, q: CallbackQuery):
+    module = q.data.split(".", 1)[1]
+    help_msg = HELP_COMMANDS[f"plugins.{module}"]["help_msg"]
+    help_kb = HELP_COMMANDS[f"plugins.{module}"]["buttons"]
+
+    try:
+        await q.edit_message_caption(
+            caption=help_msg,
+            parse_mode=enums.ParseMode.MARKDOWN,
+            reply_markup=ikb(help_kb, True, todo="commands"),
+        )
+    except MediaCaptionTooLong:
+        caption, kb = await get_divided_msg(f"plugins.{module}", back_to_do="commands")
+        await q.edit_message_caption(caption, enums.ParseMode.MARKDOWN, kb)
+    await q.answer()
+
+
+# ─── Staffs ───
 @Gojo.on_callback_query(filters.regex("^give_bot_staffs$"))
 async def give_bot_staffs(c: Gojo, q: CallbackQuery):
     reply = ""
     try:
         owner = await c.get_users(OWNER_ID)
-        reply += f"**👑 Owner:** {(await mention_html(owner.first_name, OWNER_ID))} (`{OWNER_ID}`)\n"
+        reply = f"<b>🌟 Owner:</b> {(await mention_html(owner.first_name, OWNER_ID))} (<code>{OWNER_ID}</code>)\n"
     except RPCError:
-        reply += f"**👑 Owner:** `{OWNER_ID}`\n"
+        pass
 
-    reply += "\n**⚡ Developers:**\n"
-    for uid in get_support_staff("dev") or []:
-        try:
-            u = await c.get_users(int(uid))
-            reply += f"• {(await mention_html(u.first_name, int(uid)))} (`{uid}`)\n"
-        except RPCError:
-            reply += f"• `{uid}`\n"
+    true_dev = get_support_staff("dev")
+    reply += "\n<b>Developers ⚡️:</b>\n"
+    if not true_dev:
+        reply += "No Dev Users\n"
+    else:
+        for each_user in true_dev:
+            try:
+                user = await c.get_users(int(each_user))
+                reply += f"• {(await mention_html(user.first_name, user.id))} (<code>{user.id}</code>)\n"
+            except RPCError:
+                pass
 
-    reply += "\n**🐉 Sudo Users:**\n"
-    for uid in get_support_staff("sudo") or []:
-        try:
-            u = await c.get_users(int(uid))
-            reply += f"• {(await mention_html(u.first_name, int(uid)))} (`{uid}`)\n"
-        except RPCError:
-            reply += f"• `{uid}`\n"
+    true_sudo = get_support_staff("sudo")
+    reply += "\n<b>Sudo Users 🐉:</b>\n"
+    if not true_sudo:
+        reply += "No Sudo Users\n"
+    else:
+        for each_user in true_sudo:
+            try:
+                user = await c.get_users(int(each_user))
+                reply += f"• {(await mention_html(user.first_name, user.id))} (<code>{user.id}</code>)\n"
+            except RPCError:
+                pass
 
-    reply += "\n**🐺 Whitelisted Users:**\n"
-    for uid in get_support_staff("whitelist") or []:
-        try:
-            u = await c.get_users(int(uid))
-            reply += f"• {(await mention_html(u.first_name, int(uid)))} (`{uid}`)\n"
-        except RPCError:
-            reply += f"• `{uid}`\n"
+    reply += "\n<b>Whitelisted Users 🐺:</b>\n"
+    wl = get_support_staff("whitelist")
+    if not wl:
+        reply += "No additional whitelisted users\n"
+    else:
+        for each_user in wl:
+            try:
+                user = await c.get_users(int(each_user))
+                reply += f"• {(await mention_html(user.first_name, user.id))} (<code>{user.id}</code>)\n"
+            except RPCError:
+                pass
 
-    await q.edit_message_caption(reply, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", "start_back")]]))
+    await q.edit_message_caption(reply,
+                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back", "start_back")]]))
 
 
+# ─── Delete ───
 @Gojo.on_callback_query(filters.regex("^DELETEEEE$"))
 async def delete_back(_, q: CallbackQuery):
     await q.message.delete()
