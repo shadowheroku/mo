@@ -26,7 +26,7 @@ from Powers.utils.kbhelpers import ikb
 from Powers.utils.parser import mention_html
 from Powers.utils.start_utils import (
     gen_cmds_kb, gen_start_kb, get_help_msg,
-    get_private_note, get_private_rules
+    get_private_note, get_private_rules, get_divided_msg
 )
 from Powers.utils.string import encode_decode
 
