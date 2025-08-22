@@ -31,9 +31,12 @@ async def wish_cmd(c: Gojo, m: Message):
     text = m.text.split(None, 1)[1]
     wish_count = random.randint(1, 100)
 
+    # Proper mention
+    mention = f"[{m.from_user.first_name}](tg://user?id={m.from_user.id})"
+
     wish = (
         f"✨ **Wish Check** ✨\n\n"
-        f"👤 From: {m.from_user.mention}\n"
+        f"👤 From: {mention}\n"
         f"💭 Wish: `{text}`\n"
         f"📊 Possibility: **{wish_count}%**"
     )
@@ -63,8 +66,8 @@ async def cute_cmd(c: Gojo, m: Message):
     CUTE = (
         f"🌸 **Cuteness Meter** 🌸\n\n"
         f"👤 Target: {mention}\n"
-        f"🍑 Cuteness: **{cuteness}%**\n"
-        f"🥀 Verdict: Too cute to handle!"
+        f"🍑 Cuteness: **{cuteness}\\%**\n"   # escape `%`
+        f"🥀 Verdict: {'Adorable 💖' if cuteness > 70 else 'Cute 🥺' if cuteness > 40 else 'Needs more cuteness 😜'}"
     )
 
     await (await send_cmd(c, Types.DOCUMENT))(
