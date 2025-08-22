@@ -35,6 +35,8 @@ async def yt_video_cmd(c: Gojo, m: Message):
 
     if not query:
         await status.edit("😴 No song found.\n\n» Maybe you typed it wrong?")
+        await asyncio.sleep(60)
+        await status.delete()
         return
 
     # 🔎 Search video
@@ -42,6 +44,8 @@ async def yt_video_cmd(c: Gojo, m: Message):
     result = search.result()
     if not result or "search_result" not in result or not result["search_result"]:
         await status.edit("❌ Couldn't find anything on YouTube.")
+        await asyncio.sleep(60)
+        await status.delete()
         return
 
     info = result["search_result"][0]
@@ -75,9 +79,9 @@ async def yt_video_cmd(c: Gojo, m: Message):
 .youtube.com	TRUE	/	FALSE	1755853722	ST-xuwub9	session_logininfo=AFmmF2swRQIgUi7vRGyMnXAELvYehLLbVJWvF7dxxReoJy-CAdQFZ1QCIQCL0gOVmR-_CIjmM2b2cOG-F-zkU8troZXRmPLQjlsNHg%3AQUQ3MjNmd3d0T2tjdjREbmUtNl9ZRWdCSU5GUXIxRkc4LVZ5WlUyVG5aX3ppNnBlb3A0NmhGSG1HeHMwWnRSdzhtbkhZNXBFUEtHNFFfOGh1cy0temV4X1RKLTZ4bTdvcm4tSVRGNDJkaDh2SlFfWHRHaW13WDhjdk1aZ2czUDh0a1NoVWItbmp2R2tiS3E0OTE0TU5PUHJfcGRENGhFWHdB
 .youtube.com	TRUE	/	TRUE	1787389719	__Secure-1PSIDTS	sidts-CjEB5H03P4d3_XRWwSKbcC1SmShkTKMchEWz8e0JB8pGYYLzlDkyJ36rtzL9qrn4LiV7EAA
 .youtube.com	TRUE	/	TRUE	1787389719	__Secure-3PSIDTS	sidts-CjEB5H03P4d3_XRWwSKbcC1SmShkTKMchEWz8e0JB8pGYYLzlDkyJ36rtzL9qrn4LiV7EAA
-.youtube.com	TRUE	/	FALSE	1787389720	SIDCC	AKEyXzWQ1yScKr7VGF0WWJnyKImD-1NWv6hURzFYRfGrPfjYaAQ-UOgn-s37TIG4N_FOzWWY
-.youtube.com	TRUE	/	TRUE	1787389720	__Secure-1PSIDCC	AKEyXzUfJo3K0Uer5sGQ_F3ztjTutoFGEYfIFNFZcUQ9SqT8qvCJl96LpOI4NY0y9XApdmJH
-.youtube.com	TRUE	/	TRUE	1787389720	__Secure-3PSIDCC	AKEyXzVHCTQiD3unuY1koQkYX-kO4f-pLPZg-K_ynnBWMlwN0h4m4FbvZ9uuRCMNwbc2L84l
+.youtube.com	TRUE	/	FALSE	1787389720	SIDCC	AKEyXzWQ1yScKr7VGF0WWJnyKImD-1NWv极hURzFYRfGrPfjYaAQ-UOgn-s37TIG4N_FOzWWY
+.youtube.com	TRUE	/	TRUE	1787389720	__Secure-1PSIDCC	AKEyXzUfJo3K0U极er5sGQ_F3ztjTutoFGEYfIFNFZcUQ9SqT8qvCJl96LpOI4NY0y9XApdmJH
+.youtube.com	TRUE极	/	TRUE	1787389720	__Secure-3PSIDCC	AKEyXzVHCTQiD3unuY1koQkYX-kO4f-pLPZg-K_ynnBWMlwN0h4m4FbvZ9uuRCMNwbc2L84l
 .youtube.com	TRUE	/	TRUE	1771405720	VISITOR_INFO1_LIVE	ULQtIK6wyzY
 .youtube.com	TRUE	/	TRUE	1771405720	VISITOR_PRIVACY_METADATA	CgJJThIEGgAgGw%3D%3D
 .youtube.com	TRUE	/	TRUE	0	YSC	JFMimREF7H8
@@ -109,6 +113,8 @@ async def yt_video_cmd(c: Gojo, m: Message):
         # Clean up cookies file
         if os.path.exists(cookies_file):
             os.remove(cookies_file)
+        await asyncio.sleep(60)
+        await status.delete()
         return
 
     file_path = f"{data['id']}.mp4"
@@ -120,7 +126,7 @@ async def yt_video_cmd(c: Gojo, m: Message):
     )
 
     try:
-        await (await send_cmd(c, Types.VIDEO))(
+        sent_msg = await (await send_cmd(c, Types.VIDEO))(
             m.chat.id,
             file_path,
             caption,
@@ -128,11 +134,18 @@ async def yt_video_cmd(c: Gojo, m: Message):
             thumb=thumb_file,
             reply_markup=InlineKeyboardMarkup(BUTTON),
         )
+        
+        # Delete the success message after 60 seconds
+        await asyncio.sleep(60)
+        await sent_msg.delete()
+        
     except Exception as e:
         await status.edit(f"⚠️ Failed to upload.\n\nError: `{str(e)}`")
         # Clean up cookies file
         if os.path.exists(cookies_file):
             os.remove(cookies_file)
+        await asyncio.sleep(60)
+        await status.delete()
         return
 
     await status.delete()
