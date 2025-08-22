@@ -1,52 +1,49 @@
 import os
 import replicate
 import requests
+from pyrogram import filters
 from pyrogram.types import Message
 from Powers.bot_class import Gojo
-from Powers.utils.custom_filters import command
 
-# Load Replicate API key
-REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN" , "r8_V7pQfVBxlIzmvviUEkiYJxCcDqAAbhk1rq4Jn")
+# ✅ Set Replicate API key
+os.environ["REPLICATE_API_TOKEN"] = "r8_V7pQfVBxlIzmvviUEkiYJxCcDqAAbhk1rq4Jn"
 
-import os
-import aiohttp
-from pyrogram import Client, filters
-from pyrogram.types import Message
-from replicate import Client as ReplicateClient
+# Replicate model (Real-ESRGAN for upscaling)
+MODEL = "nightmareai/real-esrgan"
 
-# Load your Replicate API token
+@Gojo.on_message(filters.command(["upscale"]))
+async def upscale_image(c: Gojo, m: Message):
+    if len(m.command) == 2:  # Case 1: /upscale <url>
+        image_url = m.command[1]
+    elif m.reply_to_message and m.reply_to_message.photo:  # Case 2: replied photo
+        photo = m.reply_to_message.photo
+        file_path = await c.download_media(photo.file_id)
+        # Upload to a free file host to get a URL
+        with open(file_path, "rb") as f:
+            response = requests.post(
+                "https://api.imgbb.com/1/upload",
+                data={"key": "5a0b3d4d4d27e3f33ef5e9df0b3e1abc"},  # Public demo key
+                files={"image": f},
+            )
+        data = response.json()
+        if not data.get("success"):
+            return await m.reply_text("❌ Upload failed, try again.")
+        image_url = data["data"]["url"]
+    else:
+        return await m.reply_text("📸 Reply to an image or use `/upscale <url>`.")
 
-replicate = ReplicateClient(api_token=REPLICATE_API_TOKEN)
-
-@Client.on_message(filters.command("upscale"))
-async def upscale_image(c: Client, m: Message):
-    if not m.reply_to_message or not m.reply_to_message.photo:
-        return await m.reply_text("⚠️ Reply to an image to upscale it.")
+    msg = await m.reply_text("🔄 Upscaling your image, please wait...")
 
     try:
-        # Download image to memory
-        photo_path = await m.reply_to_message.download()
-        async with aiohttp.ClientSession() as session:
-            with open(photo_path, "rb") as f:
-                image_bytes = f.read()
-
-        # Run ESRGAN model on Replicate
         output = replicate.run(
-            "nightmareai/real-esrgan:f121d640bd286e1fdc67f9799164c1d5be36ff74576ee11c803ae5b665dd46aa",
-            input={
-                "image": image_bytes,  # Directly send raw bytes
-                "scale": 2
-            },
+            f"{MODEL}:latest",
+            input={"image": image_url, "scale": 2}  # You can change scale: 2, 4, etc.
         )
-
-        if not output:
-            return await m.reply_text("❌ Upscale failed. No output received.")
-
-        # Send result back
-        await m.reply_photo(photo=output, caption="✅ Upscaled successfully!")
-
+        await msg.delete()
+        await m.reply_photo(output, caption="✅ Here is your upscaled image!")
     except Exception as e:
-        await m.reply_text(f"❌ Upscale failed: {e}")
+        await msg.edit_text(f"❌ Upscale failed: {e}")
+
 
 
 __PLUGIN__ = "upscale"
