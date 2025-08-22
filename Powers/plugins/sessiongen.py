@@ -1,7 +1,6 @@
-import asyncio
 import logging
 from pyrogram import filters, Client
-from pyrogram.types import Message
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pyrogram.errors import PhoneCodeExpired, SessionPasswordNeeded
 from telethon.sessions import StringSession
 from telethon import TelegramClient
@@ -19,6 +18,7 @@ logger = logging.getLogger(__name__)
 ) = range(6)
 
 
+# ─── Start command ───
 @Gojo.on_message(filters.command("gensession"))
 async def gensession_cmd(c: Gojo, m: Message):
     """Start session generator wizard"""
@@ -27,13 +27,39 @@ async def gensession_cmd(c: Gojo, m: Message):
 
     text = (
         "⚡ **Session Generator**\n\n"
-        "Choose the library you want a session for:\n"
-        "• `pyrogram`\n• `telethon`\n\n"
-        "_Reply with one of the above._"
+        "Choose the library you want a session for:"
     )
-    await m.reply_text(text)
+    buttons = [
+        [InlineKeyboardButton("🐍 Pyrogram", callback_data="lib_pyrogram")],
+        [InlineKeyboardButton("📡 Telethon", callback_data="lib_telethon")],
+        [InlineKeyboardButton("❌ Cancel", callback_data="cancel")]
+    ]
+    await m.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
 
 
+# ─── Callback handler for choices ───
+@Gojo.on_callback_query(filters.regex("^lib_") | filters.regex("^cancel$"))
+async def choose_lib(c: Gojo, q: CallbackQuery):
+    user_id = q.from_user.id
+    if user_id not in user_sessions:
+        return await q.answer("❌ Session expired, use /gensession again.", show_alert=True)
+
+    session = user_sessions[user_id]
+
+    if q.data == "cancel":
+        del user_sessions[user_id]
+        return await q.message.edit("🚪 Cancelled session generation.")
+
+    lib = "pyrogram" if q.data == "lib_pyrogram" else "telethon"
+    session["library"] = lib
+    session["step"] = GET_API
+
+    await q.message.edit(
+        f"✅ Using **{lib.capitalize()}**.\n\n📌 Now send me your **API ID**:"
+    )
+
+
+# ─── Main wizard steps ───
 @Gojo.on_message(filters.text & ~filters.command(["cancel", "gensession"]))
 async def session_wizard(c: Gojo, m: Message):
     user_id = m.from_user.id
@@ -42,15 +68,6 @@ async def session_wizard(c: Gojo, m: Message):
 
     session = user_sessions[user_id]
     step = session.get("step")
-
-    # ─── Choose library ───
-    if step == CHOOSING:
-        lib = m.text.lower().strip()
-        if lib not in ["pyrogram", "telethon"]:
-            return await m.reply_text("❌ Please reply with `pyrogram` or `telethon`.")
-        session["library"] = lib
-        session["step"] = GET_API
-        return await m.reply_text("📌 Send me your **API ID**:")
 
     # ─── API ID ───
     if step == GET_API:
@@ -96,7 +113,7 @@ async def session_wizard(c: Gojo, m: Message):
                 session.update(client=client, phone_code_hash=sent.phone_code_hash)
 
             session["step"] = GET_CODE
-            return await m.reply_text("📨 Code sent! Reply with it in this format: `1 2 3 4 5`")
+            return await m.reply_text("📨 Code sent! Reply with it (example: `1 2 3 4 5`)")
 
         except Exception as e:
             logger.error(f"Error sending code: {e}")
@@ -105,7 +122,7 @@ async def session_wizard(c: Gojo, m: Message):
 
     # ─── Verification code ───
     if step == GET_CODE:
-        code = m.text.strip()  # keep spaces as user types them
+        code = m.text.strip()
         lib = session["library"]
         client = session["client"]
 
