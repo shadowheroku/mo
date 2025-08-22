@@ -7,13 +7,23 @@ from pyrogram.types import (
     CallbackQuery
 )
 from pyrogram.enums import ParseMode as PM
+from pyrogram.helpers import escape_markdown
 
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
+
 # ─── STORAGE ───
 rps_emojis = {"rock": "🪨", "paper": "📜", "scissors": "✂️"}
 rps_games = {}  # {chat_id: {"p1": id, "p2": id/bot, "moves": {id: choice}}}
+
+
+# ─── HELPER TO GET NAME ───
+async def get_name(c, uid):
+    if uid == "bot":
+        return "🤖 Bot"
+    u = await c.get_users(uid)
+    return f"**{escape_markdown(u.first_name, version=2)}**"
 
 
 # ─── START GAME ───
@@ -25,11 +35,19 @@ async def rps_start(c: Gojo, m: Message):
         if p1 == p2:
             return await m.reply_text("⚠️ You cannot challenge yourself!")
         rps_games[m.chat.id] = {"p1": p1, "p2": p2, "moves": {}}
-        txt = f"🎮 **Rock–Paper–Scissors**\n\n{m.from_user.mention} challenged {m.reply_to_message.from_user.mention}!\n\nChoose your moves 👇"
+        txt = (
+            f"🎮 **Rock–Paper–Scissors**\n\n"
+            f"{await get_name(c, p1)} challenged {await get_name(c, p2)}!\n\n"
+            "Choose your moves 👇"
+        )
     else:  # play with bot
         p1 = m.from_user.id
         rps_games[m.chat.id] = {"p1": p1, "p2": "bot", "moves": {}}
-        txt = f"🎮 **Rock–Paper–Scissors**\n\n{m.from_user.mention} vs 🤖 Bot\n\nChoose your move 👇"
+        txt = (
+            f"🎮 **Rock–Paper–Scissors**\n\n"
+            f"{await get_name(c, p1)} vs 🤖 Bot\n\n"
+            "Choose your move 👇"
+        )
 
     btns = [
         [
@@ -38,7 +56,7 @@ async def rps_start(c: Gojo, m: Message):
             InlineKeyboardButton("✂️ Scissors", callback_data="rps_scissors"),
         ]
     ]
-    await m.reply_text(txt, reply_markup=InlineKeyboardMarkup(btns))
+    await m.reply_text(txt, reply_markup=InlineKeyboardMarkup(btns), parse_mode=PM.MARKDOWN)
 
 
 # ─── HANDLE MOVES ───
@@ -52,7 +70,7 @@ async def rps_play(c: Gojo, q: CallbackQuery):
     move = q.data.split("_")[1]
 
     # check valid player
-    if q.from_user.id not in [game["p1"], game["p2"]]:
+    if q.from_user.id not in [game["p1"], game["p2"]] and game["p2"] != "bot":
         return await q.answer("This game isn’t for you!", show_alert=True)
 
     # record move
@@ -85,22 +103,17 @@ async def rps_play(c: Gojo, q: CallbackQuery):
 
         win = winner(p1, m1, p2, m2)
 
-        if p2 == "bot":
-            p2_name = "🤖 Bot"
-        else:
-            p2_name = (await c.get_users(p2)).mention
-
         result = (
             f"🎮 **Rock–Paper–Scissors**\n\n"
-            f"{(await c.get_users(p1)).mention}: {rps_emojis[m1]}\n"
-            f"{p2_name}: {rps_emojis[m2]}\n\n"
+            f"{await get_name(c, p1)}: {rps_emojis[m1]}\n"
+            f"{await get_name(c, p2)}: {rps_emojis[m2]}\n\n"
         )
         if not win:
             result += "🤝 It's a Tie!"
         elif win == p1:
-            result += f"🎉 Winner: {(await c.get_users(p1)).mention}"
+            result += f"🎉 Winner: {await get_name(c, p1)}"
         else:
-            result += f"🎉 Winner: {p2_name}"
+            result += f"🎉 Winner: {await get_name(c, p2)}"
 
         await q.message.edit_text(result, parse_mode=PM.MARKDOWN)
         del rps_games[chat_id]
@@ -111,6 +124,6 @@ _DISABLE_CMDS_ = ["rps"]
 
 __HELP__ = """
 **🎮 Rock–Paper–Scissors**
-• `/rps` → Play with Bot
-• Reply `/rps` → Challenge another player
+• `/rps` → Play with Bot  
+• Reply `/rps` → Challenge another player  
 """
