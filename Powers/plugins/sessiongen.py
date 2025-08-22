@@ -26,7 +26,7 @@ async def gensession_cmd(c: Gojo, m: Message):
     user_sessions[user_id] = {"step": CHOOSING}
 
     text = (
-        "⚡ **Session Generator**\n\n"
+        "⚡ <b>Session Generator</b>\n\n"
         "Choose the library you want a session for:"
     )
     buttons = [
@@ -34,7 +34,7 @@ async def gensession_cmd(c: Gojo, m: Message):
         [InlineKeyboardButton("📡 Telethon", callback_data="lib_telethon")],
         [InlineKeyboardButton("❌ Cancel", callback_data="cancel")]
     ]
-    await m.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+    await m.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="html")
 
 
 # ─── Callback handler for choices ───
@@ -47,7 +47,7 @@ async def choose_lib(c: Gojo, q: CallbackQuery):
     session = user_sessions[user_id]
 
     if q.data == "cancel":
-        del user_sessions[user_id]
+        user_sessions.pop(user_id, None)
         return await q.message.edit("🚪 Cancelled session generation.")
 
     lib = "pyrogram" if q.data == "lib_pyrogram" else "telethon"
@@ -55,7 +55,8 @@ async def choose_lib(c: Gojo, q: CallbackQuery):
     session["step"] = GET_API
 
     await q.message.edit(
-        f"✅ Using **{lib.capitalize()}**.\n\n📌 Now send me your **API ID**:"
+        f"✅ Using <b>{lib.capitalize()}</b>.\n\n📌 Now send me your <b>API ID</b>:",
+        parse_mode="html"
     )
 
 
@@ -77,13 +78,13 @@ async def session_wizard(c: Gojo, m: Message):
             return await m.reply_text("❌ API ID must be a number. Try again:")
         session["api_id"] = api_id
         session["step"] = GET_HASH
-        return await m.reply_text("📌 Now send me your **API HASH**:")
+        return await m.reply_text("📌 Now send me your <b>API HASH</b>:", parse_mode="html")
 
     # ─── API HASH ───
     if step == GET_HASH:
         session["api_hash"] = m.text.strip()
         session["step"] = GET_PHONE
-        return await m.reply_text("📌 Send me your **phone number** (with country code):")
+        return await m.reply_text("📌 Send me your <b>phone number</b> (with country code):", parse_mode="html")
 
     # ─── Phone ───
     if step == GET_PHONE:
@@ -113,12 +114,12 @@ async def session_wizard(c: Gojo, m: Message):
                 session.update(client=client, phone_code_hash=sent.phone_code_hash)
 
             session["step"] = GET_CODE
-            return await m.reply_text("📨 Code sent! Reply with it (example: `1 2 3 4 5`)")
+            return await m.reply_text("📨 Code sent! Reply with it (example: <code>1 2 3 4 5</code>)", parse_mode="html")
 
         except Exception as e:
             logger.error(f"Error sending code: {e}")
-            del user_sessions[user_id]
-            return await m.reply_text(f"❌ Failed to send code: `{e}`")
+            user_sessions.pop(user_id, None)
+            return await m.reply_text(f"❌ Failed to send code: <code>{e}</code>", parse_mode="html")
 
     # ─── Verification code ───
     if step == GET_CODE:
@@ -137,10 +138,10 @@ async def session_wizard(c: Gojo, m: Message):
                 except PhoneCodeExpired:
                     sent = await client.send_code(session["phone"])
                     session["phone_code_hash"] = sent.phone_code_hash
-                    return await m.reply_text("⚠️ Code expired. Sent a new one, please reply again.")
+                    return await m.reply_text("⚠️ Code expired. Sent a new one, please reply again.", parse_mode="html")
                 except SessionPasswordNeeded:
                     session["step"] = GET_PASSWORD
-                    return await m.reply_text("🔒 Your account has 2FA. Send me your password:")
+                    return await m.reply_text("🔒 Your account has 2FA. Send me your password:", parse_mode="html")
 
                 string = await client.export_session_string()
                 await client.disconnect()
@@ -155,24 +156,24 @@ async def session_wizard(c: Gojo, m: Message):
                 except PhoneCodeExpiredError:
                     sent = await client.send_code_request(session["phone"])
                     session["phone_code_hash"] = sent.phone_code_hash
-                    return await m.reply_text("⚠️ Code expired. Sent a new one, please reply again.")
+                    return await m.reply_text("⚠️ Code expired. Sent a new one, please reply again.", parse_mode="html")
                 except SessionPasswordNeededError:
                     session["step"] = GET_PASSWORD
-                    return await m.reply_text("🔒 Your account has 2FA. Send me your password:")
+                    return await m.reply_text("🔒 Your account has 2FA. Send me your password:", parse_mode="html")
 
                 string = client.session.save()
                 await client.disconnect()
 
-            del user_sessions[user_id]
+            user_sessions.pop(user_id, None)
             return await m.reply_text(
-                f"✅ Here’s your **{lib.capitalize()}** session string:\n\n`{string}`\n\n⚠️ Keep it safe!",
-                parse_mode="markdown"
+                f"✅ Here’s your <b>{lib.capitalize()}</b> session string:\n\n<code>{string}</code>\n\n⚠️ Keep it safe!",
+                parse_mode="html"
             )
 
         except Exception as e:
             logger.error(f"Sign in error: {e}")
-            del user_sessions[user_id]
-            return await m.reply_text(f"❌ Error: `{e}`")
+            user_sessions.pop(user_id, None)
+            return await m.reply_text(f"❌ Error: <code>{e}</code>", parse_mode="html")
 
     # ─── Password ───
     if step == GET_PASSWORD:
@@ -190,21 +191,21 @@ async def session_wizard(c: Gojo, m: Message):
                 string = client.session.save()
                 await client.disconnect()
 
-            del user_sessions[user_id]
+            user_sessions.pop(user_id, None)
             return await m.reply_text(
-                f"✅ Here’s your **{lib.capitalize()}** session string:\n\n`{string}`\n\n⚠️ Keep it safe!",
-                parse_mode="markdown"
+                f"✅ Here’s your <b>{lib.capitalize()}</b> session string:\n\n<code>{string}</code>\n\n⚠️ Keep it safe!",
+                parse_mode="html"
             )
         except Exception as e:
             logger.error(f"2FA error: {e}")
-            del user_sessions[user_id]
-            return await m.reply_text(f"❌ Error: `{e}`")
+            user_sessions.pop(user_id, None)
+            return await m.reply_text(f"❌ Error: <code>{e}</code>", parse_mode="html")
 
 
 __PLUGIN__ = "gensession"
 __HELP__ = """
-**⚡ Session Generator**
-Command: `/gensession`
+<b>⚡ Session Generator</b>
+Command: <code>/gensession</code>
 
 Step-by-step wizard to generate a session string.
 
