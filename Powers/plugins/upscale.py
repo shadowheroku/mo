@@ -18,17 +18,13 @@ def enhance_image(input_path, output_path):
     upscale_factor = 2
     upscaled = cv2.resize(img, None, fx=upscale_factor, fy=upscale_factor, interpolation=cv2.INTER_LANCZOS4)
 
-    # Denoise (smooth colors without blurring edges too much)
-    smooth = cv2.fastNlMeansDenoisingColored(upscaled, None, 10, 10, 7, 21)
-
-    # Sharpen lines
-    kernel = np.array([[0, -1, 0],
-                       [-1,  5,-1],
-                       [0, -1, 0]])
-    sharp = cv2.filter2D(smooth, -1, kernel)
+    # Stronger Sharpening Kernel
+    kernel = np.array([[0, -1,  0],
+                       [-1,  6, -1],
+                       [0, -1,  0]])
+    sharp = cv2.filter2D(upscaled, -1, kernel)
 
     # --- Brightness & Color Enhancement ---
-    # Convert to HSV for better color control
     hsv = cv2.cvtColor(sharp, cv2.COLOR_BGR2HSV).astype("float32")
 
     # Increase brightness (value channel)
