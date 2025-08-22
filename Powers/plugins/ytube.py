@@ -58,7 +58,7 @@ async def yt_video_cmd(c: Gojo, m: Message):
     # Download thumbnail
     thumb_file = wget.download(thumbnail_url)
 
-    # Create cookies content directly in code
+    # ✅ Cookies (cleaned from stray chars)
     cookies_content = """# Netscape HTTP Cookie File
 # http://curl.haxx.se/rfc/cookie_spec.html
 # This is a generated file!  Do not edit.
@@ -72,21 +72,21 @@ async def yt_video_cmd(c: Gojo, m: Message):
 .youtube.com	TRUE	/	TRUE	1790415156	PREF	f4=4000000&f6=40000000&tz=Asia.Calcutta
 .youtube.com	TRUE	/	TRUE	1786531289	LOGIN_INFO	AFmmF2swRQIgUi7vRGyMnXAELvYehLLbVJWvF7dxxReoJy-CAdQFZ1QCIQCL0gOVmR-_CIjmM2b2cOG-F-zkU8troZXRmPLQjlsNHg:QUQ3MjNmd3d0T2tjdjREbmUtNl9ZRWdCSU5GUXIxRkc4LVZ5WlUyVG5aX3ppNnBlb3A0NmhGSG1HeHMwWnRSdzhtbkhZNXBFUEtHNFFfOGh1cy0temV4X1RKLTZ4bTdvcm4tSVRGNDJkaDh2SlFfWHRHaW13WDhjdk1aZ2czUDh0a1NoVWItbmp2R2tiS3E0OTE0TU5PUHJfcGRENGhFWHdB
 .youtube.com	TRUE	/	FALSE	1790413715	SID	g.a0000ggnLhnJKu_gLFYBExpJiJWJEJU-hqFssT6_n_BI2vKLkhUW3WtIr2KXSphwvPD_iA3wJwACgYKAT4SARQSFQHGX2Miy-Hzr7AJBWQCGTSUnWBWnxoVAUF8yKqehsVWbi7DM3ohv0qgF3030076
-.youtube.com	TRUE	/	TRUE	1790413715	__Secure-1PSID	g.a0000ggnLhnJKu_gLFYBExpJiJWJEJU-hqFssT6_n_BI2vKLkhUWO7ltMJJxMAS2U3J1L3V_0AACgYKAQgSARQSFQHGX2Mik8hsLASEV6VT1KutYS47wxoVAUF8yKo7FhOsIZ6AQeFYdIVv极UyF0076
-.youtube.com	TRUE	/	TRUE	1790413715	__Secure-3PSID	g.a0000ggnLhnJKu_g极YBExpJiJWJEJU-hqFssT6_n_BI2vKLkhUWaKoNnMPHuYOMZAZ4iZ0JkgACgYKAcgSARQSFQHGX2MiBlI7iXl6pSSeDA0wS1GePxoVAUF8yKoeAckC0Z62WbqHN3EBMCu80076
+.youtube.com	TRUE	/	TRUE	1790413715	__Secure-1PSID	g.a0000ggnLhnJKu_gLFYBExpJiJWJEJU-hqFssT6_n_BI2vKLkhUWO7ltMJJxMAS2U3J1L3V_0AACgYKAQgSARQSFQHGX2Mik8hsLASEV6VT1KutYS47wxoVAUF8yKo7FhOsIZ6AQeFYdIVvUyF0076
+.youtube.com	TRUE	/	TRUE	1790413715	__Secure-3PSID	g.a0000ggnLhnJKu_gYBExpJiJWJEJU-hqFssT6_n_BI2vKLkhUWaKoNnMPHuYOMZAZ4iZ0JkgACgYKAcgSARQSFQHGX2MiBlI7iXl6pSSeDA0wS1GePxoVAUF8yKoeAckC0Z62WbqHN3EBMCu80076
 .youtube.com	TRUE	/	TRUE	1787390923	__Secure-1PSIDTS	sidts-CjEB5H03P7yKRy_kKEb7Q-l1l74yjxmfFPtb1z3Ifuzkr8ezEO6liSZh7BzjqEY2GCZ8EAA
-.youtube.com	TRUE	/	TRUE	1787390923	__Secure-3极SIDTS	sidts-CjEB5H03P7yKRy_kKEb7Q-l1l74yjxmfFPtb1z3Ifuzkr8ezEO6liSZh7BzjqEY2GCZ8EAA
+.youtube.com	TRUE	/	TRUE	1787390923	__Secure-3PSIDTS	sidts-CjEB5H03P7yKRy_kKEb7Q-l1l74yjxmfFPtb1z3Ifuzkr8ezEO6liSZh7BzjqEY2GCZ8EAA
 .youtube.com	TRUE	/	FALSE	1787391159	SIDCC	AKEyXzWLeaCY4FpQ_QjyWf8CwwQO9IG1ml11KuemX3-joz17qh7BBiTMlVGeCPUo3T5l3zwq
 .youtube.com	TRUE	/	TRUE	1787391159	__Secure-1PSIDCC	AKEyXzVCH6_axpp3S9BLPVwxsxNNKfg-xzac4AMiRyoJfun0J2Hibhca7KXMjJXX8Wi9Ee9p
-.youtube.com	TRUE	/	TRUE	1787391159	__Secure-3PSIDCC	AKEyXzXrLvQpjwU5DeXjf7t8IOvyG2极ZlYBQQgReP3j_W6VKK4Bm9G4-3I_Du9SVv8mduyMJ
+.youtube.com	TRUE	/	TRUE	1787391159	__Secure-3PSIDCC	AKEyXzXrLvQpjwU5DeXjf7t8IOvyG2ZlYBQQgReP3j_W6VKK4Bm9G4-3I_Du9SVv8mduyMJ
 .youtube.com	TRUE	/	TRUE	1771407153	VISITOR_INFO1_LIVE	ULQtIK6wyzY
 .youtube.com	TRUE	/	TRUE	1771407153	VISITOR_PRIVACY_METADATA	CgJJThIEGgAgGw%3D%3D
 .youtube.com	TRUE	/	TRUE	0	YSC	JFMimREF7H8
 .youtube.com	TRUE	/	TRUE	1771405715	__Secure-ROLLOUT_TOKEN	CNbPrM_Ot53OYxCFiJDSia2OAxj_063oiJ6PAw%3D%3D"""
 
-    # Create a temporary cookies file
+    # Create a temporary cookies file (UTF-8 safe)
     cookies_file = "temp_cookies.txt"
-    with open(cookies_file, "w") as f:
+    with open(cookies_file, "w", encoding="utf-8") as f:
         f.write(cookies_content)
 
     opts = {
@@ -107,7 +107,6 @@ async def yt_video_cmd(c: Gojo, m: Message):
             data = ytdl.extract_info(video_url, download=True)
     except Exception as e:
         await status.edit(f"**Failed to download.**\n\nError: `{str(e)}`")
-        # Clean up cookies file
         if os.path.exists(cookies_file):
             os.remove(cookies_file)
         await asyncio.sleep(60)
@@ -118,7 +117,7 @@ async def yt_video_cmd(c: Gojo, m: Message):
     caption = (
         f"❄ **Title:** [{video_title}]({video_url})\n"
         f"💫 **Channel:** {video_channel}\n"
-        f"✨ **Searched:** `极{query}`\n"
+        f"✨ **Searched:** `{query}`\n"
         f"🥀 **Requested by:** {mention}"
     )
 
@@ -131,14 +130,11 @@ async def yt_video_cmd(c: Gojo, m: Message):
             thumb=thumb_file,
             reply_markup=InlineKeyboardMarkup(BUTTON),
         )
-        
-        # Delete the success message after 60 seconds
         await asyncio.sleep(60)
         await sent_msg.delete()
-        
+
     except Exception as e:
         await status.edit(f"⚠️ Failed to upload.\n\nError: `{str(e)}`")
-        # Clean up cookies file
         if os.path.exists(cookies_file):
             os.remove(cookies_file)
         await asyncio.sleep(60)
