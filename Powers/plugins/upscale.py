@@ -1,47 +1,36 @@
 import os
-import cv2
 import tempfile
-import numpy as np
+import requests
 from pyrogram import filters
 from pyrogram.types import Message
-from PIL import Image, ImageFilter
 from Powers.bot_class import Gojo
 
+# 🔑 Get your key from https://rapidapi.com/developer
+RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "db695f9a31msh317d0f72b049ab7p1c6935jsn65e8560b2087
+")
+
+UPSCALE_API_URL = "rapidapi.com"
 
 
+def upscale_via_api(image_path: str, scale: int = 2) -> str:
+    """Send image to Upscale.media API and return output URL"""
+    with open(image_path, "rb") as f:
+        response = requests.post(
+            UPSCALE_API_URL,
+            files={"image": f},
+            data={"scale": str(scale)},  # 2x or 4x
+            headers={
+                "X-RapidAPI-Key": RAPIDAPI_KEY,
+                "X-RapidAPI-Host": "upscale-media-image-super-resolution.p.rapidapi.com"
+            },
+            timeout=120
+        )
 
-def enhance_image(input_path, output_path):
-    # Read image with OpenCV
-    img = cv2.imread(input_path)
+    data = response.json()
+    if "output_url" not in data:
+        raise Exception(data.get("message", "Unknown API error"))
 
-    # Upscale using OpenCV's super-resize (Lanczos)
-    upscale_factor = 2
-    upscaled = cv2.resize(img, None, fx=upscale_factor, fy=upscale_factor, interpolation=cv2.INTER_LANCZOS4)
-
-    # Stronger Sharpening Kernel
-    kernel = np.array([[0, -1,  0],
-                       [-1,  6, -1],
-                       [0, -1,  0]])
-    sharp = cv2.filter2D(upscaled, -1, kernel)
-
-    # --- Brightness & Color Enhancement ---
-    hsv = cv2.cvtColor(sharp, cv2.COLOR_BGR2HSV).astype("float32")
-
-    # Increase brightness (value channel)
-    hsv[:, :, 2] = hsv[:, :, 2] * 1.1   # +10% brightness
-
-    # Increase saturation slightly
-    hsv[:, :, 1] = hsv[:, :, 1] * 1.15  # +15% color richness
-
-    # Clip values to avoid overflow
-    hsv = np.clip(hsv, 0, 255)
-
-    # Convert back to BGR
-    final = cv2.cvtColor(hsv.astype("uint8"), cv2.COLOR_HSV2BGR)
-
-    # Save result
-    cv2.imwrite(output_path, final)
-
+    return data["output_url"]
 
 
 @Gojo.on_message(filters.command(["upscale", "hd"], prefixes=["/", "!", "."]))
@@ -49,43 +38,47 @@ async def upscale_image(client: Gojo, m: Message):
     if not m.reply_to_message or not (m.reply_to_message.photo or m.reply_to_message.sticker):
         return await m.reply_text("⚠️ Reply to an image or sticker to upscale.")
 
-    msg = await m.reply_text("🔄 Processing image...")
+    msg = await m.reply_text("🔄 Uploading to AI Upscaler...")
 
-    # Download image to temp
+    # Download input
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
     await m.reply_to_message.download(temp_file.name)
 
-    out_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-
     try:
-        # Enhance image locally
-        enhance_image(temp_file.name, out_file.name)
+        # Call API (default 2x, change to 4x if you want super HD)
+        upscaled_url = upscale_via_api(temp_file.name, scale=4)
 
-        # Send back result as file
-        await m.reply_document(out_file.name, caption="✨ Upscaled (Sharpened + Smoothed)")
+        # Download result
+        out_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        r = requests.get(upscaled_url, timeout=120)
+        with open(out_file.name, "wb") as f:
+            f.write(r.content)
 
+        # Send result
+        await m.reply_document(out_file.name, caption="✨ Upscaled with AI (Upscale.media 4x)")
         await msg.delete()
+
     except Exception as e:
-        await msg.edit_text(f"❌ Error: {e}")
+        await msg.edit_text(f"❌ API Error: {e}")
+
     finally:
         try:
             os.remove(temp_file.name)
-        except:
-            pass
-        try:
-            os.remove(out_file.name)
         except:
             pass
 
 
 __PLUGIN__ = "upscale"
 __HELP__ = """
-**🖼 AI Image Enhancer (Local)**
-`/upscale` or `/hd` - Reply to an image to upscale & enhance
+**🖼 AI Image Upscaler (API)**
+`/upscale` or `/hd` - Reply to an image to upscale & enhance using AI
 
 **Features:**
-- 2x resolution boost (offline, no API needed)
-- Sharpens lines & fixes edges
-- Smooths colors (no harsh noise)
+- Uses Upscale.media AI (via RapidAPI)
+- Supports 2x and 4x upscale
+- Preserves details better than OpenCV
 - Returns file directly in Telegram
+
+⚠️ Requires `RAPIDAPI_KEY`
+Get one free at [RapidAPI](https://rapidapi.com/).
 """
