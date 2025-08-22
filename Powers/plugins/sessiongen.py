@@ -2,6 +2,7 @@ import logging
 from pyrogram import filters, Client
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pyrogram.errors import PhoneCodeExpired, SessionPasswordNeeded
+from pyrogram.enums import ParseMode  # ✅ FIX
 from telethon.sessions import StringSession
 from telethon import TelegramClient
 from telethon.errors import PhoneCodeExpiredError, SessionPasswordNeededError
@@ -34,7 +35,7 @@ async def gensession_cmd(c: Gojo, m: Message):
         [InlineKeyboardButton("📡 Telethon", callback_data="lib_telethon")],
         [InlineKeyboardButton("❌ Cancel", callback_data="cancel")]
     ]
-    await m.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="html")
+    await m.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode=ParseMode.HTML)
 
 
 # ─── Callback handler for choices ───
@@ -56,7 +57,7 @@ async def choose_lib(c: Gojo, q: CallbackQuery):
 
     await q.message.edit(
         f"✅ Using <b>{lib.capitalize()}</b>.\n\n📌 Now send me your <b>API ID</b>:",
-        parse_mode="html"
+        parse_mode=ParseMode.HTML
     )
 
 
@@ -78,13 +79,13 @@ async def session_wizard(c: Gojo, m: Message):
             return await m.reply_text("❌ API ID must be a number. Try again:")
         session["api_id"] = api_id
         session["step"] = GET_HASH
-        return await m.reply_text("📌 Now send me your <b>API HASH</b>:", parse_mode="html")
+        return await m.reply_text("📌 Now send me your <b>API HASH</b>:", parse_mode=ParseMode.HTML)
 
     # ─── API HASH ───
     if step == GET_HASH:
         session["api_hash"] = m.text.strip()
         session["step"] = GET_PHONE
-        return await m.reply_text("📌 Send me your <b>phone number</b> (with country code):", parse_mode="html")
+        return await m.reply_text("📌 Send me your <b>phone number</b> (with country code):", parse_mode=ParseMode.HTML)
 
     # ─── Phone ───
     if step == GET_PHONE:
@@ -114,12 +115,12 @@ async def session_wizard(c: Gojo, m: Message):
                 session.update(client=client, phone_code_hash=sent.phone_code_hash)
 
             session["step"] = GET_CODE
-            return await m.reply_text("📨 Code sent! Reply with it (example: <code>1 2 3 4 5</code>)", parse_mode="html")
+            return await m.reply_text("📨 Code sent! Reply with it (example: <code>1 2 3 4 5</code>)", parse_mode=ParseMode.HTML)
 
         except Exception as e:
             logger.error(f"Error sending code: {e}")
             user_sessions.pop(user_id, None)
-            return await m.reply_text(f"❌ Failed to send code: <code>{e}</code>", parse_mode="html")
+            return await m.reply_text(f"❌ Failed to send code: <code>{e}</code>", parse_mode=ParseMode.HTML)
 
     # ─── Verification code ───
     if step == GET_CODE:
@@ -138,10 +139,10 @@ async def session_wizard(c: Gojo, m: Message):
                 except PhoneCodeExpired:
                     sent = await client.send_code(session["phone"])
                     session["phone_code_hash"] = sent.phone_code_hash
-                    return await m.reply_text("⚠️ Code expired. Sent a new one, please reply again.", parse_mode="html")
+                    return await m.reply_text("⚠️ Code expired. Sent a new one, please reply again.", parse_mode=ParseMode.HTML)
                 except SessionPasswordNeeded:
                     session["step"] = GET_PASSWORD
-                    return await m.reply_text("🔒 Your account has 2FA. Send me your password:", parse_mode="html")
+                    return await m.reply_text("🔒 Your account has 2FA. Send me your password:", parse_mode=ParseMode.HTML)
 
                 string = await client.export_session_string()
                 await client.disconnect()
@@ -156,10 +157,10 @@ async def session_wizard(c: Gojo, m: Message):
                 except PhoneCodeExpiredError:
                     sent = await client.send_code_request(session["phone"])
                     session["phone_code_hash"] = sent.phone_code_hash
-                    return await m.reply_text("⚠️ Code expired. Sent a new one, please reply again.", parse_mode="html")
+                    return await m.reply_text("⚠️ Code expired. Sent a new one, please reply again.", parse_mode=ParseMode.HTML)
                 except SessionPasswordNeededError:
                     session["step"] = GET_PASSWORD
-                    return await m.reply_text("🔒 Your account has 2FA. Send me your password:", parse_mode="html")
+                    return await m.reply_text("🔒 Your account has 2FA. Send me your password:", parse_mode=ParseMode.HTML)
 
                 string = client.session.save()
                 await client.disconnect()
@@ -167,13 +168,13 @@ async def session_wizard(c: Gojo, m: Message):
             user_sessions.pop(user_id, None)
             return await m.reply_text(
                 f"✅ Here’s your <b>{lib.capitalize()}</b> session string:\n\n<code>{string}</code>\n\n⚠️ Keep it safe!",
-                parse_mode="html"
+                parse_mode=ParseMode.HTML
             )
 
         except Exception as e:
             logger.error(f"Sign in error: {e}")
             user_sessions.pop(user_id, None)
-            return await m.reply_text(f"❌ Error: <code>{e}</code>", parse_mode="html")
+            return await m.reply_text(f"❌ Error: <code>{e}</code>", parse_mode=ParseMode.HTML)
 
     # ─── Password ───
     if step == GET_PASSWORD:
@@ -194,12 +195,12 @@ async def session_wizard(c: Gojo, m: Message):
             user_sessions.pop(user_id, None)
             return await m.reply_text(
                 f"✅ Here’s your <b>{lib.capitalize()}</b> session string:\n\n<code>{string}</code>\n\n⚠️ Keep it safe!",
-                parse_mode="html"
+                parse_mode=ParseMode.HTML
             )
         except Exception as e:
             logger.error(f"2FA error: {e}")
             user_sessions.pop(user_id, None)
-            return await m.reply_text(f"❌ Error: <code>{e}</code>", parse_mode="html")
+            return await m.reply_text(f"❌ Error: <code>{e}</code>", parse_mode=ParseMode.HTML)
 
 
 __PLUGIN__ = "gensession"
