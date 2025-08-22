@@ -7,6 +7,7 @@ from pyrogram.types import (
     CallbackQuery
 )
 from pyrogram.enums import ParseMode as PM
+from pyrogram.helpers import escape_markdown
 
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
@@ -14,6 +15,14 @@ from Powers.utils.custom_filters import command
 
 # ─── STORAGE ───
 xo_games = {}  # {chat_id: {"board": list, "p1": id, "p2": id/"bot", "turn": id, "symbols": {id: "❌/⭕"}}}
+
+
+# ─── HELPER TO GET NAME ───
+async def get_name(c, uid):
+    if uid == "bot":
+        return "🤖 Bot"
+    u = await c.get_users(uid)
+    return f"**{escape_markdown(u.first_name, version=2)}**"
 
 
 # ─── START GAME ───
@@ -32,7 +41,7 @@ async def xo_start(c: Gojo, m: Message):
             "turn": p1,
             "symbols": {p1: "❌", p2: "⭕"}
         }
-        txt = f"🎮 **Tic-Tac-Toe**\n\n{m.from_user.mention} vs {m.reply_to_message.from_user.mention}"
+        txt = f"🎮 **Tic-Tac-Toe**\n\n{await get_name(c, p1)} vs {await get_name(c, p2)}"
     else:  # play vs bot
         p1 = m.from_user.id
         p2 = "bot"
@@ -43,7 +52,7 @@ async def xo_start(c: Gojo, m: Message):
             "turn": p1,
             "symbols": {p1: "❌", p2: "⭕"}
         }
-        txt = f"🎮 **Tic-Tac-Toe**\n\n{m.from_user.mention} vs 🤖 Bot"
+        txt = f"🎮 **Tic-Tac-Toe**\n\n{await get_name(c, p1)} vs 🤖 Bot"
 
     await send_board(c, m.chat.id, m, txt)
 
@@ -63,12 +72,9 @@ def make_board(board):
 async def send_board(c, chat_id, m: Message, header: str):
     game = xo_games[chat_id]
     turn_user = game["turn"]
-    if turn_user == "bot":
-        turn_name = "🤖 Bot"
-    else:
-        turn_name = (await c.get_users(turn_user)).mention
+    turn_name = await get_name(c, turn_user)
     text = f"{header}\n\nTurn: {turn_name} ({game['symbols'][turn_user]})"
-    await m.reply_text(text, reply_markup=make_board(game["board"]))
+    await m.reply_text(text, reply_markup=make_board(game["board"]), parse_mode=PM.MARKDOWN)
 
 
 # ─── CALLBACK MOVES ───
@@ -101,12 +107,20 @@ async def xo_move(c: Gojo, q: CallbackQuery):
     # check winner
     winner = check_winner(game["board"])
     if winner:
-        winner_name = (await c.get_users(user)).mention
-        await q.message.edit_text(f"🎉 {winner_name} wins with {game['symbols'][user]}!\n\nGame Over.", reply_markup=make_board(game["board"]))
+        winner_name = await get_name(c, user)
+        await q.message.edit_text(
+            f"🎉 {winner_name} wins with {game['symbols'][user]}!\n\nGame Over.",
+            reply_markup=make_board(game["board"]),
+            parse_mode=PM.MARKDOWN
+        )
         del xo_games[chat_id]
         return
     elif " " not in game["board"]:
-        await q.message.edit_text("🤝 It's a draw!\n\nGame Over.", reply_markup=make_board(game["board"]))
+        await q.message.edit_text(
+            "🤝 It's a draw!\n\nGame Over.",
+            reply_markup=make_board(game["board"]),
+            parse_mode=PM.MARKDOWN
+        )
         del xo_games[chat_id]
         return
 
@@ -119,11 +133,19 @@ async def xo_move(c: Gojo, q: CallbackQuery):
 
         # check bot win
         if check_winner(game["board"]):
-            await q.message.edit_text(f"🤖 Bot wins with {game['symbols']['bot']}!\n\nGame Over.", reply_markup=make_board(game["board"]))
+            await q.message.edit_text(
+                f"🤖 Bot wins with {game['symbols']['bot']}!\n\nGame Over.",
+                reply_markup=make_board(game["board"]),
+                parse_mode=PM.MARKDOWN
+            )
             del xo_games[chat_id]
             return
         elif " " not in game["board"]:
-            await q.message.edit_text("🤝 It's a draw!\n\nGame Over.", reply_markup=make_board(game["board"]))
+            await q.message.edit_text(
+                "🤝 It's a draw!\n\nGame Over.",
+                reply_markup=make_board(game["board"]),
+                parse_mode=PM.MARKDOWN
+            )
             del xo_games[chat_id]
             return
 
@@ -133,9 +155,9 @@ async def xo_move(c: Gojo, q: CallbackQuery):
         game["turn"] = game["p1"] if user == game["p2"] else game["p2"]
 
     # update board
-    header = f"🎮 **Tic-Tac-Toe**\n\n{(await c.get_users(game['p1'])).mention} vs {(await c.get_users(game['p2'])).mention if game['p2']!='bot' else '🤖 Bot'}"
+    header = f"🎮 **Tic-Tac-Toe**\n\n{await get_name(c, game['p1'])} vs {await get_name(c, game['p2'])}"
     await q.message.edit_text(
-        f"{header}\n\nTurn: {(await c.get_users(game['turn'])).mention if game['turn']!='bot' else '🤖 Bot'} ({game['symbols'][game['turn']]})",
+        f"{header}\n\nTurn: {await get_name(c, game['turn'])} ({game['symbols'][game['turn']]})",
         reply_markup=make_board(game["board"]),
         parse_mode=PM.MARKDOWN
     )
@@ -179,6 +201,6 @@ _DISABLE_CMDS_ = ["xo"]
 
 __HELP__ = """
 **🎮 Tic-Tac-Toe**
-• `/xo` → Play with Bot
-• Reply `/xo` → Challenge another user
+• `/xo` → Play with Bot  
+• Reply `/xo` → Challenge another user  
 """
