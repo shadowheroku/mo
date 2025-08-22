@@ -128,11 +128,16 @@ async def yt_video_cmd(c: Gojo, m: Message):
             thumb=thumb_file,
             reply_markup=InlineKeyboardMarkup(BUTTON),
         )
+    await asyncio.sleep(60)
+        await sent_msg.delete()
+        
     except Exception as e:
         await status.edit(f"⚠️ Failed to upload.\n\nError: `{str(e)}`")
         # Clean up cookies file
         if os.path.exists(cookies_file):
             os.remove(cookies_file)
+        await asyncio.sleep(60)
+        await status.delete()
         return
 
     await status.delete()
