@@ -6,8 +6,7 @@ from pyrogram.types import Message
 from Powers.bot_class import Gojo
 
 # 🔑 Get your key from https://rapidapi.com/developer
-RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "db695f9a31msh317d0f72b049ab7p1c6935jsn65e8560b2087
-")
+RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "db695f9a31msh317d0f72b049ab7p1c6935jsn65e8560b2087")
 
 UPSCALE_API_URL = "rapidapi.com"
 
