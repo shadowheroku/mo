@@ -8,55 +8,45 @@ from Powers.utils.custom_filters import command
 # Load Replicate API key
 REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN" , "r8_V7pQfVBxlIzmvviUEkiYJxCcDqAAbhk1rq4Jn")
 
-if not REPLICATE_API_TOKEN:
-    raise ValueError("⚠️ Please set the REPLICATE_API_TOKEN environment variable.")
+import os
+import aiohttp
+from pyrogram import Client, filters
+from pyrogram.types import Message
+from replicate import Client as ReplicateClient
 
-# Init Replicate client
-replicate_client = replicate.Client(api_token=REPLICATE_API_TOKEN)
+# Load your Replicate API token
 
+replicate = ReplicateClient(api_token=REPLICATE_API_TOKEN)
 
-@Gojo.on_message(command("upscale"))
-async def upscale_image(c: Gojo, m: Message):
-    """Upscale an image using Real-ESRGAN (Replicate)"""
+@Client.on_message(filters.command("upscale"))
+async def upscale_image(c: Client, m: Message):
     if not m.reply_to_message or not m.reply_to_message.photo:
-        return await m.reply_text("⚠️ Reply to an image to upscale it!")
+        return await m.reply_text("⚠️ Reply to an image to upscale it.")
 
     try:
-        # Get file from Telegram
-        photo = await m.reply_to_message.download()
-        await m.reply_text("⏳ Upscaling image, please wait...")
+        # Download image to memory
+        photo_path = await m.reply_to_message.download()
+        async with aiohttp.ClientSession() as session:
+            with open(photo_path, "rb") as f:
+                image_bytes = f.read()
 
-        # Upload image to Replicate delivery server
-        image_url = replicate_client.files.upload(photo)
-
-        # Run Real-ESRGAN model
-        output = replicate_client.run(
+        # Run ESRGAN model on Replicate
+        output = replicate.run(
             "nightmareai/real-esrgan:f121d640bd286e1fdc67f9799164c1d5be36ff74576ee11c803ae5b665dd46aa",
-            input={"image": image_url, "scale": 2}
+            input={
+                "image": image_bytes,  # Directly send raw bytes
+                "scale": 2
+            },
         )
 
-        # output is usually a list of image URLs, take the first one
-        if isinstance(output, list):
-            result_url = output[0]
-        else:
-            result_url = output
+        if not output:
+            return await m.reply_text("❌ Upscale failed. No output received.")
 
-        # Download result image
-        result = requests.get(result_url)
-        filename = "upscaled.png"
-        with open(filename, "wb") as f:
-            f.write(result.content)
-
-        # Send back upscaled image
-        await m.reply_photo(filename, caption="✨ Upscaled with Real-ESRGAN")
-
-        # Cleanup
-        os.remove(photo)
-        os.remove(filename)
+        # Send result back
+        await m.reply_photo(photo=output, caption="✅ Upscaled successfully!")
 
     except Exception as e:
         await m.reply_text(f"❌ Upscale failed: {e}")
-
 
 
 __PLUGIN__ = "upscale"
