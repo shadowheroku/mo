@@ -9,7 +9,7 @@ from Powers.utils.custom_filters import command
 from Powers.utils.cmd_senders import send_cmd
 from Powers.utils.msg_types import Types
 
-SUPPORT_CHAT = "l_ABOUT_PRINCE_l"
+SUPPORT_CHAT = "Shadowchathq"
 
 # Buttons and static data
 BUTTON = [[InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ", url=f"https://t.me/{SUPPORT_CHAT}")]]
