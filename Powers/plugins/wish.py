@@ -19,7 +19,7 @@ CUTIE = "https://64.media.tumblr.com/d701f53eb5681e87a957a547980371d2/tumblr_nbj
 @Gojo.on_message(command("wish"))
 async def wish_cmd(c: Gojo, m: Message):
     if len(m.command) < 2:
-        await m.reply_text("ᴀᴅᴅ ᴡɪꜱʜ ʙᴀʙʏ🥀!")
+        await m.reply_text("ᴀᴅᴅ ᴀ ᴡɪꜱʜ ʙᴀʙʏ🥀!")
         return
 
     try:
@@ -32,9 +32,10 @@ async def wish_cmd(c: Gojo, m: Message):
     wish_count = random.randint(1, 100)
 
     wish = (
-        f"✨ ʜᴇʏ {m.from_user.mention}!\n\n"
-        f"✨ ʏᴏᴜʀ ᴡɪꜱʜ: {text}\n"
-        f"✨ ᴘᴏꜱꜱɪʙʟᴇ ᴛᴏ: {wish_count}%"
+        f"✨ **Wish Check** ✨\n\n"
+        f"👤 From: {m.from_user.mention}\n"
+        f"💭 Wish: `{text}`\n"
+        f"📊 Possibility: **{wish_count}%**"
     )
 
     await (await send_cmd(c, Types.ANIMATION))(
@@ -56,9 +57,15 @@ async def cute_cmd(c: Gojo, m: Message):
         user_id = m.reply_to_message.from_user.id
         user_name = m.reply_to_message.from_user.first_name
 
-    mention = f"[{user_name}](tg://user?id={str(user_id)})"
+    mention = f"[{user_name}](tg://user?id={user_id})"
     cuteness = random.randint(1, 100)
-    CUTE = f"🍑 {mention} {cuteness}% ᴄᴜᴛᴇ ʙᴀʙʏ🥀"
+
+    CUTE = (
+        f"🌸 **Cuteness Meter** 🌸\n\n"
+        f"👤 Target: {mention}\n"
+        f"🍑 Cuteness: **{cuteness}%**\n"
+        f"🥀 Verdict: Too cute to handle!"
+    )
 
     await (await send_cmd(c, Types.DOCUMENT))(
         m.chat.id,
@@ -77,10 +84,10 @@ _DISABLE_CMDS_ = ["wish", "cute"]
 __HELP__ = """
 **Wish & Cute**
 
-• /wish <your wish>
-   Check how possible your wish is ✨
+• /wish <your wish>  
+   Check how possible your wish is ✨  
    Example: `/wish I want a new iPhone`
 
-• /cute (or reply to a user)
+• /cute (or reply to a user)  
    Check how much cute you or your friend is 🍑
 """
