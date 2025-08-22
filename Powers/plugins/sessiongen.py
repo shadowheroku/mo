@@ -174,6 +174,8 @@ async def resend_code(c: Gojo, q: CallbackQuery):
 
 # ------------- TEXT FLOW -------------
 
+# ------------------- TEXT FLOW -------------------
+
 @Gojo.on_message(filters.private & ~filters.service)
 async def session_wizard_flow(c: Gojo, m: Message):
     uid = m.from_user.id
@@ -214,7 +216,7 @@ async def session_wizard_flow(c: Gojo, m: Message):
     if st.step == "need_phone":
         st.phone = m.text.strip().replace(" ", "")
         st.step = "need_code"
-        # Trigger sending code depending on framework
+        # Trigger sending code
         try:
             if st.framework == "pyrogram":
                 tmp = ClientTempPyro(api_id=st.api_id, api_hash=st.api_hash)
@@ -224,15 +226,11 @@ async def session_wizard_flow(c: Gojo, m: Message):
                     await tcli.send_code_request(st.phone)
             await m.reply_text(
                 "Sent a login code to your Telegram.\n"
-                "Please send the **OTP code** you received (only the digits).",
+                "👉 Please send the **OTP code** (you can copy-paste it with spaces, e.g. `1 2 3 4 5`).",
                 reply_markup=_mk_kb_resend_cancel(), parse_mode=PM.MARKDOWN
             )
         except FloodWait as fw:
             await m.reply_text(f"Flood wait: **{fw.value}s**. Try again later with /session.", parse_mode=PM.MARKDOWN)
-            _reset(uid)
-        except BadRequest as br:
-            await m.reply_text(f"Request failed: `{br}`\nCheck your API ID/HASH/phone and /session again.",
-                               parse_mode=PM.MARKDOWN)
             _reset(uid)
         except Exception as e:
             await m.reply_text(f"Error sending code: `{e}`\nRestart with /session.", parse_mode=PM.MARKDOWN)
@@ -241,25 +239,32 @@ async def session_wizard_flow(c: Gojo, m: Message):
 
     # STEP: CODE
     if st.step == "need_code":
-        code = "".join(ch for ch in m.text if ch.isdigit())
+        code = m.text.strip()  # ✅ keep spaces in OTP
         if not code:
-            await m.reply_text("Please send only the **numeric** OTP code.", parse_mode=PM.MARKDOWN)
+            await m.reply_text("Please send the OTP code you received (digits, spaces allowed).",
+                               parse_mode=PM.MARKDOWN)
             return
 
         if st.framework == "pyrogram":
             try:
-                sess = await make_pyrogram_string(st.api_id, st.api_hash, st.phone, code, st.phone_code_hash)
+                sess = await make_pyrogram_string(
+                    st.api_id, st.api_hash, st.phone, code, st.phone_code_hash
+                )
                 await _deliver_session(m, sess, framework="Pyrogram")
                 _reset(uid)
-            except SessionPasswordNeeded:
-                st.step = "need_2fa"
-                await m.reply_text("2FA is enabled. Send your **password**.",
-                                   parse_mode=PM.MARKDOWN, reply_markup=_mk_kb_cancel())
+            except PhoneCodeExpired:
+                # 🔁 auto-resend a new code
+                tmp = ClientTempPyro(api_id=st.api_id, api_hash=st.api_hash)
+                st.phone_code_hash = await tmp.send_code(st.phone)
+                await m.reply_text("⌛ Code expired. A new code has been sent — please enter the latest OTP.",
+                                   reply_markup=_mk_kb_resend_cancel(), parse_mode=PM.MARKDOWN)
             except PhoneCodeInvalid:
                 await m.reply_text("❌ Invalid code. Try again or tap **Resend Code**.",
                                    parse_mode=PM.MARKDOWN, reply_markup=_mk_kb_resend_cancel())
-            except PhoneCodeExpired:
-                await m.reply_text("⌛ Code expired. Tap **Resend Code**.", reply_markup=_mk_kb_resend_cancel())
+            except SessionPasswordNeeded:
+                st.step = "need_2fa"
+                await m.reply_text("2FA is enabled. Send your **password**.", parse_mode=PM.MARKDOWN,
+                                   reply_markup=_mk_kb_cancel())
             except Exception as e:
                 await m.reply_text(f"Login failed: `{e}`\nRestart with /session.", parse_mode=PM.MARKDOWN)
                 _reset(uid)
@@ -271,41 +276,23 @@ async def session_wizard_flow(c: Gojo, m: Message):
                 sess = await make_telethon_string(st.api_id, st.api_hash, st.phone, code)
                 await _deliver_session(m, sess, framework="Telethon")
                 _reset(uid)
-            except SessionPasswordNeededError:
-                st.step = "need_2fa"
-                await m.reply_text("2FA is enabled. Send your **password**.",
-                                   parse_mode=PM.MARKDOWN, reply_markup=_mk_kb_cancel())
+            except PhoneCodeExpiredError:
+                async with TelegramClient(TLStringSession(), st.api_id, st.api_hash) as tcli:
+                    await tcli.send_code_request(st.phone)
+                await m.reply_text("⌛ Code expired. A new code has been sent — please enter the latest OTP.",
+                                   reply_markup=_mk_kb_resend_cancel(), parse_mode=PM.MARKDOWN)
             except PhoneCodeInvalidError:
                 await m.reply_text("❌ Invalid code. Try again or tap **Resend Code**.",
                                    parse_mode=PM.MARKDOWN, reply_markup=_mk_kb_resend_cancel())
-            except PhoneCodeExpiredError:
-                await m.reply_text("⌛ Code expired. Tap **Resend Code**.", reply_markup=_mk_kb_resend_cancel())
+            except SessionPasswordNeededError:
+                st.step = "need_2fa"
+                await m.reply_text("2FA is enabled. Send your **password**.", parse_mode=PM.MARKDOWN,
+                                   reply_markup=_mk_kb_cancel())
             except Exception as e:
                 await m.reply_text(f"Login failed: `{e}`\nRestart with /session.", parse_mode=PM.MARKDOWN)
                 _reset(uid)
             return
 
-    # STEP: 2FA PASSWORD
-    if st.step == "need_2fa":
-        password = m.text
-        if st.framework == "pyrogram":
-            try:
-                sess = await make_pyrogram_string(st.api_id, st.api_hash, st.phone, code=None,
-                                                  phone_code_hash=st.phone_code_hash, password=password)
-                await _deliver_session(m, sess, framework="Pyrogram")
-                _reset(uid)
-            except Exception as e:
-                await m.reply_text(f"2FA failed: `{e}`\nRestart with /session.", parse_mode=PM.MARKDOWN)
-                _reset(uid)
-        else:
-            try:
-                sess = await make_telethon_string(st.api_id, st.api_hash, st.phone, code=None, password=password)
-                await _deliver_session(m, sess, framework="Telethon")
-                _reset(uid)
-            except Exception as e:
-                await m.reply_text(f"2FA failed: `{e}`\nRestart with /session.", parse_mode=PM.MARKDOWN)
-                _reset(uid)
-        return
 
 
 # ------------- CORE LOGIN BUILDERS -------------
