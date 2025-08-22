@@ -66,11 +66,12 @@ async def cute_cmd(c: Gojo, m: Message):
     CUTE = (
         f"🌸 **Cuteness Meter** 🌸\n\n"
         f"👤 Target: {mention}\n"
-        f"🍑 Cuteness: **{cuteness}\\%**\n"   # escape `%`
+        f"🍑 Cuteness: **{cuteness}%**\n"
         f"🥀 Verdict: {'Adorable 💖' if cuteness > 70 else 'Cute 🥺' if cuteness > 40 else 'Needs more cuteness 😜'}"
     )
 
-    await (await send_cmd(c, Types.DOCUMENT))(
+    # Use ANIMATION instead of DOCUMENT so caption shows
+    await (await send_cmd(c, Types.ANIMATION))(
         m.chat.id,
         CUTIE,
         CUTE,
