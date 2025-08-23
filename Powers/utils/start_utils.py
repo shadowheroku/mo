@@ -264,3 +264,35 @@ Commands available:
         help_kb = ikb(ou, True)
 
     return help_msg, help_kb
+
+# ─── Split Long Help Messages ───
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+async def get_divided_msg(module: str, back_to_do: str = "start"):
+    """
+    Handle very long help messages that exceed Telegram's caption limit (1024 chars).
+    Returns a shortened caption + a keyboard with a back button.
+    """
+    try:
+        help_msg = HELP_COMMANDS[module]["help_msg"]
+        help_kb = HELP_COMMANDS[module].get("buttons", [])
+    except KeyError:
+        return "Help message not found.", InlineKeyboardMarkup(
+            [[InlineKeyboardButton("« Back", callback_data=back_to_do)]]
+        )
+
+    # Telegram's max caption length is 1024 characters
+    if len(help_msg) > 1024:
+        caption = help_msg[:1000] + "...\n\n[Message trimmed]"
+    else:
+        caption = help_msg
+
+    # Convert stored kb into InlineKeyboardMarkup
+    if help_kb:
+        keyboard = ikb(help_kb, True, todo="commands")
+    else:
+        keyboard = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("« Back", callback_data=back_to_do)]]
+        )
+
+    return caption, keyboard
