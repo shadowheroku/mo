@@ -318,11 +318,13 @@ def spend_balance(user_id: str, amount: int) -> bool:
     return True
 
 # ─── /mpromote COMMAND ───
+from pyrogram.types import ChatPermissions
+
 @Gojo.on_message(command("mpromote"))
 async def mpromote(c: Gojo, m: Message):
     load_promotions()
     user = str(m.from_user.id)
-    cost = 1_000_000  # cleaner formatting
+    cost = 1_000_000
 
     # Deduct coins safely
     if not spend_balance(user, cost):
@@ -332,25 +334,27 @@ async def mpromote(c: Gojo, m: Message):
     promotions[user] = {"title": "Coin Master", "coins_spent": cost}
     save_promotions()
 
-    # Promote user with only delete & pin permissions
     try:
+        # Promote user using Pyrogram's correct arguments
         await c.promote_chat_member(
             chat_id=m.chat.id,
             user_id=int(user),
-            is_anonymous=False,
             can_change_info=False,
             can_post_messages=False,
             can_edit_messages=False,
-            can_delete_messages=True,
+            can_delete_messages=True,  # works in recent Pyrogram
             can_invite_users=False,
             can_restrict_members=False,
             can_pin_messages=True,
             can_promote_members=False,
             can_manage_video_chats=False,
-            can_manage_chat=False
+            can_manage_chat=False,
         )
     except Exception as e:
-        return await m.reply_text(f"⚠️ Failed to promote: {e}")
+        # If still fails due to permissions, inform
+        return await m.reply_text(
+            f"⚠️ Failed to promote. Make sure I am admin and can promote: {e}"
+        )
 
     await m.reply_text(
         f"🏆 You are now a **Coin Master**!\n💰 {cost} coins have been spent.\nYou can delete and pin messages in this group."
