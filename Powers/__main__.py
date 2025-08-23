@@ -1,37 +1,33 @@
+import logging
 import sys
-from platform import system
-
-from Powers import LOGGER
+import asyncio
 from Powers.bot_class import Gojo
 
+# ─── LOGGER ───
+logger = logging.getLogger("Gojo_Satoru")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - [%(name)s] - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
 
-def setup_uvloop():
-    """Try to setup uvloop if available and not on Windows."""
-    if system() == "Windows":
-        LOGGER.info("Windows system detected, skipping uvloop setup.")
-        return
-
+# ─── MAIN ───
+async def main():
+    bot = Gojo()
     try:
-        import uvloop
-        uvloop.install()
-        LOGGER.info("uvloop installed and enabled successfully.")
-    except ImportError:
-        LOGGER.warning("uvloop not installed. Running without it.")
+        await bot.start()
+        logger.info("✅ Gojo bot started successfully.")
+        await idle()  # Keeps bot running
     except Exception as e:
-        LOGGER.error(f"Failed to enable uvloop: {e}")
-
-
-def main():
-    setup_uvloop()
-    try:
-        Gojo().run()
-    except KeyboardInterrupt:
-        LOGGER.info("Bot stopped manually (KeyboardInterrupt).")
-        sys.exit(0)
-    except Exception as e:
-        LOGGER.error(f"Bot crashed with error: {e}", exc_info=True)
-        sys.exit(1)
-
+        logger.error(f"❌ Bot crashed with error: {e}", exc_info=True)
+    finally:
+        await bot.stop()
+        logger.info("🛑 Gojo bot stopped.")
 
 if __name__ == "__main__":
-    main()
+    from pyrogram import idle
+
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Bot stopped manually.")
