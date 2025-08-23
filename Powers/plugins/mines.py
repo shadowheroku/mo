@@ -386,17 +386,19 @@ async def mpromote(c: Gojo, m: Message):
 
     # Promote user in the group with only delete & pin rights
     try:
-        await c.promote_chat_member(
-            chat_id=m.chat.id,
-            user_id=int(user),
-            can_delete_messages=True,
-            can_pin_messages=True,
-            can_change_info=False,
-            can_restrict_members=False,
-            can_invite_users=True,
-            can_manage_voice_chats=True,
-            can_promote_members=False,
-            can_manage_chat=True
+    await c.promote_chat_member(
+        chat_id=m.chat.id,
+        user_id=int(user),
+        can_change_info=False,        # cannot change group info
+        can_post_messages=False,      # cannot post messages as channel
+        can_edit_messages=False,      # cannot edit messages
+        can_delete_messages=True,     # can delete messages
+        can_invite_users=True,        # can invite users
+        can_restrict_members=False,   # cannot restrict members
+        can_pin_messages=True,        # can pin messages
+        can_promote_members=False,    # cannot promote others
+        can_manage_voice_chats=False, # adjust based on your needs
+        can_manage_chat=False  
         )
     except Exception as e:
         return await m.reply_text(f"⚠️ Failed to promote: {e}")
