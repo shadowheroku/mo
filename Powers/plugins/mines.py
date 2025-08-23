@@ -696,7 +696,7 @@ async def dice_cmd(c: Gojo, m: Message):
         await m.reply_text(f"🎲 Dice rolled: {dice_roll}")
     
     # Wait for 5 seconds before showing the result
-    await asyncio.sleep(5)
+    await asyncio.sleep(4)
     
     dice_emojis = {
         1: "⚀",
