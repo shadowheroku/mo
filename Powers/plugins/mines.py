@@ -686,8 +686,11 @@ async def dice_cmd(c: Gojo, m: Message):
     # Convert shorthand to full word
     user_choice = "odd" if choice in ["o", "odd"] else "even"
     
-    # Roll the dice (1-6) and get corresponding emoji
-    dice_roll = random.randint(1, 6)
+    # Send Telegram dice animation
+    dice_message = await m.reply_dice("🎲")
+    
+    # Get the dice value from Telegram's dice animation
+    dice_roll = dice_message.dice.value
     dice_emojis = {
         1: "⚀",
         2: "⚁", 
