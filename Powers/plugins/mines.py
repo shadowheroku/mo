@@ -170,12 +170,14 @@ def render_board(board, revealed, show_all=False, game_id=None):
     return InlineKeyboardMarkup(buttons)
 
 def get_initial_multiplier(num_mines):
-    # Reduced multiplier for low coin generation
-    if num_mines <= 3: return 1.0
-    if num_mines <= 6: return 1.5
-    if num_mines <= 10: return 2.0
-    return 2.5
-
+    # Extremely low multipliers - very difficult
+    if num_mines <= 3: return 0.3    # Very low reward for few mines
+    if num_mines <= 6: return 0.5    # Minimal reward
+    if num_mines <= 10: return 0.7   # Still very low
+    if num_mines <= 15: return 0.9   # Slightly better but still low
+    if num_mines <= 20: return 1.1   # Barely above original bet
+    return 1.3                       # Minimal profit even for high risk
+    
 def next_game_id():
     return str(random.randint(10000, 99999))
 
@@ -280,10 +282,20 @@ async def mines_withdraw(c: Gojo, q: CallbackQuery):
     if user != game["user"]:
         return await q.answer("⚠️ This is not your game!", show_alert=True)
 
+    # Count how many gems have been revealed
+    gems_revealed = 0
+    for idx in game["revealed"]:
+        if game["board"][idx] == "💎":
+            gems_revealed += 1
+
+    # Require at least 3 gems to withdraw
+    if gems_revealed < 3:
+        return await q.answer("⚠️ You need to reveal at least 3 gems before withdrawing!", show_alert=True)
+
     user_balance[user] = user_balance.get(user, 1000) + game["reward"]
     save_balance()
     await q.message.edit_text(
-        f"💰 You withdrew {game['reward']} coins!\nBalance: {user_balance[user]}",
+        f"💰 You withdrew {game['reward']} coins!\nGems revealed: {gems_revealed}\nBalance: {user_balance[user]}",
         reply_markup=render_board(game["board"], game["revealed"], show_all=True)
     )
     del mines_games[game_id]
