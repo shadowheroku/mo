@@ -8,9 +8,7 @@ async def send_game(c: Gojo, m: Message, emoji: str = "🎲"):
     score = x.dice.value
     await m.reply_text(f"Hey {m.from_user.mention}, your score is: {score}", quote=True)
 
-@Gojo.on_message(command("dice"))
-async def dice_cmd(c: Gojo, m: Message):
-    await send_game(c, m, "🎲")
+
 
 @Gojo.on_message(command("dart"))
 async def dart_cmd(c: Gojo, m: Message):
