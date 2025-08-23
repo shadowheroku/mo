@@ -718,7 +718,7 @@ async def dice_cmd(c: Gojo, m: Message):
         
         await m.reply_text(
             f"🎲 **Dice Roll: {dice_emoji} {dice_roll}**\n"
-            f"Damn. You're lucky! 🍀"
+            f"Damn. You're lucky!"
         )
     else:
         # Lose
