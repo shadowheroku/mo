@@ -249,22 +249,30 @@ async def mines_play(c: Gojo, q: CallbackQuery):
         )
         del mines_games[game_id]
     else:
-        # reward per gem
-        gem_reward = int(game["amount"] * game["multiplier"])
-        game["reward"] += gem_reward
+        # Profit per gem (not including original bet)
+        gem_profit = int(game["amount"] * game["multiplier"])
+        game["reward"] += gem_profit
         game["multiplier"] *= 0.7  # even lower multiplier
+        
+        # Calculate total return (original bet + profit)
+        total_return = game["amount"] + game["reward"]
+        
         await q.message.edit_text(
-            f"💎 You revealed a gem!\nReward for this gem: {gem_reward} coins\nTotal: {game['reward']} coins\nMultiplier now: {game['multiplier']:.2f}",
+            f"💎 You revealed a gem!\nProfit from this gem: {gem_profit} coins\nTotal profit: {game['reward']} coins\nMultiplier now: {game['multiplier']:.2f}",
             reply_markup=render_board(game["board"], game["revealed"], game_id=game_id)
         )
 
         # all safe cells revealed
         safe_cells = 25 - game["mines"]
         if len(game["revealed"]) == safe_cells:
-            user_balance[user] = user_balance.get(user, 1000) + game["reward"]
+            # Return original bet + profit
+            user_balance[user] = user_balance.get(user, 1000) + game["amount"] + game["reward"]
             save_balance()
             await q.message.edit_text(
-                f"🎉 Congratulations! You cleared all safe cells!\nYou won {game['reward']} monic coins!\nBalance: {user_balance[user]}",
+                f"🎉 Congratulations! You cleared all safe cells!\n"
+                f"You won {game['reward']} coins profit!\n"
+                f"Total returned: {game['amount'] + game['reward']} coins\n"
+                f"Balance: {user_balance[user]}",
                 reply_markup=render_board(game["board"], game["revealed"], show_all=True)
             )
             del mines_games[game_id]
