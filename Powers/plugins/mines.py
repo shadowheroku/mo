@@ -298,8 +298,8 @@ async def balance(c: Gojo, m: Message):
     
     # Simple approach with spacing to make copying easier
     await m.reply_text(
-        f"💰 Your monic coins balance:\n\n"
-        f"      {bal}\n"
+        f"💰 Your monic coins balance:\n"
+        f"  :- {bal}\n"
     )
 
 # ─── DAILY COMMAND ───
