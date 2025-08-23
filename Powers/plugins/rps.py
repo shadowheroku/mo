@@ -6,9 +6,7 @@ from pyrogram.types import (
     InlineKeyboardButton,
     CallbackQuery
 )
-from pyrogram.enums import ParseMode
-from pyrogram.helpers import escape_markdown
-
+from pyrogram.utils import escape_markdown   # ✅ FIXED
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
