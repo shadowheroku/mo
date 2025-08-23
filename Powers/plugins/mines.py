@@ -252,21 +252,33 @@ async def mgive(c: Gojo, m: Message):
     save_balance()
     await m.reply_text(f"✅ Sent {amount} coins to {escape_markdown(target.first_name)}!\n💰 Your balance: {user_balance[sender]}")
 
+# ─── BALANCE HELPER ───
+def give_balance(user_id: str, amount: int):
+    """Add amount to user balance safely."""
+    load_balance()
+    user_balance[user_id] = user_balance.get(user_id, 1000) + amount
+    save_balance()
+
+# ─── /mgift COMMAND ───
 @Gojo.on_message(command("mgift"))
 async def mgift(c: Gojo, m: Message):
-    load_balance()
     if m.from_user.id != OWNER_ID:
         return await m.reply_text("⚠️ Only owner can use this command")
     if not m.reply_to_message:
         return await m.reply_text("Reply to user's message to gift coins")
+    
     args = m.text.split()
     if len(args) < 2 or not args[1].isdigit():
         return await m.reply_text("Usage: /mgift <amount> (reply)")
+    
     target = m.reply_to_message.from_user
     amount = int(args[1])
-    user_balance[str(target.id)] = user_balance.get(str(target.id), 1000) + amount
-    save_balance()
-    await m.reply_text(f"🎁 Gave {amount} coins to {escape_markdown(target.first_name)}!")
+
+    # Use helper to safely update
+    give_balance(str(target.id), amount)
+
+    await m.reply_text(f"🎁 Gave {amount} coins to {escape_markdown(target.first_name)}!\n💰 New balance: {user_balance[str(target.id)]}")
+
 
 @Gojo.on_message(command("take"))
 async def take(c: Gojo, m: Message):
@@ -295,19 +307,26 @@ async def top_collectors(c: Gojo, m: Message):
     await m.reply_text(msg)
 
 # ─── PROMOTE COMMAND ───
+# ─── BALANCE HELPER ───
+def spend_balance(user_id: str, amount: int) -> bool:
+    """Deduct amount from user balance. Returns True if successful, False if insufficient balance."""
+    load_balance()
+    if user_balance.get(user_id, 1000) < amount:
+        return False
+    user_balance[user_id] -= amount
+    save_balance()
+    return True
+
+# ─── /mpromote COMMAND ───
 @Gojo.on_message(command("mpromote"))
 async def mpromote(c: Gojo, m: Message):
-    load_balance()
     load_promotions()
     user = str(m.from_user.id)
-    cost = 10_00_000
+    cost = 1_000_000  # cleaner formatting
 
-    if user_balance.get(user, 1000) < cost:
+    # Deduct coins safely
+    if not spend_balance(user, cost):
         return await m.reply_text(f"❌ Not enough coins! Need {cost}")
-
-    # Deduct coins
-    user_balance[user] -= cost
-    save_balance()
 
     # Save promotion info
     promotions[user] = {"title": "Coin Master", "coins_spent": cost}
@@ -333,7 +352,9 @@ async def mpromote(c: Gojo, m: Message):
     except Exception as e:
         return await m.reply_text(f"⚠️ Failed to promote: {e}")
 
-    await m.reply_text("🏆 You are now a **Coin Master**!\nYou can delete and pin messages in this group.")
+    await m.reply_text(
+        f"🏆 You are now a **Coin Master**!\n💰 {cost} coins have been spent.\nYou can delete and pin messages in this group."
+    )
 
 
 # ─── SET TITLE ───
