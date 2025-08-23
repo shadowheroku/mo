@@ -1,10 +1,13 @@
-from re import compile as compile_re
-from re import escape
-from shlex import split
-from typing import List, Union
+# custom_filters.py (Pyrogram v2 compatible)
 
-from pyrogram.enums import ChatMemberStatus as CMS
-from pyrogram.enums import ChatType
+from __future__ import annotations
+
+from re import compile as compile_re
+from re import escape as re_escape
+from shlex import split
+from typing import List, Union, Optional
+
+from pyrogram.enums import ChatMemberStatus as CMS, ChatType
 from pyrogram.errors import RPCError, UserNotParticipant
 from pyrogram.filters import create
 from pyrogram.types import CallbackQuery, ChatJoinRequest, Message
@@ -21,368 +24,366 @@ from Powers.supports import get_support_staff
 from Powers.utils.caching import ADMIN_CACHE, admin_cache_reload
 
 
+# ---------- Helpers ----------
+
+def _compile_cmd_regex(prefixes: List[str], bot_username: str) -> object:
+    # ^([!/.])(cmd)(@bot)?(?:\s|$)(.*)
+    return compile_re(
+        r"^[{prefix}](\w+)(?:@{bot})?(?:\s|$)(.*)".format(
+            prefix="|".join(re_escape(p) for p in prefixes),
+            bot=re_escape(bot_username or "")
+        ),
+        flags=0
+    )
+
+
+async def _get_user_status(m: Message) -> Optional[CMS]:
+    """
+    Returns the user's ChatMemberStatus in the chat, or:
+    - CMS.ADMINISTRATOR for anonymous admins
+    - CMS.OWNER for private chats
+    - None on RPC error
+    """
+    # Anonymous admin messages come via sender_chat == chat.id
+    if m.sender_chat and m.sender_chat.id == m.chat.id:
+        return CMS.ADMINISTRATOR
+
+    if m.chat.type == ChatType.PRIVATE:
+        return CMS.OWNER
+
+    if not m.from_user:
+        return None
+
+    try:
+        member = await m.chat.get_member(m.from_user.id)
+        return member.status
+    except UserNotParticipant:
+        # Not a participant; treat as non-admin
+        return None
+    except RPCError:
+        return None
+
+
+async def _ensure_admin_cache(m: Message):
+    """Warm/refresh the admin cache if missing."""
+    try:
+        return {i[0] for i in ADMIN_CACHE[m.chat.id]}
+    except KeyError:
+        return {i[0] for i in await admin_cache_reload(m, "custom_filter_update")}
+
+
+# ---------- Command filter ----------
+
 def command(
-        commands: Union[str, List[str]],
-        case_sensitive: bool = False,
-        owner_cmd: bool = False,
-        dev_cmd: bool = False,
-        sudo_cmd: bool = False,
+    commands: Union[str, List[str]],
+    case_sensitive: bool = False,
+    owner_cmd: bool = False,
+    dev_cmd: bool = False,
+    sudo_cmd: bool = False,
 ):
+    """
+    Matches messages that start with PREFIX_HANDLER + command.
+    - Supports @BotUsername suffix.
+    - Enforces owner/dev/sudo levels when requested.
+    - Deletes messages for disabled commands if action == "del" and user is not admin/owner.
+    """
+
     async def func(flt, c: Gojo, m: Message):
         if not m:
             return False
 
-        date = m.edit_date
-        if date:
-            return False  # reaction
+        # ignore edits/reactions
+        if m.edit_date:
+            return False
 
+        # ignore channels
         if m.chat and m.chat.type == ChatType.CHANNEL:
             return False
 
-        if m and not m.from_user and not m.chat.is_admin:
+        # no author (service/anon-but-not-channel); let anon admin pass via sender_chat logic later
+        if not m.from_user and not (m.sender_chat and m.sender_chat.id == (m.chat.id if m.chat else 0)):
             return False
 
-        if any([m.forward_from_chat, m.forward_from]):
+        # ignore forwarded
+        if getattr(m, "forward_from_chat", None) or getattr(m, "forward_from", None):
             return False
 
+        # ignore bots
+        if m.from_user and m.from_user.is_bot:
+            return False
+
+        # role gates
         if m.from_user:
-            if m.from_user.is_bot:
+            if owner_cmd and (m.from_user.id != OWNER_ID):
                 return False
 
-            if owner_cmd and (m.from_user.id != OWNER_ID):
-                # Only owner allowed to use this...!
-                return False
-                    
             DEV_LEVEL = get_support_staff("dev_level")
             if dev_cmd and (m.from_user.id not in DEV_LEVEL):
-                # Only devs allowed to use this...!
                 return False
-                    
+
             SUDO_LEVEL = get_support_staff("sudo_level")
             if sudo_cmd and (m.from_user.id not in SUDO_LEVEL):
-                # Only sudos and above allowed to use it
                 return False
 
-        text: str = m.text or m.caption
+        text: str = m.text or m.caption or ""
         if not text:
             return False
-        regex = r"^[{prefix}](\w+)(@{bot_name})?(?: |$)(.*)".format(
-            prefix="|".join(escape(x) for x in PREFIX_HANDLER),
-            bot_name=c.me.username,
-        )
-        matches = compile_re(regex).search(text)
-        if matches:
-            m.command = [matches.group(1)]
-            if matches.group(1) not in flt.commands:
-                return False
-            if bool(m.chat and m.chat.type in {ChatType.SUPERGROUP, ChatType.GROUP}):
-                try:
-                    if m.chat.is_admin:
-                        user_status = CMS.ADMINISTRATOR
-                    else:
-                        user_status = (await m.chat.get_member(m.from_user.id)).status
-                except UserNotParticipant:
-                    # i.e anon admin
-                    user_status = CMS.ADMINISTRATOR
-                except ValueError:
-                    # i.e. PM
-                    user_status = CMS.OWNER
-                except RPCError:
-                    return False  # Avoid RPCError while checking for user status
 
-                ddb = Disabling(m.chat.id)
-                if str(matches.group(1)) in ddb.get_disabled() and user_status not in (
-                        CMS.OWNER,
-                        CMS.ADMINISTRATOR,
-                ) and ddb.get_action() == "del":
+        # parse command
+        regex = _compile_cmd_regex(PREFIX_HANDLER, c.me.username)
+        match = regex.search(text)
+        if not match:
+            return False
+
+        cmd_name = match.group(1)
+        args_str = match.group(2) or ""
+
+        # normalize case
+        key = cmd_name if case_sensitive else cmd_name.lower()
+        if key not in flt.commands:
+            return False
+
+        # disable checks in groups
+        if m.chat and m.chat.type in {ChatType.SUPERGROUP, ChatType.GROUP}:
+            user_status = await _get_user_status(m)
+            ddb = Disabling(m.chat.id)
+            if str(key) in ddb.get_disabled():
+                if (user_status not in (CMS.OWNER, CMS.ADMINISTRATOR)) and ddb.get_action() == "del":
                     try:
                         await m.delete()
                     except RPCError:
-                        return False
-            if matches.group(3) == "":
-                return True
-            try:
-                for arg in split(matches.group(3)):
-                    m.command.append(arg)
-            except ValueError:
-                pass
-            return True
-        return False
+                        pass
+                    return False
 
-    commands = commands if isinstance(commands, list) else [commands]
-    commands = {c if case_sensitive else c.lower() for c in commands}
+        # build m.command similar to Pyrogram's behavior
+        m.command = [cmd_name]
+        try:
+            if args_str:
+                for arg in split(args_str):
+                    m.command.append(arg)
+        except ValueError:
+            # malformed quotes; ignore args
+            pass
+
+        return True
+
+    commands_list = commands if isinstance(commands, list) else [commands]
+    commands_set = {c if case_sensitive else c.lower() for c in commands_list}
 
     return create(
         func,
         "NormalCommandFilter",
-        commands=commands,
+        commands=commands_set,
         case_sensitive=case_sensitive,
     )
 
 
-async def bot_admin_check_func(_, c: Gojo, m: Message or CallbackQuery):
-    """Check if bot is Admin or not."""
+# ---------- Role/permission filters ----------
 
+async def bot_admin_check_func(_, c: Gojo, m: Message | CallbackQuery):
+    """True if bot is admin in the group."""
     if isinstance(m, CallbackQuery):
         m = m.message
 
-    if m.chat.type not in [ChatType.SUPERGROUP, ChatType.GROUP]:
+    if not m or not m.chat or m.chat.type not in (ChatType.SUPERGROUP, ChatType.GROUP):
         return False
 
-    # Telegram and GroupAnonyamousBot
+    # sender_chat updates (Telegram service) -> allow
     if m.sender_chat:
         return True
 
-    try:
-        admin_group = {i[0] for i in ADMIN_CACHE[m.chat.id]}
-    except KeyError:
-        admin_group = {
-            i[0] for i in await admin_cache_reload(m, "custom_filter_update")
-        }
-    except ValueError as ef:
-        # To make language selection work in private chat of user, i.e. PM
-        if ("The chat_id" and "belongs to a user") in ef:
-            return True
-
+    admin_group = await _ensure_admin_cache(m)
     if c.me.id in admin_group:
         return True
 
-    await m.reply_text(
-        "I am not an admin to recive updates in this group; Mind Promoting?",
-    )
-
+    await m.reply_text("I need to be an admin to work properly here. Please promote me.")
     return False
 
 
-async def admin_check_func(_, __, m: Message or CallbackQuery):
-    """Check if user is Admin or not."""
+async def admin_check_func(_, __, m: Message | CallbackQuery):
+    """True if user is admin or anonymous admin."""
     if isinstance(m, CallbackQuery):
         m = m.message
 
-    if m.chat.type not in [ChatType.SUPERGROUP, ChatType.GROUP]:
+    if not m or not m.chat or m.chat.type not in (ChatType.SUPERGROUP, ChatType.GROUP):
         return False
 
-    # Telegram and GroupAnonyamousBot
+    # anonymous admin
     if m.sender_chat and m.sender_chat.id == m.chat.id:
         return True
 
     if not m.from_user:
         return False
 
-    try:
-        admin_group = {i[0] for i in ADMIN_CACHE[m.chat.id]}
-    except KeyError:
-        admin_group = {
-            i[0] for i in await admin_cache_reload(m, "custom_filter_update")
-        }
-    except ValueError as ef:
-        # To make language selection work in private chat of user, i.e. PM
-        if ("The chat_id" and "belongs to a user") in ef:
-            return True
-
+    admin_group = await _ensure_admin_cache(m)
     if m.from_user.id in admin_group:
         return True
 
-    await m.reply_text(text="You cannot use an admin command!")
-
+    await m.reply_text("You cannot use an admin command!")
     return False
 
 
-async def owner_check_func(_, __, m: Message or CallbackQuery):
-    """Check if user is Owner or not."""
+async def owner_check_func(_, __, m: Message | CallbackQuery):
+    """True if user is group owner."""
     if isinstance(m, CallbackQuery):
         m = m.message
 
-    if m.chat.type not in [ChatType.SUPERGROUP, ChatType.GROUP]:
+    if not m or not m.chat or m.chat.type not in (ChatType.SUPERGROUP, ChatType.GROUP):
         return False
 
     if not m.from_user:
         return False
 
-    user = await m.chat.get_member(m.from_user.id)
-
-    if user.status == CMS.OWNER:
-        status = True
-    else:
-        status = False
-        if user.status == CMS.ADMINISTRATOR:
-            msg = "You're an admin only, stay in your limits!"
-        else:
-            msg = "Do you think that you can execute owner commands?"
-        await m.reply_text(msg)
-
-    return status
-
-
-async def restrict_check_func(_, __, m: Message or CallbackQuery):
-    """Check if user can restrict users or not."""
-    if isinstance(m, CallbackQuery):
-        m = m.message
-
-    if (
-            m.chat.type not in [ChatType.SUPERGROUP, ChatType.GROUP]
-    ):
-        return False
-
-    if not m.from_user:
-        return False
-
-    user = await m.chat.get_member(m.from_user.id)
-
-    if user and user.status in [CMS.ADMINISTRATOR, CMS.OWNER] and user.privileges.can_restrict_members:
-        status = True
-    else:
-        status = False
-        await m.reply_text(text="You don't have permissions to restrict members!")
-
-    return status
-
-
-async def promote_check_func(_, __, m):
-    """Check if user can promote users or not."""
-    if isinstance(m, CallbackQuery):
-        m = m.message
-
-    if m.chat.type not in [ChatType.SUPERGROUP, ChatType.GROUP]:
-        return False
-
-    if not m.from_user:
-        return False
-
-    user = await m.chat.get_member(m.from_user.id)
-
-    if user.status in [CMS.ADMINISTRATOR, CMS.OWNER] and user.privileges.can_promote_members:
-        status = True
-    else:
-        status = False
-        await m.reply_text(text="You don't have permission to promote members!")
-
-    return status
-
-
-async def changeinfo_check_func(_, __, m):
-    """Check if user can change info or not."""
-    if isinstance(m, CallbackQuery):
-        m = m.message
-
-    if m.chat.type not in [ChatType.SUPERGROUP, ChatType.GROUP]:
-        await m.reply_text("This command is made to be used in groups not in pm!")
-        return False
-
-    # Telegram and GroupAnonyamousBot
-    if m.sender_chat:
+    member = await m.chat.get_member(m.from_user.id)
+    if member.status == CMS.OWNER:
         return True
 
-    user = await m.chat.get_member(m.from_user.id)
-
-    if user.status in [CMS.ADMINISTRATOR, CMS.OWNER] and user.privileges.can_change_info:
-        status = True
-    else:
-        status = False
-        await m.reply_text("You don't have: can_change_info permission!")
-
-    return status
+    await m.reply_text("Owner-only command.")
+    return False
 
 
-async def can_pin_message_func(_, __, m):
-    """Check if user can change info or not."""
+async def restrict_check_func(_, __, m: Message | CallbackQuery):
+    """True if user can restrict members."""
     if isinstance(m, CallbackQuery):
         m = m.message
 
-    if m.chat.type not in [ChatType.SUPERGROUP, ChatType.GROUP]:
-        await m.reply_text("This command is made to be used in groups not in pm!")
+    if not m or not m.chat or m.chat.type not in (ChatType.SUPERGROUP, ChatType.GROUP):
         return False
 
-    # Telegram and GroupAnonyamousBot
-    if m.sender_chat:
+    if not m.from_user:
+        return False
+
+    member = await m.chat.get_member(m.from_user.id)
+    if member and member.status in (CMS.ADMINISTRATOR, CMS.OWNER) and getattr(member.privileges, "can_restrict_members", False):
         return True
 
-    # Bypass the bot devs, sudos and owner
+    await m.reply_text("You don't have permission to restrict members!")
+    return False
+
+
+async def promote_check_func(_, __, m: Message | CallbackQuery):
+    """True if user can promote members."""
+    if isinstance(m, CallbackQuery):
+        m = m.message
+
+    if not m or not m.chat or m.chat.type not in (ChatType.SUPERGROUP, ChatType.GROUP):
+        return False
+
+    if not m.from_user:
+        return False
+
+    member = await m.chat.get_member(m.from_user.id)
+    if member and member.status in (CMS.ADMINISTRATOR, CMS.OWNER) and getattr(member.privileges, "can_promote_members", False):
+        return True
+
+    await m.reply_text("You don't have permission to promote members!")
+    return False
+
+
+async def changeinfo_check_func(_, __, m: Message | CallbackQuery):
+    """True if user can change chat info."""
+    if isinstance(m, CallbackQuery):
+        m = m.message
+
+    if not m or not m.chat:
+        return False
+
+    if m.chat.type not in (ChatType.SUPERGROUP, ChatType.GROUP):
+        await m.reply_text("This command is meant for groups, not PM.")
+        return False
+
+    # anonymous admin
+    if m.sender_chat and m.sender_chat.id == m.chat.id:
+        return True
+
+    if not m.from_user:
+        return False
+
+    member = await m.chat.get_member(m.from_user.id)
+    if member and member.status in (CMS.ADMINISTRATOR, CMS.OWNER) and getattr(member.privileges, "can_change_info", False):
+        return True
+
+    await m.reply_text("You don't have: can_change_info permission!")
+    return False
+
+
+async def can_pin_message_func(_, __, m: Message | CallbackQuery):
+    """True if user can pin messages. Sudo-level bypass allowed."""
+    if isinstance(m, CallbackQuery):
+        m = m.message
+
+    if not m or not m.chat:
+        return False
+
+    if m.chat.type not in (ChatType.SUPERGROUP, ChatType.GROUP):
+        await m.reply_text("This command is meant for groups, not PM.")
+        return False
+
+    # anonymous admin
+    if m.sender_chat and m.sender_chat.id == m.chat.id:
+        return True
+
+    if not m.from_user:
+        return False
+
     SUDO_LEVEL = get_support_staff("sudo_level")
     if m.from_user.id in SUDO_LEVEL:
         return True
 
-    user = await m.chat.get_member(m.from_user.id)
+    member = await m.chat.get_member(m.from_user.id)
+    if member and member.status in (CMS.ADMINISTRATOR, CMS.OWNER) and getattr(member.privileges, "can_pin_messages", False):
+        return True
 
-    if user.status in [CMS.ADMINISTRATOR, CMS.OWNER] and user.privileges.can_pin_messages:
-        status = True
-    else:
-        status = False
-        await m.reply_text("You don't have: can_pin_messages permission!")
+    await m.reply_text("You don't have: can_pin_messages permission!")
+    return False
 
-    return status
 
+# ---------- Feature filters ----------
 
 async def auto_join_check_filter(_, __, j: ChatJoinRequest):
-    chat = j.chat.id
     aj = AUTOJOIN()
-    join_type = aj.get_autojoin(chat)
-
+    join_type = aj.get_autojoin(j.chat.id)
     return bool(join_type)
 
 
 async def afk_check_filter(_, __, m: Message):
-    if not m.from_user:
+    if not m.from_user or m.from_user.is_bot:
         return False
-
-    if m.from_user.is_bot:
-        return False
-
     if m.chat.type == ChatType.PRIVATE:
         return False
 
     afk = AFK()
     chat = m.chat.id
-    is_repl_afk = None
-    if m.reply_to_message:
-        if repl_user := m.reply_to_message.from_user:
-            repl_user = m.reply_to_message.from_user.id
-            is_repl_afk = afk.check_afk(chat, repl_user)
-            return bool(is_repl_afk)
 
-    user = m.from_user.id
+    if m.reply_to_message and m.reply_to_message.from_user:
+        repl_user_id = m.reply_to_message.from_user.id
+        return bool(afk.check_afk(chat, repl_user_id))
 
-    is_afk = afk.check_afk(chat, user)
-
-    return bool(is_afk)
+    return bool(afk.check_afk(chat, m.from_user.id))
 
 
 async def flood_check_filter(_, __, m: Message):
+    if not m.chat or not m.from_user or m.chat.type == ChatType.PRIVATE:
+        return False
+
     Flood = Floods()
-    if not m.chat:
+    if not Flood.is_chat(m.chat.id):
         return False
 
-    if not m.from_user:
-        return False
-
-    if m.chat.type == ChatType.PRIVATE:
-        return False
-
-    u_id = m.from_user.id
-    c_id = m.chat.id
-    is_flood = Flood.is_chat(c_id)
-    if not is_flood:
-        return False
     try:
         admin_group = {i[0] for i in ADMIN_CACHE[m.chat.id]}
     except KeyError:
-        admin_group = {
-            i[0] for i in await admin_cache_reload(m, "custom_filter_update")
-        }
+        admin_group = {i[0] for i in await admin_cache_reload(m, "custom_filter_update")}
+
     app_users = Approve(m.chat.id).list_approved()
+    approved_ids = {i[0] for i in app_users}
     SUDO_LEVEL = get_support_staff("sudo_level")
 
-    if u_id in SUDO_LEVEL:
+    uid = m.from_user.id
+    if uid in SUDO_LEVEL or uid in admin_group or uid in approved_ids:
         return False
 
-    elif u_id in admin_group:
-        return False
-
-    elif u_id in {i[0] for i in app_users}:
-        return False
-
-    else:
-        return True
+    return True
 
 
 async def captcha_filt(_, __, m: Message):
@@ -391,6 +392,8 @@ async def captcha_filt(_, __, m: Message):
     except Exception:
         return False
 
+
+# ---------- Exported filters ----------
 
 captcha_filter = create(captcha_filt)
 flood_filter = create(flood_check_filter)
