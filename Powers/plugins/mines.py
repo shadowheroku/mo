@@ -296,10 +296,9 @@ async def balance(c: Gojo, m: Message):
     user = str(m.from_user.id)
     bal = user_balance.get(user, 1000)
     
-    # Using code formatting for easy copying
+    # Format with extra spacing to make copying easier
     await m.reply_text(
-        f"💰 Your monic coins balance:\n\n`{bal}`\n\n_Tap on the number above to copy it_",
-        parse_mode="markdown"
+        f"💰 Your monic coins balance:\n\n      {bal}\n\nTap and hold on the number above to copy it"
     )
 
 # ─── DAILY COMMAND ───
