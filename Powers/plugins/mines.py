@@ -69,7 +69,7 @@ async def mines_start(c: Gojo, m: Message):
     load_balance()
     args = m.text.split()
     if len(args) != 3 or not args[1].isdigit() or not args[2].isdigit():
-        return await m.reply_text("Usage: /mines <amount> <number_of_mines>")
+        return await m.reply_text("Usage: /mines amount number_of_mines")
 
     amount = int(args[1])
     num_mines = int(args[2])
