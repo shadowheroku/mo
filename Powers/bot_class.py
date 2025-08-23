@@ -24,8 +24,6 @@ class Gojo(Client):
     """Starts the Pyrogram Client on the Bot Token when we do 'python3 -m Powers'"""
 
     def __init__(self):
-        # name = Powers
-
         super().__init__(
             "Gojo_Satoru",
             bot_token=BOT_TOKEN,
@@ -35,32 +33,33 @@ class Gojo(Client):
             workers=WORKERS,
         )
 
-    async def start(self, use_qr=False, except_ids=[]):
+    async def start(self):
         """Start the bot."""
-        await super().start(use_qr=use_qr, except_ids=except_ids)
+        await super().start()
+
         await self.set_bot_commands(
             [
-                BotCommand(
-                    "start", "To check weather the bot is alive or not"),
+                BotCommand("start", "To check whether the bot is alive"),
                 BotCommand("help", "To get help menu"),
                 BotCommand("donate", "To buy me a coffee"),
-                BotCommand("bug", "To report bugs")
+                BotCommand("bug", "To report bugs"),
             ]
         )
-        meh = await self.get_me()  # Get bot info from pyrogram client
+
+        meh = await self.get_me()
         LOGGER.info("Starting bot...")
         Config.BOT_ID = meh.id
         Config.BOT_NAME = meh.first_name
         Config.BOT_USERNAME = meh.username
+
         startmsg = await self.send_message(MESSAGE_DUMP, "<i>Starting Bot...</i>")
 
-        # Show in Log that bot has started
         LOGGER.info(
             f"Pyrogram v{__version__} (Layer - {layer}) started on {meh.username}",
         )
         LOGGER.info(f"Python Version: {python_version()}\n")
 
-        # Get cmds and keys
+        # Load plugins and support users
         cmd_list = await load_cmds(await all_plugins())
         await load_support_users()
         await cache_support()
@@ -68,12 +67,13 @@ class Gojo(Client):
         LOGGER.info(f"Sudo Users: {SUPPORT_USERS['Sudo']}")
         LOGGER.info(f"Whitelist users: {SUPPORT_USERS['White']}")
         LOGGER.info(f"Plugins Loaded: {cmd_list}")
+
+        # Schedule birthday jobs if enabled
         if BDB_URI:
-            scheduler.add_job(send_wishish, 'cron', [
-                self], hour=0, minute=0, second=0)
+            scheduler.add_job(send_wishish, "cron", [self], hour=0, minute=0, second=0)
             scheduler.start()
-        # Send a message to MESSAGE_DUMP telling that the
-        # bot has started and has loaded all plugins!
+
+        # Edit startup message
         await startmsg.edit_text(
             (
                 f"<b><i>@{meh.username} started on Pyrogram v{__version__} (Layer - {layer})</i></b>\n"
@@ -89,15 +89,17 @@ class Gojo(Client):
         """Stop the bot and send a message to MESSAGE_DUMP telling that the bot has stopped."""
         runtime = strftime("%Hh %Mm %Ss", gmtime(t() - UPTIME))
         LOGGER.info("Uploading logs before stopping...!\n")
-        # Send Logs to MESSAGE_DUMP and LOG_CHANNEL
+
         scheduler.remove_all_jobs()
         target = MESSAGE_DUMP or OWNER_ID
         await self.send_message(
             target,
-                "Bot Stopped!\n\n" f"Uptime: {runtime}\n" f"<code>{LOG_DATETIME}</code>"
+            f"Bot Stopped!\n\nUptime: {runtime}\n<code>{LOG_DATETIME}</code>",
         )
+
         await super().stop()
         MongoDB.close()
+
         LOGGER.info(
             f"""Bot Stopped.
             Logs have been uploaded to the MESSAGE_DUMP Group!
