@@ -230,36 +230,47 @@ async def mgive(c: Gojo, m: Message):
     await m.reply_text(f"✅ Sent {amount} coins to {escape_markdown(target.first_name)}!")
 
 # ─── OWNER GIFT COMMAND ───
-OWNER_ID = 8429156335  # replace with your id
+OWNER_ID = 8429156335  # replace with your id # your Telegram ID
+
 @Gojo.on_message(command("mgift"))
 async def mgift(c: Gojo, m: Message):
+    load_balance()
     if m.from_user.id != OWNER_ID:
-        return await m.reply_text("⚠️ Only owner can use this command.")
-    args = m.text.split()
-    if len(args) != 3 or not args[2].isdigit():
-        return await m.reply_text("Usage: /mgift @user amount")
-    target = m.reply_to_message.from_user if m.reply_to_message else None
-    if not target:
+        return await m.reply_text("⚠️ Only the owner can use this command.")
+
+    if not m.reply_to_message:
         return await m.reply_text("Reply to a user's message to gift coins.")
-    amount = int(args[2])
+
+    args = m.text.split()
+    if len(args) < 2 or not args[1].isdigit():
+        return await m.reply_text("Usage: /mgift <amount> (reply to a user)")
+
+    target = m.reply_to_message.from_user
+    amount = int(args[1])
+
     user_balance[str(target.id)] = user_balance.get(str(target.id), 1000) + amount
     save_balance()
     await m.reply_text(f"🎁 Gave {amount} coins to {escape_markdown(target.first_name)}!")
+
 
 # ─── TAKE COMMAND ───
 @Gojo.on_message(command("take"))
 async def take(c: Gojo, m: Message):
     load_balance()
-    args = m.text.split()
-    if len(args) != 3 or not args[2].isdigit():
-        return await m.reply_text("Usage: /take @user amount")
-    target = m.reply_to_message.from_user if m.reply_to_message else None
-    if not target:
+    if not m.reply_to_message:
         return await m.reply_text("Reply to a user's message to take coins.")
-    amount = int(args[2])
+
+    args = m.text.split()
+    if len(args) < 2 or not args[1].isdigit():
+        return await m.reply_text("Usage: /take <amount> (reply to a user)")
+
+    target = m.reply_to_message.from_user
+    amount = int(args[1])
+
     user_balance[str(target.id)] = max(user_balance.get(str(target.id), 1000) - amount, 0)
     save_balance()
     await m.reply_text(f"❌ Removed {amount} coins from {escape_markdown(target.first_name)}'s balance!")
+
 
 # ─── TOP COMMAND ───
 @Gojo.on_message(command("top"))
