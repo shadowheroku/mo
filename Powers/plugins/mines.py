@@ -637,8 +637,8 @@ async def bet_command(c: Gojo, m: Message):
         save_balance()
         
         await m.reply_text(
-            f"The coin landed on {result}\n"
-            f"You won {amount} coins"
+            f"The coin landed on {result}!\n"
+            f"You won {amount} coins!"
         )
     else:
         # Lose
@@ -646,8 +646,8 @@ async def bet_command(c: Gojo, m: Message):
         save_balance()
         
         await m.reply_text(
-            f"The coin landed on {result}\n"
-            f"You lost {amount} coins"
+            f"The coin landed on {result}!\n"
+            f"You lost {amount} coins!"
         )
 
 @Gojo.on_message(command(["dice", "roll"]))
