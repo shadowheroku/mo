@@ -306,6 +306,125 @@ async def top_collectors(c: Gojo, m: Message):
         msg += f"{i}. {escape_markdown(user_obj.first_name)} - {coins} monic coins\n"
     await m.reply_text(msg)
 
+SEASON_FILE = "monic_season.json"
+PROMOTIONS_FILE = "monic_promotions.json"
+
+# ─── STORAGE ───
+season_info = {}  # {"season_start": timestamp}
+promotions = {}   # {user_id: {"title": "Coin Master", "coins_spent": amount}}
+
+# ─── LOAD/SAVE ───
+def load_season():
+    global season_info
+    if os.path.exists(SEASON_FILE):
+        with open(SEASON_FILE, "r") as f:
+            season_info = json.load(f)
+    else:
+        season_info = {"season_start": datetime.now().isoformat()}
+
+def save_season():
+    with open(SEASON_FILE, "w") as f:
+        json.dump(season_info, f)
+
+def load_promotions():
+    global promotions
+    if os.path.exists(PROMOTIONS_FILE):
+        with open(PROMOTIONS_FILE, "r") as f:
+            promotions = json.load(f)
+    else:
+        promotions = {}
+
+def save_promotions():
+    with open(PROMOTIONS_FILE, "w") as f:
+        json.dump(promotions, f)
+
+# ─── SEASON CHECK ───
+async def check_season(c: Gojo, gc_chat_id):
+    load_balance()
+    load_season()
+    now = datetime.now()
+    season_start = datetime.fromisoformat(season_info.get("season_start"))
+    days_elapsed = (now - season_start).days
+
+    # Notify 1 day before season ends
+    if days_elapsed == 29:
+        await c.send_message(gc_chat_id, "⏳ Season ends tomorrow! Prepare for the new season!")
+
+    # Reset season every 30 days
+    if days_elapsed >= 30:
+        for uid in user_balance:
+            user_balance[uid] = 1000
+        save_balance()
+        season_info["season_start"] = now.isoformat()
+        save_season()
+        # Notify in GC and DM
+        await c.send_message(gc_chat_id, "🎉 New season started! All coins reset to 1000!")
+        for uid in user_balance:
+            try:
+                await c.send_message(int(uid), "🎉 New season started! Your coins have been reset to 1000.")
+            except:
+                continue
+
+# ─── PROMOTE COMMAND ───
+@Gojo.on_message(command("mpromote"))
+async def mpromote(c: Gojo, m: Message):
+    load_balance()
+    load_promotions()
+    user = str(m.from_user.id)
+    cost = 10_00_000
+
+    if user_balance.get(user, 1000) < cost:
+        return await m.reply_text(f"❌ Not enough coins! You need {cost} coins.")
+
+    # Deduct coins
+    user_balance[user] -= cost
+    save_balance()
+
+    # Save promotion info
+    promotions[user] = {"title": "Coin Master", "coins_spent": cost}
+    save_promotions()
+
+    # Promote user in the group with only delete & pin rights
+    try:
+        await c.promote_chat_member(
+            chat_id=m.chat.id,
+            user_id=int(user),
+            can_delete_messages=True,
+            can_pin_messages=True,
+            can_change_info=False,
+            can_restrict_members=False,
+            can_invite_users=True,
+            can_manage_voice_chats=True,
+            can_promote_members=False,
+            can_manage_chat=True
+        )
+    except Exception as e:
+        return await m.reply_text(f"⚠️ Failed to promote: {e}")
+
+    await m.reply_text("🏆 You are now a **Coin Master**!\nYou can delete and pin messages in this group.")
+
+
+# ─── SET TITLE COMMAND ───
+@Gojo.on_message(command("mtitle"))
+async def mtitle(c: Gojo, m: Message):
+    load_balance()
+    load_promotions()
+    user = str(m.from_user.id)
+    if user not in promotions:
+        return await m.reply_text("⚠️ You must be a Coin Master to set a title. Use /mpromote first.")
+    args = m.text.split(maxsplit=1)
+    if len(args) != 2:
+        return await m.reply_text("Usage: /mtitle <title>")
+    title_cost = 1_00_000
+    if user_balance.get(user, 1000) < title_cost:
+        return await m.reply_text(f"❌ Not enough coins! Title change costs {title_cost} coins.")
+    user_balance[user] -= title_cost
+    promotions[user]["title"] = args[1]
+    save_balance()
+    save_promotions()
+    await m.reply_text(f"✅ Your admin title is now: {args[1]}")
+
+
 __PLUGIN__ = "mines"
 _DISABLE_CMDS_ = ["mines"]
 __HELP__ = """
