@@ -401,17 +401,40 @@ async def mgift(c: Gojo, m: Message):
 async def take(c: Gojo, m: Message):
     await check_season_reset(c)
     load_balance()
-    if not m.reply_to_message:
-        return await m.reply_text("Reply to a user's message to take coins.")
+    
+    # Owner check
+    if m.from_user.id != OWNER_ID:
+        return await m.reply_text("⚠️ Only the owner can use this command.")
 
     args = m.text.split()
-    if len(args) < 2 or not args[1].isdigit():
-        return await m.reply_text("Usage: /take <amount> (reply to a user)")
 
-    target = m.reply_to_message.from_user
-    amount = int(args[1])
+    # Case 1: Reply to a user
+    if m.reply_to_message:
+        target = m.reply_to_message.from_user
+        if len(args) != 2 or not args[1].isdigit():
+            return await m.reply_text("Usage: /take <amount> (reply to a user)")
+        amount = int(args[1])
 
-    user_balance[str(target.id)] = max(user_balance.get(str(target.id), 1000) - amount, 0)
+    # Case 2: Mention username or ID
+    else:
+        if len(args) != 3 or not args[2].isdigit():
+            return await m.reply_text("Usage: /take @user amount")
+        try:
+            target = await c.get_users(args[1])
+        except:
+            return await m.reply_text("⚠️ Could not find that user.")
+        amount = int(args[2])
+
+    if amount <= 0:
+        return await m.reply_text("❌ Amount must be greater than 0!")
+
+    # Check if target has enough coins
+    target_balance = user_balance.get(str(target.id), 1000)
+    if target_balance < amount:
+        return await m.reply_text(f"❌ {escape_markdown(target.first_name)} only has {target_balance} coins!")
+
+    # Remove coins
+    user_balance[str(target.id)] = max(target_balance - amount, 0)
     save_balance()
     await m.reply_text(f"❌ Removed {amount} coins from {escape_markdown(target.first_name)}'s balance!")
 
