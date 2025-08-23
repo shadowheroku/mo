@@ -296,9 +296,13 @@ async def balance(c: Gojo, m: Message):
     user = str(m.from_user.id)
     bal = user_balance.get(user, 1000)
     
-    # Format with extra spacing to make copying easier
+    # Using Telegram's copyable text entity
+    from pyrogram.types import MessageEntity
+    
+    # Create the message with a copyable entity
     await m.reply_text(
-        f"💰 Your monic coins balance:\n\n      {bal}\n\nTap and hold on the number above to copy it"
+        f"💰 Your monic coins balance:\n\n<code>{bal}</code>\n\nTap on the number to copy it",
+        parse_mode="html"
     )
 
 # ─── DAILY COMMAND ───
