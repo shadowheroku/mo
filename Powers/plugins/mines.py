@@ -708,33 +708,32 @@ async def dice_cmd(c: Gojo, m: Message):
     
     # Determine win/loss
     if user_choice == result:
-        # Win - 2x payout
-        win_amount = amount
-        user_balance[user] = current_balance + win_amount
-        save_balance()
-        
-        await m.reply_text(
-            f"**Dice Roll Result**\n\n"
-            f"🎲 Dice: {dice_emoji} {dice_roll}\n"
-            f"Your bet: {amount} coins on {user_choice}\n"
-            f"Result: {result}\n\n"
-            f"✅ **WIN** - You won {win_amount} coins!\n"
-            f"New balance: {user_balance[user]} coins"
-        )
+    # Win - 2x payout
+    win_amount = amount
+    user_balance[user] = current_balance + win_amount
+    save_balance()
+    
+    await m.reply_text(
+        f"🎲 **Dice Roll: {dice_emoji} {dice_roll}**\n\n"
+        f"Damn. You're lucky! 🍀\n"
+        f"You win {win_amount:,} coins!\n\n"
+        f"**Bet:** {amount:,} on {user_choice}\n"
+        f"**Result:** {result}\n"
+        f"**New balance:** {user_balance[user]:,} coins"
+    )
     else:
-        # Lose
-        user_balance[user] = current_balance - amount
-        save_balance()
-        
-        await m.reply_text(
-            f"**Dice Roll Result**\n\n"
-            f"🎲 Dice: {dice_emoji} {dice_roll}\n"
-            f"Your bet: {amount} coins on {user_choice}\n"
-            f"Result: {result}\n\n"
-            f"❌ **LOSS** - You lost {amount} coins\n"
-            f"New balance: {user_balance[user]} coins"
-        )
-        
+    # Lose
+    user_balance[user] = current_balance - amount
+    save_balance()
+    
+     await m.reply_text(
+        f"🎲 **Dice Roll: {dice_emoji} {dice_roll}**\n\n"
+        f"Better luck next time! 😔\n"
+        f"You lost {amount:,} coins\n\n"
+        f"**Bet:** {amount:,} on {user_choice}\n"
+        f"**Result:** {result}\n"
+        f"**New balance:** {user_balance[user]:,} coins"
+    )
 # Initialize data on bot start
 load_season()
 load_balance()
