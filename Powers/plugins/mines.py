@@ -603,7 +603,7 @@ async def bet_command(c: Gojo, m: Message):
     
     args = m.text.split()
     if len(args) != 3:
-        return await m.reply_text("✑ ᴜsᴀɢᴇ : /bet [ᴀᴍᴏᴜɴᴛ] [ʜᴇᴀᴅs/ᴛᴀɪʟs]")
+        return await m.reply_text("Usage: /bet [amount] [heads/tails]")
     
     user = str(m.from_user.id)
     current_balance = user_balance.get(user, 1000)
@@ -611,43 +611,37 @@ async def bet_command(c: Gojo, m: Message):
     # Parse amount
     try:
         amount = int(args[1])
-        if amount <= 0:
-            return await m.reply_text("❌ Bet amount must be greater than 0!")
+        if amount < 10:
+            return await m.reply_text("Minimum bet is 10 coins!")
         if amount > current_balance:
-            return await m.reply_text(f"❌ You don't have enough coins! Balance: {current_balance}")
+            return await m.reply_text(f"Insufficient balance! You have: {current_balance} coins")
     except ValueError:
-        return await m.reply_text("❌ Please enter a valid number for the bet amount!")
+        return await m.reply_text("Please enter a valid number for the bet amount")
     
     # Parse choice
     choice = args[2].lower()
     if choice not in ["heads", "h", "tails", "t"]:
-        return await m.reply_text("❌ Please choose either 'heads' or 'tails'!")
+        return await m.reply_text("Please choose either 'heads' or 'tails'")
     
     # Convert shorthand to full word
-    if choice in ["h", "heads"]:
-        user_choice = "heads"
-        user_choice_emoji = "🪙"
-    else:
-        user_choice = "tails"
-        user_choice_emoji = "🐍"
+    user_choice = "heads" if choice in ["h", "heads"] else "tails"
     
     # Flip the coin
     result = random.choice(["heads", "tails"])
-    result_emoji = "🪙" if result == "heads" else "🐍"
     
     # Determine win/loss
     if user_choice == result:
         # Win - 2x payout
-        win_amount = amount * 2
+        win_amount = amount
         user_balance[user] = current_balance + win_amount
         save_balance()
         
         await m.reply_text(
-            f"🎉 {result_emoji} **YOU WON!** {result_emoji}\n\n"
-            f"Your choice: {user_choice_emoji} {user_choice.upper()}\n"
-            f"Result: {result_emoji} {result.upper()}\n\n"
-            f"💰 You won {win_amount} coins!\n"
-            f"💵 New balance: {user_balance[user]}"
+            f"**Coin Flip Result**\n\n"
+            f"Your bet: {amount} coins on {user_choice}\n"
+            f"Result: {result}\n\n"
+            f"✅ **WIN** - You won {win_amount} coins!\n"
+            f"New balance: {user_balance[user]} coins"
         )
     else:
         # Lose
@@ -655,11 +649,11 @@ async def bet_command(c: Gojo, m: Message):
         save_balance()
         
         await m.reply_text(
-            f"💥 {result_emoji} **YOU LOST!** {result_emoji}\n\n"
-            f"Your choice: {user_choice_emoji} {user_choice.upper()}\n"
-            f"Result: {result_emoji} {result.upper()}\n\n"
-            f"❌ You lost {amount} coins!\n"
-            f"💵 New balance: {user_balance[user]}"
+            f"**Coin Flip Result**\n\n"
+            f"Your bet: {amount} coins on {user_choice}\n"
+            f"Result: {result}\n\n"
+            f"❌ **LOSS** - You lost {amount} coins\n"
+            f"New balance: {user_balance[user]} coins"
         )
 
 # Initialize data on bot start
