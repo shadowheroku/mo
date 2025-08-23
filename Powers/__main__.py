@@ -1,6 +1,7 @@
 import logging
 import sys
 import asyncio
+from pyrogram import idle
 from Powers.bot_class import Gojo
 
 # ─── LOGGER ───
@@ -21,12 +22,11 @@ async def main():
     except Exception as e:
         logger.error(f"❌ Bot crashed with error: {e}", exc_info=True)
     finally:
-        await bot.stop()
+        if bot.is_connected:   # <── prevent double termination
+            await bot.stop()
         logger.info("🛑 Gojo bot stopped.")
 
 if __name__ == "__main__":
-    from pyrogram import idle
-
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
