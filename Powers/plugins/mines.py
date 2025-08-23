@@ -6,7 +6,7 @@ from pyrogram import filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
-
+import asyncio
 # ─── ESCAPE MARKDOWN ───
 def escape_markdown(text: str, version: int = 2) -> str:
     escape_chars = r"_*[]()~`>#+-=|{}.!"
