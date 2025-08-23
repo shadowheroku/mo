@@ -305,22 +305,36 @@ async def mpromote(c: Gojo, m: Message):
     if user_balance.get(user, 1000) < cost:
         return await m.reply_text(f"❌ Not enough coins! Need {cost}")
 
+    # Deduct coins
     user_balance[user] -= cost
     save_balance()
-    promotions[user] = {"title":"Coin Master", "coins_spent":cost}
+
+    # Save promotion info
+    promotions[user] = {"title": "Coin Master", "coins_spent": cost}
     save_promotions()
 
+    # Promote user with only delete & pin permissions
     try:
         await c.promote_chat_member(
             chat_id=m.chat.id,
             user_id=int(user),
+            is_anonymous=False,
+            can_change_info=False,
+            can_post_messages=False,
+            can_edit_messages=False,
             can_delete_messages=True,
-            can_pin_messages=True
+            can_invite_users=False,
+            can_restrict_members=False,
+            can_pin_messages=True,
+            can_promote_members=False,
+            can_manage_video_chats=False,
+            can_manage_chat=False
         )
     except Exception as e:
-        return await m.reply_text(f"⚠️ Failed: {e}")
+        return await m.reply_text(f"⚠️ Failed to promote: {e}")
 
-    await m.reply_text("🏆 You are now a **Coin Master**! You can delete and pin messages.")
+    await m.reply_text("🏆 You are now a **Coin Master**!\nYou can delete and pin messages in this group.")
+
 
 # ─── SET TITLE ───
 @Gojo.on_message(command("mtitle"))
