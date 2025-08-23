@@ -717,8 +717,8 @@ async def dice_cmd(c: Gojo, m: Message):
         save_balance()
         
         await m.reply_text(
-            f"🎲 **Dice Roll: {dice_emoji} {dice_roll}**\n"
-            f"Damn. You're lucky!"
+            f"Damn. You're lucky! \n"
+            f"You win {win_amount:,} coins!"
         )
     else:
         # Lose
@@ -726,8 +726,8 @@ async def dice_cmd(c: Gojo, m: Message):
         save_balance()
         
         await m.reply_text(
-            f"🎲 **Dice Roll: {dice_emoji} {dice_roll}**\n"
-            f"Better luck next time! "
+            f"Better luck next time! \n"
+            f"You lost {amount:,} coins"
         )
 # Initialize data on bot start
 load_season()
