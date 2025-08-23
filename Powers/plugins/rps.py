@@ -6,7 +6,19 @@ from pyrogram.types import (
     InlineKeyboardButton,
     CallbackQuery
 )
-from pyrogram.utils import escape_markdown   # ✅ FIXED
+def escape_markdown(text: str, version: int = 2) -> str:
+    """
+    Escape text for Telegram Markdown (v1 or v2).
+    """
+    if version == 1:
+        escape_chars = r"_*`["
+    elif version == 2:
+        escape_chars = r"_*[]()~`>#+-=|{}.!"
+    else:
+        raise ValueError("Markdown version must be 1 or 2")
+
+    return "".join(f"\\{c}" if c in escape_chars else c for c in text)
+  # ✅ FIXED
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
