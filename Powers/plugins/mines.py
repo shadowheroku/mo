@@ -8,46 +8,66 @@ from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
 # ─── ESCAPE MARKDOWN ───
-def escape_markdown(text: str, version: int = 2) -> str:
+def escape_markdown(text: str) -> str:
     escape_chars = r"_*[]()~`>#+-=|{}.!"""
     return "".join(f"\\{c}" if c in escape_chars else c for c in text)
 
 # ─── FILE PATHS ───
 BALANCE_FILE = "monic_balance.json"
 DAILY_FILE = "monic_daily.json"
+SEASON_FILE = "monic_season.json"
+PROMOTIONS_FILE = "monic_promotions.json"
 
 # ─── STORAGE ───
-mines_games = {}  # {game_id: {user, amount, mines, board, revealed, multiplier, reward}}
-user_balance = {}  # loaded from JSON
-daily_claim = {}   # daily claim timestamps
+mines_games = {}     # {game_id: {user, amount, mines, board, revealed, multiplier, reward}}
+user_balance = {}    # {user_id: balance}
+daily_claim = {}     # {user_id: last_claim_iso}
+season_info = {}     # {"season_start": timestamp}
+promotions = {}      # {user_id: {"title": str, "coins_spent": int}}
+
+OWNER_ID = 8429156335  # replace with your Telegram ID
 
 # ─── JSON LOAD/SAVE ───
+def load_json(file_path, default=None):
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            return json.load(f)
+    return default if default is not None else {}
+
+def save_json(file_path, data):
+    with open(file_path, "w") as f:
+        json.dump(data, f)
+
 def load_balance():
     global user_balance
-    if os.path.exists(BALANCE_FILE):
-        with open(BALANCE_FILE, "r") as f:
-            user_balance = json.load(f)
-    else:
-        user_balance = {}
+    user_balance = load_json(BALANCE_FILE, {})
 
 def save_balance():
-    with open(BALANCE_FILE, "w") as f:
-        json.dump(user_balance, f)
+    save_json(BALANCE_FILE, user_balance)
 
 def load_daily():
     global daily_claim
-    if os.path.exists(DAILY_FILE):
-        with open(DAILY_FILE, "r") as f:
-            daily_claim = json.load(f)
-    else:
-        daily_claim = {}
+    daily_claim = load_json(DAILY_FILE, {})
 
 def save_daily():
-    with open(DAILY_FILE, "w") as f:
-        json.dump(daily_claim, f)
+    save_json(DAILY_FILE, daily_claim)
 
-# ─── HELPERS ───
-def generate_board(size, num_mines):
+def load_season():
+    global season_info
+    season_info = load_json(SEASON_FILE, {"season_start": datetime.now().isoformat()})
+
+def save_season():
+    save_json(SEASON_FILE, season_info)
+
+def load_promotions():
+    global promotions
+    promotions = load_json(PROMOTIONS_FILE, {})
+
+def save_promotions():
+    save_json(PROMOTIONS_FILE, promotions)
+
+# ─── MINES GAME HELPERS ───
+def generate_board(size=5, num_mines=5):
     board = ["💣"] * num_mines + ["💎"] * (size*size - num_mines)
     random.shuffle(board)
     return board
@@ -64,13 +84,11 @@ def render_board(board, revealed, show_all=False, game_id=None):
             else:
                 row.append(InlineKeyboardButton("⬜", callback_data=f"mines_{idx}"))
         buttons.append(row)
-
     if game_id and not show_all:
         buttons.append([InlineKeyboardButton("💰 Withdraw", callback_data=f"mines_withdraw_{game_id}")])
     return InlineKeyboardMarkup(buttons)
 
-def get_initial_multiplier(num_mines):
-    # Reduced multiplier for low coin generation
+def get_multiplier(num_mines):
     if num_mines <= 3: return 1.0
     if num_mines <= 6: return 1.5
     if num_mines <= 10: return 2.0
@@ -79,22 +97,22 @@ def get_initial_multiplier(num_mines):
 def next_game_id():
     return str(random.randint(10000, 99999))
 
-# ─── START GAME ───
+# ─── MINES GAME COMMAND ───
 @Gojo.on_message(command("mines"))
 async def mines_start(c: Gojo, m: Message):
     load_balance()
     args = m.text.split()
     if len(args) != 3 or not args[1].isdigit() or not args[2].isdigit():
-        return await m.reply_text("Usage: /mines amount number_of_mines")
+        return await m.reply_text("Usage: /mines <amount> <mines>")
 
     amount = int(args[1])
     num_mines = int(args[2])
     user = str(m.from_user.id)
 
     if amount < 100:
-        return await m.reply_text("❌ Minimum bet is 100 monic coins!")
+        return await m.reply_text("❌ Minimum bet is 100 coins!")
     if user_balance.get(user, 1000) < amount:
-        return await m.reply_text(f"❌ Not enough monic coins! Balance: {user_balance.get(user,1000)}")
+        return await m.reply_text(f"❌ Not enough coins! Balance: {user_balance.get(user,1000)}")
     if num_mines < 3 or num_mines > 24:
         return await m.reply_text("❌ Mines must be between 3 and 24")
 
@@ -106,22 +124,22 @@ async def mines_start(c: Gojo, m: Message):
         "mines": num_mines,
         "board": board,
         "revealed": set(),
-        "multiplier": get_initial_multiplier(num_mines),
+        "multiplier": get_multiplier(num_mines),
         "reward": 0
     }
 
     await m.reply_text(
-        f"🎮 **Mines Game**\n\nBet: {amount} monic coins | Mines: {num_mines}\nGame ID: {game_id}\nPick a cell!",
+        f"🎮 **Mines Game**\nBet: {amount} coins | Mines: {num_mines}\nGame ID: {game_id}\nPick a cell!",
         reply_markup=render_board(board, set(), game_id=game_id)
     )
 
-# ─── HANDLE MOVES ───
+# ─── MINES PLAY CALLBACK ───
 @Gojo.on_callback_query(filters.regex(r"mines_(\d+)"))
 async def mines_play(c: Gojo, q: CallbackQuery):
     idx = int(q.data.split("_")[1])
     game_id = None
     for gid, g in mines_games.items():
-        if q.from_user.id == int(g["user"]):
+        if g["user"] == str(q.from_user.id):
             game_id = gid
             break
     if not game_id:
@@ -140,27 +158,23 @@ async def mines_play(c: Gojo, q: CallbackQuery):
         user_balance[user] = user_balance.get(user, 1000) - game["amount"]
         save_balance()
         await q.message.edit_text(
-            f"💥 Boom! You hit a mine!\nYou lost {game['amount']} monic coins.\nBalance: {user_balance[user]}",
+            f"💥 Boom! You hit a mine!\nYou lost {game['amount']} coins.\nBalance: {user_balance[user]}",
             reply_markup=render_board(game["board"], game["revealed"], show_all=True)
         )
         del mines_games[game_id]
     else:
-        # reward per gem
         gem_reward = int(game["amount"] * game["multiplier"])
         game["reward"] += gem_reward
-        game["multiplier"] *= 0.7  # even lower multiplier
+        game["multiplier"] *= 0.7
         await q.message.edit_text(
-            f"💎 You revealed a gem!\nReward for this gem: {gem_reward} coins\nTotal: {game['reward']} coins\nMultiplier now: {game['multiplier']:.2f}",
+            f"💎 You revealed a gem!\nReward: {gem_reward} | Total: {game['reward']} coins\nMultiplier: {game['multiplier']:.2f}",
             reply_markup=render_board(game["board"], game["revealed"], game_id=game_id)
         )
-
-        # all safe cells revealed
-        safe_cells = 25 - game["mines"]
-        if len(game["revealed"]) == safe_cells:
+        if len(game["revealed"]) == 25 - game["mines"]:
             user_balance[user] = user_balance.get(user, 1000) + game["reward"]
             save_balance()
             await q.message.edit_text(
-                f"🎉 Congratulations! You cleared all safe cells!\nYou won {game['reward']} monic coins!\nBalance: {user_balance[user]}",
+                f"🎉 All safe cells cleared!\nYou won {game['reward']} coins!\nBalance: {user_balance[user]}",
                 reply_markup=render_board(game["board"], game["revealed"], show_all=True)
             )
             del mines_games[game_id]
@@ -171,7 +185,7 @@ async def mines_withdraw(c: Gojo, q: CallbackQuery):
     game_id = q.data.split("_")[-1]
     if game_id not in mines_games:
         return await q.answer("⚠️ Game not found!", show_alert=True)
-    
+
     game = mines_games[game_id]
     user = str(q.from_user.id)
     if user != game["user"]:
@@ -185,15 +199,13 @@ async def mines_withdraw(c: Gojo, q: CallbackQuery):
     )
     del mines_games[game_id]
 
-# ─── BALANCE COMMAND ───
+# ─── COINS & DAILY COMMANDS ───
 @Gojo.on_message(command("balance"))
 async def balance(c: Gojo, m: Message):
     load_balance()
     user = str(m.from_user.id)
-    bal = user_balance.get(user, 1000)
-    await m.reply_text(f"💰 Balance: {bal} monic coins")
+    await m.reply_text(f"💰 Balance: {user_balance.get(user,1000)} coins")
 
-# ─── DAILY COMMAND ───
 @Gojo.on_message(command("daily"))
 async def daily(c: Gojo, m: Message):
     load_balance()
@@ -210,160 +222,77 @@ async def daily(c: Gojo, m: Message):
     save_daily()
     await m.reply_text("🎁 You claimed 100 daily coins!")
 
-# ─── GIVE COMMAND ───
+# ─── GIVE / OWNER GIFT / TAKE ───
 @Gojo.on_message(command("mgive"))
 async def mgive(c: Gojo, m: Message):
     load_balance()
-    args = m.text.split()
     sender = str(m.from_user.id)
-
-    if user_balance.get(sender, 1000) <= 0:
-        return await m.reply_text("❌ You have no coins to send!")
-
-    # Case 1: Reply to a user
+    args = m.text.split()
     if m.reply_to_message:
         target = m.reply_to_message.from_user
         if len(args) != 2 or not args[1].isdigit():
-            return await m.reply_text("Usage: /mgive <amount> (reply to a user)")
+            return await m.reply_text("Usage: /mgive <amount> (reply to user)")
         amount = int(args[1])
-
-    # Case 2: Mention username or ID
     else:
         if len(args) != 3 or not args[2].isdigit():
             return await m.reply_text("Usage: /mgive @user amount")
         try:
             target = await c.get_users(args[1])
         except:
-            return await m.reply_text("⚠️ Could not find that user.")
+            return await m.reply_text("⚠️ User not found")
         amount = int(args[2])
 
     if amount <= 0:
-        return await m.reply_text("❌ Amount must be greater than 0!")
+        return await m.reply_text("❌ Amount must be > 0")
+    if user_balance.get(sender,1000) < amount:
+        return await m.reply_text(f"❌ Not enough coins! Balance: {user_balance.get(sender,1000)}")
 
-    if user_balance.get(sender, 1000) < amount:
-        return await m.reply_text(f"❌ Not enough coins! Your balance: {user_balance.get(sender,1000)}")
-
-    # Transfer coins
     user_balance[sender] -= amount
     user_balance[str(target.id)] = user_balance.get(str(target.id), 1000) + amount
     save_balance()
-    await m.reply_text(f"✅ Sent {amount} coins to {escape_markdown(target.first_name)}!\n💰 Your new balance: {user_balance[sender]}")
-
-
-# ─── OWNER GIFT COMMAND ───
-OWNER_ID = 8429156335  # replace with your id # your Telegram ID
+    await m.reply_text(f"✅ Sent {amount} coins to {escape_markdown(target.first_name)}!\n💰 Your balance: {user_balance[sender]}")
 
 @Gojo.on_message(command("mgift"))
 async def mgift(c: Gojo, m: Message):
     load_balance()
     if m.from_user.id != OWNER_ID:
-        return await m.reply_text("⚠️ Only the owner can use this command.")
-
+        return await m.reply_text("⚠️ Only owner can use this command")
     if not m.reply_to_message:
-        return await m.reply_text("Reply to a user's message to gift coins.")
-
+        return await m.reply_text("Reply to user's message to gift coins")
     args = m.text.split()
     if len(args) < 2 or not args[1].isdigit():
-        return await m.reply_text("Usage: /mgift <amount> (reply to a user)")
-
+        return await m.reply_text("Usage: /mgift <amount> (reply)")
     target = m.reply_to_message.from_user
     amount = int(args[1])
-
     user_balance[str(target.id)] = user_balance.get(str(target.id), 1000) + amount
     save_balance()
     await m.reply_text(f"🎁 Gave {amount} coins to {escape_markdown(target.first_name)}!")
 
-
-# ─── TAKE COMMAND ───
 @Gojo.on_message(command("take"))
 async def take(c: Gojo, m: Message):
     load_balance()
     if not m.reply_to_message:
-        return await m.reply_text("Reply to a user's message to take coins.")
-
+        return await m.reply_text("Reply to a user's message to take coins")
     args = m.text.split()
     if len(args) < 2 or not args[1].isdigit():
-        return await m.reply_text("Usage: /take <amount> (reply to a user)")
-
+        return await m.reply_text("Usage: /take <amount> (reply)")
     target = m.reply_to_message.from_user
-    amount = int(args[1])
-
-    user_balance[str(target.id)] = max(user_balance.get(str(target.id), 1000) - amount, 0)
+    user_balance[str(target.id)] = max(user_balance.get(str(target.id),1000) - int(args[1]),0)
     save_balance()
-    await m.reply_text(f"❌ Removed {amount} coins from {escape_markdown(target.first_name)}'s balance!")
+    await m.reply_text(f"❌ Removed {args[1]} coins from {escape_markdown(target.first_name)}!")
 
-
-# ─── TOP COMMAND ───
+# ─── TOP COLLECTORS ───
 @Gojo.on_message(command("top"))
 async def top_collectors(c: Gojo, m: Message):
     load_balance()
     if not user_balance:
         return await m.reply_text("No collectors yet!")
-    top = sorted(user_balance.items(), key=lambda x: x[1], reverse=True)[:10]
+    top = sorted(user_balance.items(), key=lambda x:x[1], reverse=True)[:10]
     msg = "**🏆 Top Monic Collectors**\n\n"
     for i, (uid, coins) in enumerate(top, 1):
         user_obj = await c.get_users(int(uid))
-        msg += f"{i}. {escape_markdown(user_obj.first_name)} - {coins} monic coins\n"
+        msg += f"{i}. {escape_markdown(user_obj.first_name)} - {coins} coins\n"
     await m.reply_text(msg)
-
-SEASON_FILE = "monic_season.json"
-PROMOTIONS_FILE = "monic_promotions.json"
-
-# ─── STORAGE ───
-season_info = {}  # {"season_start": timestamp}
-promotions = {}   # {user_id: {"title": "Coin Master", "coins_spent": amount}}
-
-# ─── LOAD/SAVE ───
-def load_season():
-    global season_info
-    if os.path.exists(SEASON_FILE):
-        with open(SEASON_FILE, "r") as f:
-            season_info = json.load(f)
-    else:
-        season_info = {"season_start": datetime.now().isoformat()}
-
-def save_season():
-    with open(SEASON_FILE, "w") as f:
-        json.dump(season_info, f)
-
-def load_promotions():
-    global promotions
-    if os.path.exists(PROMOTIONS_FILE):
-        with open(PROMOTIONS_FILE, "r") as f:
-            promotions = json.load(f)
-    else:
-        promotions = {}
-
-def save_promotions():
-    with open(PROMOTIONS_FILE, "w") as f:
-        json.dump(promotions, f)
-
-# ─── SEASON CHECK ───
-async def check_season(c: Gojo, gc_chat_id):
-    load_balance()
-    load_season()
-    now = datetime.now()
-    season_start = datetime.fromisoformat(season_info.get("season_start"))
-    days_elapsed = (now - season_start).days
-
-    # Notify 1 day before season ends
-    if days_elapsed == 29:
-        await c.send_message(gc_chat_id, "⏳ Season ends tomorrow! Prepare for the new season!")
-
-    # Reset season every 30 days
-    if days_elapsed >= 30:
-        for uid in user_balance:
-            user_balance[uid] = 1000
-        save_balance()
-        season_info["season_start"] = now.isoformat()
-        save_season()
-        # Notify in GC and DM
-        await c.send_message(gc_chat_id, "🎉 New season started! All coins reset to 1000!")
-        for uid in user_balance:
-            try:
-                await c.send_message(int(uid), "🎉 New season started! Your coins have been reset to 1000.")
-            except:
-                continue
 
 # ─── PROMOTE COMMAND ───
 @Gojo.on_message(command("mpromote"))
@@ -374,71 +303,60 @@ async def mpromote(c: Gojo, m: Message):
     cost = 10_00_000
 
     if user_balance.get(user, 1000) < cost:
-        return await m.reply_text(f"❌ Not enough coins! You need {cost} coins.")
+        return await m.reply_text(f"❌ Not enough coins! Need {cost}")
 
-    # Deduct coins
     user_balance[user] -= cost
     save_balance()
-
-    # Save promotion info
-    promotions[user] = {"title": "Coin Master", "coins_spent": cost}
+    promotions[user] = {"title":"Coin Master", "coins_spent":cost}
     save_promotions()
 
-    # Promote user in the group with only delete & pin rights
     try:
         await c.promote_chat_member(
             chat_id=m.chat.id,
             user_id=int(user),
-            can_change_info=False,        # cannot change group info
-            can_post_messages=False,      # cannot post messages as channel
-            can_edit_messages=False,      # cannot edit messages
-            can_delete_messages=True,     # can delete messages
-            can_invite_users=True,        # can invite users
-            can_restrict_members=False,   # cannot restrict members
-            can_pin_messages=True,        # can pin messages
-            can_promote_members=False,    # cannot promote others
-            can_manage_voice_chats=False, # cannot manage voice
-            can_manage_chat=False          # cannot manage chat
+            can_delete_messages=True,
+            can_pin_messages=True
         )
     except Exception as e:
-        return await m.reply_text(f"⚠️ Failed to promote: {e}")
+        return await m.reply_text(f"⚠️ Failed: {e}")
 
-    await m.reply_text("🏆 You are now a **Coin Master**!\nYou can delete and pin messages in this group.")
+    await m.reply_text("🏆 You are now a **Coin Master**! You can delete and pin messages.")
 
-
-# ─── SET TITLE COMMAND ───
+# ─── SET TITLE ───
 @Gojo.on_message(command("mtitle"))
 async def mtitle(c: Gojo, m: Message):
     load_balance()
     load_promotions()
     user = str(m.from_user.id)
     if user not in promotions:
-        return await m.reply_text("⚠️ You must be a Coin Master to set a title. Use /mpromote first.")
+        return await m.reply_text("⚠️ Must be a Coin Master first (/mpromote)")
     args = m.text.split(maxsplit=1)
     if len(args) != 2:
         return await m.reply_text("Usage: /mtitle <title>")
     title_cost = 1_00_000
-    if user_balance.get(user, 1000) < title_cost:
-        return await m.reply_text(f"❌ Not enough coins! Title change costs {title_cost} coins.")
+    if user_balance.get(user,1000) < title_cost:
+        return await m.reply_text(f"❌ Not enough coins! Title cost: {title_cost}")
     user_balance[user] -= title_cost
     promotions[user]["title"] = args[1]
     save_balance()
     save_promotions()
     await m.reply_text(f"✅ Your admin title is now: {args[1]}")
 
-
+# ─── PLUGIN INFO ───
 __PLUGIN__ = "mines"
 _DISABLE_CMDS_ = ["mines"]
 __HELP__ = """
 🎮 Mines Game
 • /mines <amount> <mines> → Start a Mines game (min 100 coins)
-• /balance → Check your monic coins
+• /balance → Check your coins
 • /daily → Claim 100 coins daily
-• /mgive → Give coins to someone from your balance (reply to their message)
-• /mgift → Owner can gift coins to anyone
-• /take → Remove coins from a user (reply)
-• /top → Top collectors of monic coins
+• /mgive → Give coins to someone (reply)
+• /mgift → Owner can gift coins
+• /take → Take coins from a user (reply)
+• /top → Top collectors
+• /mpromote → Become Coin Master
+• /mtitle → Set Coin Master title
 
-💡 You can withdraw anytime using the 💰 Withdraw button to collect your current winnings.
+💡 Withdraw anytime using 💰 Withdraw button.
 💣 Hitting a bomb ends the game and reveals all cells.
 """
