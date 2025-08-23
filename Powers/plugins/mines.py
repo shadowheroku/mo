@@ -595,6 +595,73 @@ async def mseason(c: Gojo, m: Message):
         f"🔄 **All balances will be reset to 1000 coins when the season ends**"
     )
 
+
+@Gojo.on_message(command("bet"))
+async def bet_command(c: Gojo, m: Message):
+    await check_season_reset(c)
+    load_balance()
+    
+    args = m.text.split()
+    if len(args) != 3:
+        return await m.reply_text("✑ ᴜsᴀɢᴇ : /bet [ᴀᴍᴏᴜɴᴛ] [ʜᴇᴀᴅs/ᴛᴀɪʟs]")
+    
+    user = str(m.from_user.id)
+    current_balance = user_balance.get(user, 1000)
+    
+    # Parse amount
+    try:
+        amount = int(args[1])
+        if amount <= 0:
+            return await m.reply_text("❌ Bet amount must be greater than 0!")
+        if amount > current_balance:
+            return await m.reply_text(f"❌ You don't have enough coins! Balance: {current_balance}")
+    except ValueError:
+        return await m.reply_text("❌ Please enter a valid number for the bet amount!")
+    
+    # Parse choice
+    choice = args[2].lower()
+    if choice not in ["heads", "h", "tails", "t"]:
+        return await m.reply_text("❌ Please choose either 'heads' or 'tails'!")
+    
+    # Convert shorthand to full word
+    if choice in ["h", "heads"]:
+        user_choice = "heads"
+        user_choice_emoji = "🪙"
+    else:
+        user_choice = "tails"
+        user_choice_emoji = "🐍"
+    
+    # Flip the coin
+    result = random.choice(["heads", "tails"])
+    result_emoji = "🪙" if result == "heads" else "🐍"
+    
+    # Determine win/loss
+    if user_choice == result:
+        # Win - 2x payout
+        win_amount = amount * 2
+        user_balance[user] = current_balance + win_amount
+        save_balance()
+        
+        await m.reply_text(
+            f"🎉 {result_emoji} **YOU WON!** {result_emoji}\n\n"
+            f"Your choice: {user_choice_emoji} {user_choice.upper()}\n"
+            f"Result: {result_emoji} {result.upper()}\n\n"
+            f"💰 You won {win_amount} coins!\n"
+            f"💵 New balance: {user_balance[user]}"
+        )
+    else:
+        # Lose
+        user_balance[user] = current_balance - amount
+        save_balance()
+        
+        await m.reply_text(
+            f"💥 {result_emoji} **YOU LOST!** {result_emoji}\n\n"
+            f"Your choice: {user_choice_emoji} {user_choice.upper()}\n"
+            f"Result: {result_emoji} {result.upper()}\n\n"
+            f"❌ You lost {amount} coins!\n"
+            f"💵 New balance: {user_balance[user]}"
+        )
+
 # Initialize data on bot start
 load_season()
 load_balance()
@@ -606,6 +673,7 @@ _DISABLE_CMDS_ = ["mines"]
 __HELP__ = """
 🎮 Mines Game
 • /mines <amount> <mines> → Start a Mines game (min 100 coins)
+• /bet <amount> <heads/tails> → Coin flip betting game
 • /balance → Check your monic coins
 • /daily → Claim 100 coins daily
 • /mgive → Give coins to someone from your balance (reply to their message)
