@@ -656,6 +656,78 @@ async def bet_command(c: Gojo, m: Message):
             f"New balance: {user_balance[user]} coins"
         )
 
+@Gojo.on_message(command(["dice", "roll"]))
+async def dice_cmd(c: Gojo, m: Message):
+    await check_season_reset(c)
+    load_balance()
+    
+    args = m.text.split()
+    if len(args) != 3:
+        return await m.reply_text("Usage: /dice [amount] [odd/even/o/e]")
+    
+    user = str(m.from_user.id)
+    current_balance = user_balance.get(user, 1000)
+    
+    # Parse amount
+    try:
+        amount = int(args[1])
+        if amount < 10:
+            return await m.reply_text("Minimum bet is 10 coins!")
+        if amount > current_balance:
+            return await m.reply_text(f"Insufficient balance! You have: {current_balance} coins")
+    except ValueError:
+        return await m.reply_text("Please enter a valid number for the bet amount")
+    
+    # Parse choice
+    choice = args[2].lower()
+    if choice not in ["odd", "o", "even", "e"]:
+        return await m.reply_text("Please choose either 'odd' or 'even'")
+    
+    # Convert shorthand to full word
+    user_choice = "odd" if choice in ["o", "odd"] else "even"
+    
+    # Roll the dice (1-6) and get corresponding emoji
+    dice_roll = random.randint(1, 6)
+    dice_emojis = {
+        1: "⚀",
+        2: "⚁", 
+        3: "⚂",
+        4: "⚃",
+        5: "⚄",
+        6: "⚅"
+    }
+    dice_emoji = dice_emojis[dice_roll]
+    result = "odd" if dice_roll % 2 == 1 else "even"
+    
+    # Determine win/loss
+    if user_choice == result:
+        # Win - 2x payout
+        win_amount = amount
+        user_balance[user] = current_balance + win_amount
+        save_balance()
+        
+        await m.reply_text(
+            f"**Dice Roll Result**\n\n"
+            f"🎲 Dice: {dice_emoji} {dice_roll}\n"
+            f"Your bet: {amount} coins on {user_choice}\n"
+            f"Result: {result}\n\n"
+            f"✅ **WIN** - You won {win_amount} coins!\n"
+            f"New balance: {user_balance[user]} coins"
+        )
+    else:
+        # Lose
+        user_balance[user] = current_balance - amount
+        save_balance()
+        
+        await m.reply_text(
+            f"**Dice Roll Result**\n\n"
+            f"🎲 Dice: {dice_emoji} {dice_roll}\n"
+            f"Your bet: {amount} coins on {user_choice}\n"
+            f"Result: {result}\n\n"
+            f"❌ **LOSS** - You lost {amount} coins\n"
+            f"New balance: {user_balance[user]} coins"
+        )
+        
 # Initialize data on bot start
 load_season()
 load_balance()
