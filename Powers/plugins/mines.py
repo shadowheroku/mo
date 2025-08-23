@@ -637,11 +637,8 @@ async def bet_command(c: Gojo, m: Message):
         save_balance()
         
         await m.reply_text(
-            f"**Coin Flip Result**\n\n"
-            f"Your bet: {amount} coins on {user_choice}\n"
-            f"Result: {result}\n\n"
-            f"✅ **WIN** - You won {win_amount} coins!\n"
-            f"New balance: {user_balance[user]} coins"
+            f"The coin landed on {result}\n"
+            f"You won {amount} coins"
         )
     else:
         # Lose
@@ -649,11 +646,8 @@ async def bet_command(c: Gojo, m: Message):
         save_balance()
         
         await m.reply_text(
-            f"**Coin Flip Result**\n\n"
-            f"Your bet: {amount} coins on {user_choice}\n"
-            f"Result: {result}\n\n"
-            f"❌ **LOSS** - You lost {amount} coins\n"
-            f"New balance: {user_balance[user]} coins"
+            f"The coin landed on {result}\n"
+            f"You lost {amount} coins"
         )
 
 @Gojo.on_message(command(["dice", "roll"]))
