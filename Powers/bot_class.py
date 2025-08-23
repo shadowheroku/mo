@@ -7,9 +7,10 @@ from pyrogram import Client, __version__
 from pyrogram.raw.all import layer
 from pyrogram.types import BotCommand
 
-from Powers import (API_HASH, API_ID, BOT_TOKEN, LOG_DATETIME, LOGFILE, LOGGER,
-                    MESSAGE_DUMP, NO_LOAD, UPTIME, WORKERS, load_cmds,
-                    scheduler)
+from Powers import (
+    API_HASH, API_ID, BOT_TOKEN, LOG_DATETIME, LOGGER,
+    NO_LOAD, UPTIME, WORKERS, load_cmds, scheduler
+)
 from Powers.database import MongoDB
 from Powers.plugins import all_plugins
 from Powers.plugins.scheduled_jobs import *
@@ -17,7 +18,6 @@ from Powers.supports import *
 from Powers.vars import Config
 
 INITIAL_LOCK = RLock()
-
 
 
 class Gojo(Client):
@@ -52,8 +52,6 @@ class Gojo(Client):
         Config.BOT_NAME = meh.first_name
         Config.BOT_USERNAME = meh.username
 
-        startmsg = await self.send_message(MESSAGE_DUMP, "<i>Starting Bot...</i>")
-
         LOGGER.info(
             f"Pyrogram v{__version__} (Layer - {layer}) started on {meh.username}",
         )
@@ -73,36 +71,20 @@ class Gojo(Client):
             scheduler.add_job(send_wishish, "cron", [self], hour=0, minute=0, second=0)
             scheduler.start()
 
-        # Edit startup message
-        await startmsg.edit_text(
-            (
-                f"<b><i>@{meh.username} started on Pyrogram v{__version__} (Layer - {layer})</i></b>\n"
-                f"\n<b>Python:</b> <u>{python_version()}</u>\n"
-                "\n<b>Loaded Plugins:</b>\n"
-                f"<i>{cmd_list}</i>\n"
-            ),
-        )
-
         LOGGER.info("Bot Started Successfully!\n")
 
     async def stop(self):
-        """Stop the bot and send a message to MESSAGE_DUMP telling that the bot has stopped."""
+        """Stop the bot and cleanup."""
         runtime = strftime("%Hh %Mm %Ss", gmtime(t() - UPTIME))
-        LOGGER.info("Uploading logs before stopping...!\n")
+        LOGGER.info("Stopping bot...")
 
         scheduler.remove_all_jobs()
-        target = MESSAGE_DUMP or OWNER_ID
-        await self.send_message(
-            target,
-            f"Bot Stopped!\n\nUptime: {runtime}\n<code>{LOG_DATETIME}</code>",
-        )
-
         await super().stop()
         MongoDB.close()
 
         LOGGER.info(
             f"""Bot Stopped.
-            Logs have been uploaded to the MESSAGE_DUMP Group!
-            Runtime: {runtime}s\n
+            Runtime: {runtime}
+            Logs saved at {LOG_DATETIME}
         """,
         )
