@@ -695,6 +695,9 @@ async def dice_cmd(c: Gojo, m: Message):
         dice_roll = random.randint(1, 6)
         await m.reply_text(f"🎲 Dice rolled: {dice_roll}")
     
+    # Wait for 5 seconds before showing the result
+    await asyncio.sleep(5)
+    
     dice_emojis = {
         1: "⚀",
         2: "⚁", 
@@ -714,7 +717,7 @@ async def dice_cmd(c: Gojo, m: Message):
         save_balance()
         
         await m.reply_text(
-            f"🎲 **Dice Roll: {dice_emoji} {dice_roll}**\n\n"
+            f"🎲 **Dice Roll: {dice_emoji} {dice_roll}**\n"
             f"Damn. You're lucky! 🍀"
         )
     else:
@@ -723,8 +726,8 @@ async def dice_cmd(c: Gojo, m: Message):
         save_balance()
         
         await m.reply_text(
-            f"🎲 **Dice Roll: {dice_emoji} {dice_roll}**\n\n"
-            f"Better luck next time! 😔"
+            f"🎲 **Dice Roll: {dice_emoji} {dice_roll}**\n"
+            f"Better luck next time! "
         )
 # Initialize data on bot start
 load_season()
