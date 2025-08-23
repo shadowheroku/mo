@@ -687,7 +687,7 @@ async def dice_cmd(c: Gojo, m: Message):
     user_choice = "odd" if choice in ["o", "odd"] else "even"
     
     # Send Telegram dice animation
-    dice_message = await m.reply_dice("🎲")
+    dice_message = await m.reply_text("🎲")
     
     # Get the dice value from Telegram's dice animation
     dice_roll = dice_message.dice.value
