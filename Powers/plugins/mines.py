@@ -309,7 +309,7 @@ async def mines_withdraw(c: Gojo, q: CallbackQuery):
     del mines_games[game_id]
 
 # ─── BALANCE COMMAND ───
-@Gojo.on_message(command("balance"))
+@Gojo.on_message(command("balance", "bal"))
 async def balance(c: Gojo, m: Message):
     await check_season_reset(c)
     load_balance()
