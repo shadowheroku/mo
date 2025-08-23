@@ -4,14 +4,11 @@ from pyrogram import Client
 from Powers import BDB_URI, TIME_ZONE
 from Powers.database.chats_db import Chats
 
-# from Powers.database.users_db import Users
 if BDB_URI:
     from Powers.plugins import bday_cinfo, bday_info
 
 from datetime import datetime, time
 from random import choice
-
-from pyrogram.enums import ChatMemberStatus
 
 from Powers.utils.extras import birthday_wish
 
@@ -44,37 +41,21 @@ async def send_wishish(JJK: Client):
                             suf = "th"
                         else:
                             suffix = {1: 'st', 2: 'nd', 3: 'rd'}
-                            suffix.get((agee % 10), "th")
+                            suf = suffix.get((agee % 10), "th")
                         agee = f"{agee}{suf}"
                     U = await JJK.get_chat_member(chat_id=j, user_id=i["user_id"])
                     if U.user.is_deleted:
                         bday_info.delete_one({"user_id": i["user_id"]})
                         continue
                     wish = choice(birthday_wish)
-                    if U.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]:
-                        xXx = await JJK.send_message(j, f"Happy {agee} birthday {U.user.mention}🥳\n{wish}")
+                    if U.status in ["member", "administrator", "owner"]:
+                        xXx = await JJK.send_message(
+                            j,
+                            f"Happy {agee} birthday {U.user.mention} 🥳\n{wish}"
+                        )
                         try:
                             await xXx.pin()
                         except Exception:
                             pass
                 except Exception:
                     pass
-
-
-""""
-from datetime import date, datetime
-
-#form = 
-num = "18/05/2005"
-st = "18 May 2005"
-timm = datetime.strptime(num,"%d/%m/%Y").date()
-x = datetime.now().date()
-if timm.month < x.month:
-    next_b = date(x.year + 1, timm.month, timm.day)
-    days_left = (next_b - x).days
-else:
-    timmm = date(x.year, timm.month, timm.day)
-    days_left = (timmm - x).days
-print(days_left)
-print(x.year - timm.year)
-"""
