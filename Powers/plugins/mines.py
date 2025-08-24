@@ -11,7 +11,11 @@ import asyncio
 def escape_markdown(text: str, version: int = 2) -> str:
     escape_chars = r"_*[]()~`>#+-=|{}.!"
     return "".join(f"\\{c}" if c in escape_chars else c for c in text)
+# Add to your imports
+import time
 
+# Add to your storage section
+give_cooldowns = {}  # {user_id: last_give_timestamp}
 # ─── FILE PATHS ───
 BALANCE_FILE = "monic_balance.json"
 DAILY_FILE = "monic_daily.json"
