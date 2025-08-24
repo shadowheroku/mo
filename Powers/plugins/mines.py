@@ -383,17 +383,16 @@ async def daily(c: Gojo, m: Message):
 
 # ─── GIVE COMMAND ───
 # Add to your imports
-import time
-
-# Add to your storage section
-give_cooldowns = {}  # {user_id: last_give_timestamp}
-
 @Gojo.on_message(command("mgive"))
 async def mgive(c: Gojo, m: Message):
     await check_season_reset(c)
     load_balance()
     args = m.text.split()
     sender = str(m.from_user.id)
+    
+    # Check if user is replying to someone
+    if not m.reply_to_message:
+        return await m.reply_text("❌ You must reply to a user's message to give coins!")
     
     # Check cooldown (30 minutes = 1800 seconds)
     current_time = time.time()
@@ -408,22 +407,11 @@ async def mgive(c: Gojo, m: Message):
     if user_balance.get(sender, 1000) <= 0:
         return await m.reply_text("❌ You have no coins to send!")
 
-    # Case 1: Reply to a user
-    if m.reply_to_message:
-        target = m.reply_to_message.from_user
-        if len(args) != 2 or not args[1].isdigit():
-            return await m.reply_text("Usage: /mgive <amount> (reply to a user)")
-        amount = int(args[1])
-
-    # Case 2: Mention username or ID
-    else:
-        if len(args) != 3 or not args[2].isdigit():
-            return await m.reply_text("Usage: /mgive @user amount")
-        try:
-            target = await c.get_users(args[1])
-        except:
-            return await m.reply_text("⚠️ Could not find that user.")
-        amount = int(args[2])
+    # Only allow replying to a user
+    target = m.reply_to_message.from_user
+    if len(args) != 2 or not args[1].isdigit():
+        return await m.reply_text("Usage: /mgive <amount> (reply to a user)")
+    amount = int(args[1])
 
     if amount <= 0:
         return await m.reply_text("❌ Amount must be greater than 0!")
