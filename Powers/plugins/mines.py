@@ -382,12 +382,28 @@ async def daily(c: Gojo, m: Message):
     await m.reply_text(f"🎁 You claimed ₼{formatted_amount} !")
 
 # ─── GIVE COMMAND ───
+# Add to your imports
+import time
+
+# Add to your storage section
+give_cooldowns = {}  # {user_id: last_give_timestamp}
+
 @Gojo.on_message(command("mgive"))
 async def mgive(c: Gojo, m: Message):
     await check_season_reset(c)
     load_balance()
     args = m.text.split()
     sender = str(m.from_user.id)
+    
+    # Check cooldown (30 minutes = 1800 seconds)
+    current_time = time.time()
+    if sender in give_cooldowns:
+        time_since_last_give = current_time - give_cooldowns[sender]
+        if time_since_last_give < 1800:  # 30 minutes
+            remaining_time = 1800 - time_since_last_give
+            minutes = int(remaining_time // 60)
+            seconds = int(remaining_time % 60)
+            return await m.reply_text(f"⏳ You can give coins again in {minutes}m {seconds}s")
 
     if user_balance.get(sender, 1000) <= 0:
         return await m.reply_text("❌ You have no coins to send!")
@@ -413,6 +429,14 @@ async def mgive(c: Gojo, m: Message):
         return await m.reply_text("❌ Amount must be greater than 0!")
 
     sender_balance = user_balance.get(sender, 1000)
+    
+    # Calculate maximum allowed amount (50% of balance)
+    max_allowed = sender_balance // 2
+    
+    if amount > max_allowed:
+        formatted_max = f"{max_allowed:,}"
+        return await m.reply_text(f"❌ You can only give up to 50% of your coins! Maximum: ₼{formatted_max}")
+
     if sender_balance < amount:
         formatted_balance = f"{sender_balance:,}"
         return await m.reply_text(f"❌ Not enough coins! Your balance: ₼{formatted_balance}")
@@ -422,14 +446,20 @@ async def mgive(c: Gojo, m: Message):
     user_balance[str(target.id)] = user_balance.get(str(target.id), 1000) + amount
     save_balance()
     
-    # Format amounts with comma separators
+    # Update cooldown
+    give_cooldowns[sender] = current_time
+    
+    # Format amounts with comma separators (copyable format)
     formatted_amount = f"{amount:,}"
     new_balance = user_balance[sender]
     formatted_new_balance = f"{new_balance:,}"
     
+    # Create copyable coin amounts using monospace formatting
     await m.reply_text(
-        f"✅ Sent ₼{formatted_amount} to {escape_markdown(target.first_name)}!\n"
-        f"💰 Your new balance: ₼{formatted_new_balance}"
+        f"✅ Sent `₼{formatted_amount}` to {escape_markdown(target.first_name)}!\n"
+        f"💰 Your new balance: `₼{formatted_new_balance}`\n\n"
+        f"⏰ Next gift available in 30 minutes",
+        parse_mode="Markdown"
     )
 
 # ─── OWNER GIFT COMMAND ───
