@@ -357,8 +357,6 @@ async def balance(c: Gojo, m: Message):
     await m.reply_text(
         f"Current coins: ₼{formatted_bal}\n"
         f"Vault amount: ₼{formatted_vault}/100,000\n"
-        f"Total: ₼{formatted_total}\n\n"
-        f"🔒 Vault coins are safe across seasons!"
     )
 # ─── DAILY COMMAND ───
 @Gojo.on_message(command("daily"))
