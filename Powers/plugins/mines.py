@@ -531,15 +531,13 @@ async def top_collectors(c: Gojo, m: Message):
     # Try to send with an image
         # Try to send with a local image
     try:
-        # Make sure you have a file named 'leaderboard.jpg' in your bot directory
+        # Make sure the file exists in your bot directory
         await m.reply_photo(
             photo="leaderboard.jpg",
-            caption=msg,
-            parse_mode="Markdown"
+            caption=msg
         )
     except:
-        # Fallback to text if image fails
-        await m.reply_text(msg, parse_mode="Markdown")
+        await m.reply_text(msg)
 
 # ─── PROMOTE COMMAND ───
 @Gojo.on_message(command("mpromote"))
