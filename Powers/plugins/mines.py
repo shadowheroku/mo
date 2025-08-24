@@ -323,7 +323,7 @@ async def balance(c: Gojo, m: Message):
     # Simple approach with spacing to make copying easier
     await m.reply_text(
         f"Current coins: ₼{bal}\n"
-        f"Vault amount: ₼{vault}/20,000,000"
+        f"Vault amount: ₼{vault}/100,000"
     )
 
 # ─── DAILY COMMAND ───
