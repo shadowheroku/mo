@@ -451,7 +451,6 @@ async def mgive(c: Gojo, m: Message):
         f"✅ Sent `₼{formatted_amount}` to {escape_markdown(target.first_name)}!\n"
         f"💰 Your new balance: `₼{formatted_new_balance}`\n\n"
         f"⏰ Next gift available in 30 minutes",
-        parse_mode="Markdown"
     )
 
 # ─── OWNER GIFT COMMAND ───
