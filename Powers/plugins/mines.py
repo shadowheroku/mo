@@ -196,8 +196,13 @@ async def mines_start(c: Gojo, m: Message):
 
     if amount < 100:
         return await m.reply_text("❌ Minimum bet is 100 monic coins!")
-    if user_balance.get(user, 1000) < amount:
-        return await m.reply_text(f"❌ Not enough monic coins! Balance: {user_balance.get(user,1000)}")
+    
+    # Format balance for display
+    user_bal = user_balance.get(user, 1000)
+    formatted_balance = f"{user_bal:,}"
+    if user_bal < amount:
+        return await m.reply_text(f"❌ Not enough monic coins! Balance: ₼{formatted_balance}")
+    
     if num_mines < 3 or num_mines > 24:
         return await m.reply_text("❌ Mines must be between 3 and 24")
 
@@ -213,8 +218,11 @@ async def mines_start(c: Gojo, m: Message):
         "reward": 0
     }
 
+    # Format amount for display
+    formatted_amount = f"{amount:,}"
+    
     await m.reply_text(
-        f"🎮 **Mines Game**\n\nBet: {amount} monic coins | Mines: {num_mines}\nGame ID: {game_id}\nPick a cell!",
+        f"🎮 **Mines Game**\n\nBet: ₼{formatted_amount} | Mines: {num_mines}\nGame ID: {game_id}\nPick a cell!",
         reply_markup=render_board(board, set(), game_id=game_id)
     )
 
@@ -243,8 +251,14 @@ async def mines_play(c: Gojo, q: CallbackQuery):
     if cell == "💣":
         user_balance[user] = user_balance.get(user, 1000) - game["amount"]
         save_balance()
+        
+        # Format amounts for display
+        formatted_amount = f"{game['amount']:,}"
+        new_balance = user_balance[user]
+        formatted_balance = f"{new_balance:,}"
+        
         await q.message.edit_text(
-            f"💥 Boom! You hit a mine!\nYou lost ₼{game['amount']}.\nBalance: ₼{user_balance[user]}",
+            f"💥 Boom! You hit a mine!\nYou lost ₼{formatted_amount}.\nBalance: ₼{formatted_balance}",
             reply_markup=render_board(game["board"], game["revealed"], show_all=True)
         )
         del mines_games[game_id]
@@ -254,11 +268,12 @@ async def mines_play(c: Gojo, q: CallbackQuery):
         game["reward"] += gem_profit
         game["multiplier"] *= 0.7  # even lower multiplier
         
-        # Calculate total return (original bet + profit)
-        total_return = game["amount"] + game["reward"]
+        # Format amounts for display
+        formatted_gem_profit = f"{gem_profit:,}"
+        formatted_reward = f"{game['reward']:,}"
         
         await q.message.edit_text(
-            f"💎 You revealed a gem!\nProfit from this gem: ₼{gem_profit} coins\nTotal profit: ₼{game['reward']} coins\nMultiplier now: {game['multiplier']:.2f}",
+            f"💎 You revealed a gem!\nProfit from this gem: ₼{formatted_gem_profit}\nTotal profit: ₼{formatted_reward}\nMultiplier now: {game['multiplier']:.2f}",
             reply_markup=render_board(game["board"], game["revealed"], game_id=game_id)
         )
 
@@ -268,11 +283,18 @@ async def mines_play(c: Gojo, q: CallbackQuery):
             # Return original bet + profit
             user_balance[user] = user_balance.get(user, 1000) + game["amount"] + game["reward"]
             save_balance()
+            
+            # Format amounts for display
+            formatted_reward = f"{game['reward']:,}"
+            formatted_total = f"{game['amount'] + game['reward']:,}"
+            new_balance = user_balance[user]
+            formatted_balance = f"{new_balance:,}"
+            
             await q.message.edit_text(
                 f"🎉 Congratulations! You cleared all safe cells!\n"
-                f"You won ₼{game['reward']} profit!\n"
-                f"Total returned: ₼{game['amount'] + game['reward']} coins\n"
-                f"Balance: ₼{user_balance[user]}",
+                f"You won ₼{formatted_reward} profit!\n"
+                f"Total returned: ₼{formatted_total}\n"
+                f"Balance: ₼{formatted_balance}",
                 reply_markup=render_board(game["board"], game["revealed"], show_all=True)
             )
             del mines_games[game_id]
@@ -302,8 +324,14 @@ async def mines_withdraw(c: Gojo, q: CallbackQuery):
 
     user_balance[user] = user_balance.get(user, 1000) + game["reward"]
     save_balance()
+    
+    # Format amounts for display
+    formatted_reward = f"{game['reward']:,}"
+    new_balance = user_balance[user]
+    formatted_balance = f"{new_balance:,}"
+    
     await q.message.edit_text(
-        f"💰 You withdrew ₼{game['reward']} coins!\nGems revealed: {gems_revealed}\nBalance: ₼{user_balance[user]}",
+        f"💰 You withdrew ₼{formatted_reward}!\nGems revealed: {gems_revealed}\nBalance: ₼{formatted_balance}",
         reply_markup=render_board(game["board"], game["revealed"], show_all=True)
     )
     del mines_games[game_id]
@@ -320,12 +348,18 @@ async def balance(c: Gojo, m: Message):
     vault = user_vault.get(user, 0)
     total = bal + vault
     
+    # Format numbers with comma separators for international system
+    formatted_bal = f"{bal:,}"
+    formatted_vault = f"{vault:,}"
+    formatted_total = f"{total:,}"
+    
     # Simple approach with spacing to make copying easier
     await m.reply_text(
-        f"Current coins: ₼{bal}\n"
-        f"Vault amount: ₼{vault}/100,000"
+        f"Current coins: ₼{formatted_bal}\n"
+        f"Vault amount: ₼{formatted_vault}/100,000\n"
+        f"Total: ₼{formatted_total}\n\n"
+        f"🔒 Vault coins are safe across seasons!"
     )
-
 # ─── DAILY COMMAND ───
 @Gojo.on_message(command("daily"))
 async def daily(c: Gojo, m: Message):
@@ -338,11 +372,16 @@ async def daily(c: Gojo, m: Message):
     if now - last < timedelta(hours=24):
         remain = timedelta(hours=24) - (now - last)
         return await m.reply_text(f"⏳ Already claimed! Come back in {remain}")
-    user_balance[user] = user_balance.get(user, 1000) + 1000
+    
+    daily_amount = 1000
+    user_balance[user] = user_balance.get(user, 1000) + daily_amount
     daily_claim[user] = now.isoformat()
     save_balance()
     save_daily()
-    await m.reply_text("🎁 You claimed ₼1000 !")
+    
+    # Format the amount with comma separators
+    formatted_amount = f"{daily_amount:,}"
+    await m.reply_text(f"🎁 You claimed ₼{formatted_amount} !")
 
 # ─── GIVE COMMAND ───
 @Gojo.on_message(command("mgive"))
@@ -375,14 +414,25 @@ async def mgive(c: Gojo, m: Message):
     if amount <= 0:
         return await m.reply_text("❌ Amount must be greater than 0!")
 
-    if user_balance.get(sender, 1000) < amount:
-        return await m.reply_text(f"❌ Not enough coins! Your balance: ₼{user_balance.get(sender,1000)}")
+    sender_balance = user_balance.get(sender, 1000)
+    if sender_balance < amount:
+        formatted_balance = f"{sender_balance:,}"
+        return await m.reply_text(f"❌ Not enough coins! Your balance: ₼{formatted_balance}")
 
     # Transfer coins
     user_balance[sender] -= amount
     user_balance[str(target.id)] = user_balance.get(str(target.id), 1000) + amount
     save_balance()
-    await m.reply_text(f"✅ Sent ₼{amount}  to {escape_markdown(target.first_name)}!\n💰 Your new balance: ₼{user_balance[sender]}")
+    
+    # Format amounts with comma separators
+    formatted_amount = f"{amount:,}"
+    new_balance = user_balance[sender]
+    formatted_new_balance = f"{new_balance:,}"
+    
+    await m.reply_text(
+        f"✅ Sent ₼{formatted_amount} to {escape_markdown(target.first_name)}!\n"
+        f"💰 Your new balance: ₼{formatted_new_balance}"
+    )
 
 # ─── OWNER GIFT COMMAND ───
 OWNER_ID = 8429156335  # replace with your id # your Telegram ID
@@ -406,7 +456,10 @@ async def mgift(c: Gojo, m: Message):
 
     user_balance[str(target.id)] = user_balance.get(str(target.id), 1000) + amount
     save_balance()
-    await m.reply_text(f"🎁 Gave ₼{amount} to {escape_markdown(target.first_name)}!")
+    
+    # Format the amount with comma separators
+    formatted_amount = f"{amount:,}"
+    await m.reply_text(f"🎁 Gave ₼{formatted_amount} to {escape_markdown(target.first_name)}!")
 
 # ─── TAKE COMMAND ───
 @Gojo.on_message(command("take"))
@@ -443,12 +496,16 @@ async def take(c: Gojo, m: Message):
     # Check if target has enough coins
     target_balance = user_balance.get(str(target.id), 1000)
     if target_balance < amount:
-        return await m.reply_text(f"❌ {escape_markdown(target.first_name)} only has {target_balance} coins!")
+        formatted_balance = f"{target_balance:,}"
+        return await m.reply_text(f"❌ {escape_markdown(target.first_name)} only has ₼{formatted_balance} coins!")
 
     # Remove coins
     user_balance[str(target.id)] = max(target_balance - amount, 0)
     save_balance()
-    await m.reply_text(f"❌ Removed ₼{amount} from {escape_markdown(target.first_name)}'s balance!")
+    
+    # Format the amount with comma separators
+    formatted_amount = f"{amount:,}"
+    await m.reply_text(f"❌ Removed ₼{formatted_amount} from {escape_markdown(target.first_name)}'s balance!")
 
 # ─── TOP COMMAND ───
 @Gojo.on_message(command("top"))
@@ -457,15 +514,32 @@ async def top_collectors(c: Gojo, m: Message):
     load_balance()
     if not user_balance:
         return await m.reply_text("No collectors yet!")
+    
     top = sorted(user_balance.items(), key=lambda x: x[1], reverse=True)[:10]
+    
+    # Create the message with international number formatting
     msg = "**🏆 Top Monic Collectors**\n\n"
     for i, (uid, coins) in enumerate(top, 1):
         try:
             user_obj = await c.get_users(int(uid))
-            msg += f"{i}. {escape_markdown(user_obj.first_name)} - ₼{coins}\n"
+            formatted_coins = f"{coins:,}"
+            msg += f"{i}. {escape_markdown(user_obj.first_name)} - ₼{formatted_coins}\n"
         except:
-            msg += f"{i}. Unknown User - {coins} monic coins\n"
-    await m.reply_text(msg)
+            formatted_coins = f"{coins:,}"
+            msg += f"{i}. Unknown User - ₼{formatted_coins}\n"
+    
+    # Try to send with an image
+        # Try to send with a local image
+    try:
+        # Make sure you have a file named 'leaderboard.jpg' in your bot directory
+        await m.reply_photo(
+            photo="leaderboard.jpg",
+            caption=msg,
+            parse_mode="Markdown"
+        )
+    except:
+        # Fallback to text if image fails
+        await m.reply_text(msg, parse_mode="Markdown")
 
 # ─── PROMOTE COMMAND ───
 @Gojo.on_message(command("mpromote"))
@@ -617,8 +691,11 @@ async def bet_command(c: Gojo, m: Message):
         amount = int(args[1])
         if amount < 10:
             return await m.reply_text("Minimum bet is 10 coins!")
+        
+        # Format balance for display
+        formatted_balance = f"{current_balance:,}"
         if amount > current_balance:
-            return await m.reply_text(f"Insufficient balance! You have: ₼{current_balance}")
+            return await m.reply_text(f"Insufficient balance! You have: ₼{formatted_balance}")
     except ValueError:
         return await m.reply_text("Please enter a valid number for the bet amount")
     
@@ -633,6 +710,9 @@ async def bet_command(c: Gojo, m: Message):
     # Flip the coin
     result = random.choice(["heads", "tails"])
     
+    # Format amount for display
+    formatted_amount = f"{amount:,}"
+    
     # Determine win/loss
     if user_choice == result:
         # Win - 2x payout
@@ -640,9 +720,11 @@ async def bet_command(c: Gojo, m: Message):
         user_balance[user] = current_balance + win_amount
         save_balance()
         
+        # Format win amount for display
+        formatted_win = f"{win_amount:,}"
         await m.reply_text(
             f"The coin landed on {result}!\n"
-            f"You won ₼{amount}!"
+            f"You won ₼{formatted_win}!"
         )
     else:
         # Lose
@@ -651,7 +733,7 @@ async def bet_command(c: Gojo, m: Message):
         
         await m.reply_text(
             f"The coin landed on {result}!\n"
-            f"You lost ₼{amount}!"
+            f"You lost ₼{formatted_amount}!"
         )
 
 @Gojo.on_message(command(["dice", "roll"]))
@@ -671,8 +753,11 @@ async def dice_cmd(c: Gojo, m: Message):
         amount = int(args[1])
         if amount < 10:
             return await m.reply_text("Minimum bet is 10 coins!")
+        
+        # Format balance for display
+        formatted_balance = f"{current_balance:,}"
         if amount > current_balance:
-            return await m.reply_text(f"Insufficient balance! You have: ₼{current_balance}")
+            return await m.reply_text(f"Insufficient balance! You have: ₼{formatted_balance}")
     except ValueError:
         return await m.reply_text("Please enter a valid number for the bet amount")
     
@@ -707,6 +792,9 @@ async def dice_cmd(c: Gojo, m: Message):
     dice_emoji = dice_emojis[dice_roll]
     result = "odd" if dice_roll % 2 == 1 else "even"
     
+    # Format amount for display
+    formatted_amount = f"{amount:,}"
+    
     # Determine win/loss
     if user_choice == result:
         # Win - 2x payout
@@ -714,9 +802,11 @@ async def dice_cmd(c: Gojo, m: Message):
         user_balance[user] = current_balance + win_amount
         save_balance()
         
+        # Format win amount for display
+        formatted_win = f"{win_amount:,}"
         await m.reply_text(
             f"Damn. You're lucky! \n"
-            f"You win ₼{win_amount:,}!"
+            f"You win ₼{formatted_win}!"
         )
     else:
         # Lose
@@ -725,7 +815,7 @@ async def dice_cmd(c: Gojo, m: Message):
         
         await m.reply_text(
             f"Better luck next time! \n"
-            f"You lost ₼{amount:,}"
+            f"You lost ₼{formatted_amount}"
         )
 
 # Add to your existing imports
@@ -768,13 +858,16 @@ async def mdeposit(c: Gojo, m: Message):
     if amount <= 0:
         return await m.reply_text("❌ Amount must be greater than 0!")
     
+    # Format balance for display
+    formatted_balance = f"{current_balance:,}"
     if current_balance < amount:
-        return await m.reply_text(f"❌ Not enough coins! Your balance: ₼{current_balance}")
+        return await m.reply_text(f"❌ Not enough coins! Your balance: ₼{formatted_balance}")
     
     # Check vault capacity (1 lakh = 100,000)
     vault_balance = user_vault.get(user, 0)
     if vault_balance + amount > 100000:
-        return await m.reply_text(f"❌ Vault capacity exceeded! Maximum is ₼100,000 . Current vault: ₼{vault_balance}")
+        formatted_vault = f"{vault_balance:,}"
+        return await m.reply_text(f"❌ Vault capacity exceeded! Maximum is ₼100,000. Current vault: ₼{formatted_vault}")
     
     # Transfer from balance to vault
     user_balance[user] = current_balance - amount
@@ -783,11 +876,16 @@ async def mdeposit(c: Gojo, m: Message):
     save_balance()
     save_vault()
     
+    # Format amounts for display
+    formatted_amount = f"{amount:,}"
+    new_balance = user_balance[user]
+    formatted_new_balance = f"{new_balance:,}"
+    
     await m.reply_text(
-        f"✅ Deposited ₼{amount} to your vault!\n\n"
-        f"💰 Balance: ₼{user_balance[user]}\n"
+        f"✅ Deposited ₼{formatted_amount} to your vault!\n\n"
+        f"💰 Balance: ₼{formatted_new_balance}\n"
     )
-
+    
 @Gojo.on_message(command("mdraw"))
 async def mdraw(c: Gojo, m: Message):
     await check_season_reset(c)
@@ -805,8 +903,10 @@ async def mdraw(c: Gojo, m: Message):
     if amount <= 0:
         return await m.reply_text("❌ Amount must be greater than 0!")
     
+    # Format vault balance for display
+    formatted_vault = f"{vault_balance:,}"
     if vault_balance < amount:
-        return await m.reply_text(f"❌ Not enough coins in vault! Your vault: {vault_balance}")
+        return await m.reply_text(f"❌ Not enough coins in vault! Your vault: ₼{formatted_vault}")
     
     # Transfer from vault to balance
     user_vault[user] = vault_balance - amount
@@ -815,9 +915,14 @@ async def mdraw(c: Gojo, m: Message):
     save_balance()
     save_vault()
     
+    # Format amounts for display
+    formatted_amount = f"{amount:,}"
+    new_balance = user_balance[user]
+    formatted_new_balance = f"{new_balance:,}"
+    
     await m.reply_text(
-        f"✅ Withdrew ₼{amount} from your vault!\n\n"
-        f"💰 Balance: ₼{user_balance[user]}\n"
+        f"✅ Withdrew ₼{formatted_amount} from your vault!\n\n"
+        f"💰 Balance: ₼{formatted_new_balance}\n"
     )
     
 # Initialize data on bot start
