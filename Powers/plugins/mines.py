@@ -403,7 +403,7 @@ async def mgive(c: Gojo, m: Message):
     if sender in give_cooldowns:
         time_since_last_give = current_time - give_cooldowns[sender]
         if time_since_last_give < 1800:  # 30 minutes
-            remaining_time = 1800 - time_since_last_give
+            remaining_time = 1800 - time_since_last_give 
             minutes = int(remaining_time // 60)
             seconds = int(remaining_time % 60)
             return await m.reply_text(f"⏳ You can give coins again in {minutes}m {seconds}s")
