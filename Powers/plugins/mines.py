@@ -313,13 +313,19 @@ async def mines_withdraw(c: Gojo, q: CallbackQuery):
 async def balance(c: Gojo, m: Message):
     await check_season_reset(c)
     load_balance()
+    load_vault()
+    
     user = str(m.from_user.id)
     bal = user_balance.get(user, 1000)
+    vault = user_vault.get(user, 0)
+    total = bal + vault
     
     # Simple approach with spacing to make copying easier
     await m.reply_text(
-        f"💰 Your monic coins balance:\n"
-        f"  :- {bal}\n"
+        f"💰 Your monic coins:\n\n"
+        f"  Balance: {bal}\n"
+        f"  Vault: {vault}/100000\n"
+        f"🔒 Vault coins are safe across seasons!"
     )
 
 # ─── DAILY COMMAND ───
@@ -723,6 +729,103 @@ async def dice_cmd(c: Gojo, m: Message):
             f"Better luck next time! \n"
             f"You lost {amount:,} coins"
         )
+
+# Add to your existing imports
+VAULT_FILE = "monic_vault.json"
+
+# Add to your storage section
+user_vault = {}  # user vault data
+
+# Add to JSON load/save functions
+def load_vault():
+    global user_vault
+    if os.path.exists(VAULT_FILE):
+        with open(VAULT_FILE, "r") as f:
+            user_vault = json.load(f)
+    else:
+        user_vault = {}
+
+def save_vault():
+    with open(VAULT_FILE, "w") as f:
+        json.dump(user_vault, f)
+
+# Add to initialization
+load_vault()
+
+# Add vault commands
+@Gojo.on_message(command("mdeposit"))
+async def mdeposit(c: Gojo, m: Message):
+    await check_season_reset(c)
+    load_balance()
+    load_vault()
+    
+    args = m.text.split()
+    if len(args) != 2 or not args[1].isdigit():
+        return await m.reply_text("Usage: /mdeposit amount")
+    
+    user = str(m.from_user.id)
+    amount = int(args[1])
+    current_balance = user_balance.get(user, 1000)
+    
+    if amount <= 0:
+        return await m.reply_text("❌ Amount must be greater than 0!")
+    
+    if current_balance < amount:
+        return await m.reply_text(f"❌ Not enough coins! Your balance: {current_balance}")
+    
+    # Check vault capacity (1 lakh = 100,000)
+    vault_balance = user_vault.get(user, 0)
+    if vault_balance + amount > 100000:
+        return await m.reply_text(f"❌ Vault capacity exceeded! Maximum is 100,000 coins. Current vault: {vault_balance}")
+    
+    # Transfer from balance to vault
+    user_balance[user] = current_balance - amount
+    user_vault[user] = vault_balance + amount
+    
+    save_balance()
+    save_vault()
+    
+    await m.reply_text(
+        f"✅ Deposited {amount} coins to your vault!\n\n"
+        f"💰 Balance: {user_balance[user]}\n"
+        f"🔒 Vault: {user_vault[user]}\n"
+        f"📦 Total: {user_balance[user] + user_vault[user]}"
+    )
+
+@Gojo.on_message(command("mdraw"))
+async def mdraw(c: Gojo, m: Message):
+    await check_season_reset(c)
+    load_balance()
+    load_vault()
+    
+    args = m.text.split()
+    if len(args) != 2 or not args[1].isdigit():
+        return await m.reply_text("Usage: /mdraw amount")
+    
+    user = str(m.from_user.id)
+    amount = int(args[1])
+    vault_balance = user_vault.get(user, 0)
+    
+    if amount <= 0:
+        return await m.reply_text("❌ Amount must be greater than 0!")
+    
+    if vault_balance < amount:
+        return await m.reply_text(f"❌ Not enough coins in vault! Your vault: {vault_balance}")
+    
+    # Transfer from vault to balance
+    user_vault[user] = vault_balance - amount
+    user_balance[user] = user_balance.get(user, 1000) + amount
+    
+    save_balance()
+    save_vault()
+    
+    await m.reply_text(
+        f"✅ Withdrew {amount} coins from your vault!\n\n"
+        f"💰 Balance: {user_balance[user]}\n"
+        f"🔒 Vault: {user_vault[user]}\n"
+        f"📦 Total: {user_balance[user] + user_vault[user]}"
+    )
+    
 # Initialize data on bot start
 load_season()
 load_balance()
