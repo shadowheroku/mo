@@ -1,7 +1,7 @@
 from datetime import datetime
 from random import choice
 
-from pyrogram import ContinuePropagation, filters
+from pyrogram import filters, ContinuePropagation
 from pyrogram.enums import ParseMode as PM
 from pyrogram.types import Message
 
@@ -52,8 +52,9 @@ async def going_afk(c: Gojo, m: Message):
         data_type = Types.TEXT
 
     afk.insert_afk(chat, user, str(time), text, data_type, content)
-
     await m.reply_text(f"{m.from_user.mention} is now AFK")
+
+    raise ContinuePropagation
 
 
 # ─── FORMAT HOURS ───
@@ -69,11 +70,11 @@ async def get_hours(hour: str):
     return txt
 
 
-# ─── AFK RETURN (Yukki-style: triggers on ANY message) ───
+# ─── AFK RETURN ───
 @Gojo.on_message(filters.group & ~filters.bot & ~filters.via_bot)
 async def afk_return(c: Gojo, m: Message):
     if not m.from_user:  # ignore channel posts etc
-        return
+        raise ContinuePropagation
 
     afk = AFK()
     user = m.from_user.id
@@ -81,7 +82,7 @@ async def afk_return(c: Gojo, m: Message):
 
     # don’t trigger return if user is setting AFK again
     if m.text and m.text.split()[0].lower() in ["/afk", "/brb"]:
-        return
+        raise ContinuePropagation
 
     # if user was AFK → remove
     if afk.check_afk(chat, user):
@@ -90,21 +91,20 @@ async def afk_return(c: Gojo, m: Message):
         tim_ = datetime.now() - time
         tim_ = str(tim_).split(",")
         tim = await get_hours(tim_[-1])
-        if len(tim_) == 1:
-            tims = tim
-        elif len(tim_) == 2:
-            tims = f"{tim_[0]} {tim}"
+        tims = tim if len(tim_) == 1 else f"{tim_[0]} {tim}"
 
         txt = f"{choice(back).format(first=m.from_user.mention)}\n\nAfk for: {tims}"
         await m.reply_text(txt)
         afk.delete_afk(chat, user)
 
+    raise ContinuePropagation
 
-# ─── AFK NOTIFIER (when replying to an AFK user) ───
+
+# ─── AFK NOTIFIER ───
 @Gojo.on_message(filters.group & filters.reply)
 async def afk_notifier(c: Gojo, m: Message):
     if not m.reply_to_message or not m.reply_to_message.from_user:
-        return
+        raise ContinuePropagation
 
     afk = AFK()
     rep_user = m.reply_to_message.from_user.id
@@ -144,6 +144,8 @@ async def afk_notifier(c: Gojo, m: Message):
                 parse_mode=PM.MARKDOWN,
                 reply_to_message_id=m.id,
             )
+
+    raise ContinuePropagation
 
 
 # ─── PLUGIN INFO ───
