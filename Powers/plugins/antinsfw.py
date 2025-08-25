@@ -25,7 +25,7 @@ DB_PATH = "antinsfw.db"
 executor = ThreadPoolExecutor(max_workers=5)
 
 # ======================
-# DATABASE INIT
+# DATABASE INIT & MIGRATION
 # ======================
 def init_db():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -36,11 +36,21 @@ def init_db():
         """CREATE TABLE IF NOT EXISTS antinsfw (
             chat_id INTEGER PRIMARY KEY,
             enabled INTEGER DEFAULT 0,
-            strict_mode INTEGER DEFAULT 0,
-            action_type TEXT DEFAULT 'delete',
-            log_channel INTEGER DEFAULT 0
+            strict_mode INTEGER DEFAULT 0
         )"""
     )
+
+    # Check and add missing columns
+    cursor.execute("PRAGMA table_info(antinsfw)")
+    columns = [col[1] for col in cursor.fetchall()]
+    
+    if "action_type" not in columns:
+        cursor.execute("ALTER TABLE antinsfw ADD COLUMN action_type TEXT DEFAULT 'delete'")
+        LOGGER.info("Added action_type column to antinsfw table")
+    
+    if "log_channel" not in columns:
+        cursor.execute("ALTER TABLE antinsfw ADD COLUMN log_channel INTEGER DEFAULT 0")
+        LOGGER.info("Added log_channel column to antinsfw table")
 
     cursor.execute(
         """CREATE TABLE IF NOT EXISTS nsfw_warnings (
