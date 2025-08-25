@@ -79,6 +79,11 @@ async def join_request_mode(c: Gojo, m: Message):
     return
 
 
+from pyrogram.types import ChatJoinRequest, CallbackQuery
+from pyrogram import filters
+from pyrogram.enums import ChatMemberStatus as CMS
+
+# ── Join Request Handler ──
 @Gojo.on_chat_join_request(auto_join_filter)
 async def join_request_handler(c: Gojo, j: ChatJoinRequest):
     user = j.from_user.id
@@ -90,81 +95,104 @@ async def join_request_handler(c: Gojo, j: ChatJoinRequest):
 
     if not join_type:
         return
+
+    # ── Auto Accept ──
     if join_type == "auto" or user in SUPPORT_STAFF:
         try:
             await c.approve_chat_join_request(chat, user)
-            await c.send_message(chat, f"Accepted join request of the {userr.mention}")
+            await c.send_message(
+                chat,
+                f"✅ Approved join request of {userr.mention}"
+            )
             return
         except Exception as ef:
-            await c.send_message(chat,
-                                 f"Some error occured while approving request, report it using `/bug`\n<b>Error:</b> <code>{ef}</code>")
+            await c.send_message(
+                chat,
+                f"⚠️ Error approving join request.\nReport with `/bug`.\n\n<b>Error:</b> <code>{ef}</code>"
+            )
             LOGGER.error(ef)
             LOGGER.error(format_exc())
             return
+
+    # ── Manual Approval ──
     elif join_type == "manual":
-        txt = "New join request is available\n**USER's INFO**\n"
-        txt += f"Name: {userr.full_name}"
-        txt += f"Mention: {userr.mention}"
-        txt += f"Id: {user}"
-        txt += f"Scam: {'True' if userr.is_scam else 'False'}"
+        txt = (
+            "📩 <b>New Join Request</b>\n\n"
+            f"👤 <b>Name:</b> {userr.full_name}\n"
+            f"🔗 <b>Mention:</b> {userr.mention}\n"
+            f"🆔 <b>ID:</b> <code>{user}</code>\n"
+            f"🚨 <b>Scam:</b> {'✅ Yes' if userr.is_scam else '❌ No'}\n"
+        )
         if userr.username:
-            txt += f"Username: @{userr.username}"
+            txt += f"📛 <b>Username:</b> @{userr.username}\n"
+
         kb = [
             [
-                ikb("Accept", f"accept_joinreq_uest_{user}"),
-                ikb("Decline", f"decline_joinreq_uest_{user}")
+                ikb("✔️ Accept", f"accept_joinreq_{user}"),
+                ikb("❌ Decline", f"decline_joinreq_{user}")
             ]
         ]
         await c.send_message(chat, txt, reply_markup=ikm(kb))
         return
 
 
-@Gojo.on_callback_query(filters.regex("^accept_joinreq_uest_") | filters.regex("^decline_joinreq_uest_"))
+# ── Accept / Decline Buttons ──
+@Gojo.on_callback_query(filters.regex("^(accept_joinreq_|decline_joinreq_)"))
 async def accept_decline_request(c: Gojo, q: CallbackQuery):
     user_id = q.from_user.id
     chat = q.message.chat.id
+
+    # Only Admins can use buttons
     try:
         user_status = (await q.message.chat.get_member(user_id)).status
         if user_status not in {CMS.OWNER, CMS.ADMINISTRATOR}:
             await q.answer(
-                "You're not even an admin, don't try this explosive shit!",
+                "🚫 You’re not an admin here!",
                 show_alert=True,
             )
             return
     except Exception:
-        await q.answer("Unknow error occured. You are not admin or owner")
+        await q.answer("⚠️ Unknown error. Maybe you’re not admin/owner.")
         return
+
+    # Extract callback data
     split = q.data.split("_")
-    chat = q.message.chat.id
+    action = split[0]     # "accept" or "decline"
     user = int(split[-1])
-    data = split[0]
+
     try:
         userr = await c.get_users(user)
     except Exception:
         userr = None
-    if data == "accept":
+
+    # ── Accept ──
+    if action == "accept":
         try:
             await c.approve_chat_join_request(chat, user)
-            await q.answer(f"Accepted join request of the {userr.mention if userr else user}", True)
-            await q.edit_message_text(f"Accepted join request of the {userr.mention if userr else user}")
+            mention = userr.mention if userr else user
+            await q.answer(f"✅ Approved: {mention}", True)
+            await q.edit_message_text(f"✅ <b>Approved join request of {mention}</b>")
         except Exception as ef:
-            await c.send_message(chat,
-                                 f"Some error occured while approving request, report it using `/bug`\n<b>Error:</b> <code>{ef}</code>")
+            await c.send_message(
+                chat,
+                f"⚠️ Error approving join request.\nReport with `/bug`.\n\n<b>Error:</b> <code>{ef}</code>"
+            )
             LOGGER.error(ef)
             LOGGER.error(format_exc())
 
-    elif data == "decline":
+    # ── Decline ──
+    elif action == "decline":
         try:
             await c.decline_chat_join_request(chat, user)
-            await q.answer(f"DECLINED: {user}")
-            await q.edit_message_text()
+            await q.answer("❌ Declined")
+            await q.edit_message_text(f"❌ <b>Declined join request of {userr.mention if userr else user}</b>")
         except Exception as ef:
-            await c.send_message(chat,
-                                 f"Some error occured while approving request, report it using `/bug`\n<b>Error:</b> <code>{ef}</code>")
+            await c.send_message(
+                chat,
+                f"⚠️ Error declining join request.\nReport with `/bug`.\n\n<b>Error:</b> <code>{ef}</code>"
+            )
             LOGGER.error(ef)
             LOGGER.error(format_exc())
-
-    return
 
 
 __PLUGIN__ = "auto join"
