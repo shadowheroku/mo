@@ -67,9 +67,28 @@ async def sticker_id_gib(c: Gojo, m: Message):
 #               STICKER KANGING
 # ================================================
 
+import os
+import asyncio
+from random import choice
+from traceback import format_exc
+from pyrogram import Client
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.enums import ChatAction
+from pyrogram.errors import (
+    PeerIdInvalid, UserIsBlocked, StickersetInvalid, StickerEmojiInvalid,
+    StickerPngNopng, StickerPngDimensions, StickerTgsNotgs, StickerVideoNowebm,
+    ShortnameOccupyFailed
+)
+
+# Constants
+MAX_STICKERS_PER_PACK = 120
+MAX_PACKS_PER_USER = 50
+MAX_STICKER_SIZE = 261120  # 255KB in bytes
+MAX_PHOTO_SIZE_MB = 10
+
 @Gojo.on_message(command(["kang", "steal"]))
-async def kang_sticker(c: Gojo, m: Message):
-    """Kang a sticker into your pack with enhanced functionality"""
+async def kang_sticker(c: Client, m: Message):
+    """Kang a sticker into your pack with enhanced file handling"""
     # Validate input
     if not m.reply_to_message:
         return await m.reply_text("❌ Reply to a sticker/image/video to kang it.")
@@ -98,7 +117,7 @@ async def kang_sticker(c: Gojo, m: Message):
     try:
         await c.send_chat_action(m.from_user.id, ChatAction.TYPING)
     except (PeerIdInvalid, UserIsBlocked):
-        kb = IKM([[IKB("✨ Start Me", url=f"https://t.me/{c.me.username}")]])
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("✨ Start Me", url=f"https://t.me/{c.me.username}")]])
         return await m.reply_text(
             "⚠️ Please start me in PM first!",
             reply_markup=kb
@@ -111,7 +130,16 @@ async def kang_sticker(c: Gojo, m: Message):
     if len(args) > 1:
         sticker_emoji = args[1].strip()
         # Validate emoji (at least one emoji character)
-        if not any(char in sticker_emoji for char in ["\U0001F600-\U0001F64F", "\U0001F300-\U0001F5FF", "\U0001F680-\U0001F6FF", "\U0001F1E0-\U0001F1FF"]):
+        emoji_ranges = [
+            "\U0001F600-\U0001F64F",  # emoticons
+            "\U0001F300-\U0001F5FF",  # symbols & pictographs
+            "\U0001F680-\U0001F6FF",  # transport & map symbols
+            "\U0001F1E0-\U0001F1FF",  # flags (iOS)
+            "\U00002702-\U000027B0",   # dingbats
+            "\U000024C2-\U0001F251", 
+        ]
+        
+        if not any(char in sticker_emoji for char in emoji_ranges):
             sticker_emoji = "🤔"  # Default if invalid
     elif m.reply_to_message.sticker and m.reply_to_message.sticker.emoji:
         sticker_emoji = m.reply_to_message.sticker.emoji
@@ -126,29 +154,33 @@ async def kang_sticker(c: Gojo, m: Message):
 
     # Process media
     path = None
+    sticker = None
+    
     try:
         is_video = media_type in ["animation", "video"] or (
             media_type == "document" and m.reply_to_message.document.mime_type.split("/")[0] == "video"
         )
         
         if is_video:
-            path = await Vsticker(c, m.reply_to_message)
-            if os.path.getsize(path) > 261120:  # 255KB limit
+            # Create video sticker
+            path = await create_video_sticker(c, m.reply_to_message)
+            if path and os.path.exists(path) and os.path.getsize(path) > MAX_STICKER_SIZE:
                 await msg.edit_text("❌ File too large for sticker.")
-                if path and os.path.exists(path):
-                    os.remove(path)
                 return
         elif media_type in ["photo", "document"]:
+            # Download and process image
+            path = await download_media(m.reply_to_message)
+            if not path or not os.path.exists(path):
+                await msg.edit_text("❌ Failed to download media.")
+                return
+                
             # Check file size
-            file_size = await get_file_size(m.reply_to_message)
-            if isinstance(file_size, str):
-                size_parts = file_size.split()
-                if len(size_parts) >= 2:
-                    size_val, size_unit = float(size_parts[0]), size_parts[1].lower()
-                    if (size_unit == "mb" and size_val > 10) or size_unit == "gb":
-                        return await msg.edit_text("❌ File too large.")
-            
-            path = await m.reply_to_message.download()
+            file_size = os.path.getsize(path)
+            if file_size > MAX_PHOTO_SIZE_MB * 1024 * 1024:
+                await msg.edit_text("❌ File too large.")
+                return
+                
+            # Resize to sticker dimensions
             path = await resize_file_to_sticker_size(path)
         elif media_type == "sticker":
             # Directly use the sticker
@@ -158,36 +190,41 @@ async def kang_sticker(c: Gojo, m: Message):
             return await msg.edit_text("❌ Unsupported media type.")
 
         # For non-sticker media, create a sticker
-        if path:
-            uploaded_file = await upload_document(c, path, m.chat.id)
-            sticker = await create_sticker(uploaded_file, sticker_emoji)
+        if path and os.path.exists(path):
+            try:
+                uploaded_file = await upload_document(c, path, m.chat.id)
+                sticker = await create_sticker(uploaded_file, sticker_emoji)
+            except Exception as upload_error:
+                await msg.edit_text(f"❌ Failed to process media: {str(upload_error)}")
+                return
 
     except ShortnameOccupyFailed:
         return await msg.edit_text("❌ Change your Telegram username and try again.")
     except Exception as e:
         await msg.edit_text(f"⚠️ Error processing media: {str(e)}")
         LOGGER.error(f"Kang error: {format_exc()}")
-        if path and os.path.exists(path):
-            os.remove(path)
         return
-
-    # Clean up temporary file
     finally:
+        # Clean up temporary file
         if path and os.path.exists(path):
-            os.remove(path)
+            try:
+                os.remove(path)
+            except:
+                pass
+
+    if not sticker:
+        return await msg.edit_text("❌ Failed to create sticker.")
 
     # Manage sticker packs
-    kang_lim = 120  # Max stickers per pack
-    packnum = limit = volume = 0
+    packnum = 0
     packname_found = False
-    max_packs = 50  # Maximum packs per user
 
     try:
-        while not packname_found and limit < max_packs:
+        while not packname_found and packnum < MAX_PACKS_PER_USER:
             packname = f"CE{m.from_user.id}{packnum}_by_{c.me.username}"
             kangpack = (
                 f"{('@' + m.from_user.username) if m.from_user.username else m.from_user.first_name[:10]}"
-                f" {f'Vol {volume}' if volume else ''} by @{c.me.username}"
+                f" {f'Vol {packnum+1}' if packnum > 0 else ''} by @{c.me.username}"
             )
 
             try:
@@ -210,14 +247,11 @@ async def kang_sticker(c: Gojo, m: Message):
                     return await msg.edit_text("❌ Invalid emoji provided.")
                 except Exception as e:
                     await msg.edit_text(f"❌ Failed to create sticker set: {str(e)}")
-                    LOGGER.error(f"Sticker set creation error: {format_exc()}")
                     return
             else:
                 # Check if sticker set is full
-                if sticker_set.set.count >= kang_lim:
+                if sticker_set.set.count >= MAX_STICKERS_PER_PACK:
                     packnum += 1
-                    limit += 1
-                    volume += 1
                     continue
                 
                 # Add to existing set
@@ -229,22 +263,24 @@ async def kang_sticker(c: Gojo, m: Message):
                 except StickersetInvalid:
                     # Sticker set might have been deleted, try creating a new one
                     packnum += 1
-                    limit += 1
-                    volume += 1
                     continue
 
         if not packname_found:
             return await msg.edit_text("❌ You've reached the 50 pack limit.")
 
-        kb = IKM([[IKB("➕ Add Pack", url=f"t.me/addstickers/{packname}")]])
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("➕ Add Pack", url=f"t.me/addstickers/{packname}")]])
         await msg.delete()
-        await m.reply_text(
+        success_msg = await m.reply_text(
             f"✅ Sticker added!\n📦 Pack: `{kangpack}`\n😀 Emoji: {sticker_emoji}",
             reply_markup=kb
         )
+        
+        # Delete success message after 30 seconds
+        await asyncio.sleep(30)
+        await success_msg.delete()
 
     except (PeerIdInvalid, UserIsBlocked):
-        kb = IKM([[IKB("✨ Start Me", url=f"t.me/{c.me.username}")]])
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("✨ Start Me", url=f"t.me/{c.me.username}")]])
         await msg.delete()
         await m.reply_text("⚠️ Please start me in PM first!", reply_markup=kb)
     except StickerPngNopng:
@@ -260,6 +296,82 @@ async def kang_sticker(c: Gojo, m: Message):
         LOGGER.error(f"Unexpected kang error: {format_exc()}")
 
 
+async def download_media(message: Message) -> str:
+    """Download media with proper error handling"""
+    try:
+        # Create downloads directory if it doesn't exist
+        downloads_dir = "downloads"
+        if not os.path.exists(downloads_dir):
+            os.makedirs(downloads_dir)
+        
+        # Generate a unique filename
+        file_ext = ".jpg" if message.photo else ".mp4" if message.video else ".webm" if message.animation else ""
+        file_name = f"{downloads_dir}/{message.id}_{message.from_user.id if message.from_user else 'unknown'}{file_ext}"
+        
+        # Download the file
+        path = await message.download(file_name=file_name)
+        return path
+    except Exception as e:
+        LOGGER.error(f"Download error: {str(e)}")
+        return None
+
+
+async def create_video_sticker(client: Client, message: Message) -> str:
+    """Create video sticker from media with proper error handling"""
+    try:
+        # Download the video
+        video_path = await download_media(message)
+        if not video_path or not os.path.exists(video_path):
+            return None
+            
+        # Process video to sticker format (implementation depends on your Vsticker function)
+        # This is a placeholder - implement your actual video processing logic here
+        sticker_path = await process_video_to_webm(video_path)
+        
+        # Clean up original video
+        if os.path.exists(video_path):
+            os.remove(video_path)
+            
+        return sticker_path
+    except Exception as e:
+        LOGGER.error(f"Video sticker creation error: {str(e)}")
+        return None
+
+
+async def process_video_to_webm(video_path: str) -> str:
+    """
+    Process video to WEBM format for stickers
+    Implement your actual video processing logic here
+    """
+    try:
+        # Placeholder implementation - replace with your actual video processing
+        import subprocess
+        webm_path = video_path + ".webm"
+        
+        # Example FFmpeg command to convert to WEBM
+        cmd = [
+            "ffmpeg", "-i", video_path,
+            "-vf", "scale=512:512:force_original_aspect_ratio=decrease,format=rgba,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000",
+            "-c:v", "libvpx-vp9", "-crf", "30", "-b:v", "128K",
+            "-an", "-t", "3", "-y", webm_path
+        ]
+        
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        
+        stdout, stderr = await process.communicate()
+        
+        if process.returncode != 0:
+            LOGGER.error(f"FFmpeg error: {stderr.decode()}")
+            return None
+            
+        return webm_path
+    except Exception as e:
+        LOGGER.error(f"Video processing error: {str(e)}")
+        return None
 
 
 @Gojo.on_message(command(["rmsticker", "removesticker"]))
