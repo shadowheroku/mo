@@ -13,8 +13,8 @@ from Powers import LOGGER
 # CONFIGURATION
 # ======================
 # Get your API keys from https://sightengine.com/
-SIGHTENGINE_API_USER = os.getenv("SIGHTENGINE_API_USER", "")
-SIGHTENGINE_API_SECRET = os.getenv("SIGHTENGINE_API_SECRET", "")
+SIGHTENGINE_API_USER = os.getenv("SIGHTENGINE_API_USER", "862487500")
+SIGHTENGINE_API_SECRET = os.getenv("SIGHTENGINE_API_SECRET", "sc2VeSyJYzKciVhP8X57GtmQvA8kyzCb")
 
 # Alternative NSFW detection using DeepAI (fallback)
 DEEPAI_API_KEY = os.getenv("DEEPAI_API_KEY", "")
