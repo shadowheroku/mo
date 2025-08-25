@@ -423,3 +423,68 @@ async def delete_nsfw_callback(client: Gojo, cq):
     except:
         await cq.message.edit_text("❌ Could not delete the message.")
     await cq.answer()
+
+import os
+import asyncio
+from pyrogram import filters, enums
+from pyrogram.types import Message
+from Powers.bot_class import Gojo
+from Powers import LOGGER
+
+# ======================
+# THREAD EXECUTOR
+# ======================
+from concurrent.futures import ThreadPoolExecutor
+executor = ThreadPoolExecutor(max_workers=4)
+
+# ======================
+# YOUR DETECTION FUNCTION
+# ======================
+# Must return (is_nsfw: bool, confidence: float, details: dict)
+def detect_nsfw(file_path: str):
+    # Example dummy implementation, replace with Sightengine API / your model
+    return False, 0.0, {}
+
+# ======================
+# AUTO-SCAN FUNCTION
+# ======================
+async def process_media_in_background(client: Gojo, message: Message):
+    file_path = None
+    try:
+        # Download media
+        file_path = await message.download()
+
+        # Run detection in thread pool (non-blocking)
+        loop = asyncio.get_event_loop()
+        is_nsfw, confidence, details = await loop.run_in_executor(
+            executor, detect_nsfw, file_path
+        )
+
+        if is_nsfw:
+            # Delete the original NSFW message
+            await message.delete()
+
+            # Send alert in group
+            await client.send_message(
+                message.chat.id,
+                f"🚨 NSFW content detected and removed!\n"
+                f"👤 User: {message.from_user.mention if message.from_user else 'Unknown'}\n"
+                f"🔎 Confidence: {confidence*100:.1f}%"
+            )
+
+    except Exception as e:
+        LOGGER.error(f"Error in auto NSFW scan: {e}")
+    finally:
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+
+# ======================
+# AUTO SCAN HANDLER
+# ======================
+@Gojo.on_message(
+    filters.group
+    & (filters.photo | filters.video | filters.document | filters.animation | filters.sticker)
+)
+async def auto_scan_nsfw(client: Gojo, message: Message):
+    # Launch background scan
+    asyncio.create_task(process_media_in_background(client, message))
