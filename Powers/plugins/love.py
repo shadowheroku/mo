@@ -16,46 +16,45 @@ async def love_calc(c: Gojo, m: Message):
     name1, name2 = m.command[1], m.command[2]
 
     processing = await m.reply_text(
-        f"💘 Calculating love between **{name1}** ❤️ **{name2}**...",
+        f"Calculating love between **{name1}** and **{name2}**...",
         parse_mode=PM.MARKDOWN,
     )
 
-    # ─── Fun processing animation ───
+    # ─── Simple processing animation ───
     stages = [
-        "🔍 Analyzing feelings...",
-        "💭 Reading hidden emotions...",
-        "💓 Checking heartbeats...",
-        "💞 Matching vibes...",
-        "💘 Almost done..."
+        "Analyzing compatibility...",
+        "Measuring connection...",
+        "Finalizing result..."
     ]
 
     for stage in stages:
         await asyncio.sleep(1.2)
         await processing.edit(stage)
 
-    await asyncio.sleep(1.5)
+    await asyncio.sleep(1.2)
 
     love_percent = random.randint(0, 100)
 
-    # Progress bar using hearts
+    # Progress bar (clean style)
     filled = int(love_percent / 10)
     empty = 10 - filled
-    progress = "❤️" * filled + "🤍" * empty
+    progress = "█" * filled + "░" * empty
 
-    # Define attractive responses
+    # Responses
     if love_percent < 30:
-        status = "💔 Not a match made in heaven..."
+        status = "Not much spark between them."
     elif love_percent < 60:
-        status = "💞 There’s something special here!"
+        status = "A decent bond with room to grow."
     elif love_percent < 90:
-        status = "💖 A strong bond full of sparks!"
+        status = "A strong and promising connection."
     else:
-        status = "💘 Twin flames destined forever!"
+        status = "A perfect match!"
 
     result_text = (
-        f"✨ **Love Calculator** ✨\n\n"
-        f"🥰 **{name1}** + **{name2}** = ❤️ `{love_percent}%`\n\n"
-        f"{progress}\n\n"
+        f"**Love Compatibility Result**\n\n"
+        f"👤 {name1} + {name2}\n\n"
+        f"❤️ Score: **{love_percent}%**\n"
+        f"`{progress}`\n\n"
         f"{status}"
     )
 
@@ -71,7 +70,7 @@ __alt_name__ = []
 __HELP__ = """
 **Love Calculator**
 • /love <name1> <name2>
-Calculates love compatibility between two names 💘
+Calculates love compatibility between two names.
 
 Example:
 `/love Naruto Hinata`
