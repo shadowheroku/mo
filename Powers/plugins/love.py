@@ -51,10 +51,10 @@ async def love_calc(c: Gojo, m: Message):
         status = "A perfect match!"
 
     result_text = (
-        f"**Love Compatibility Result**\n\n"
-        f"👤 {name1} + {name2}\n\n"
+        f"**Love Compatibility Result**\n"
+        f"👤 {name1} + {name2}\n"
         f"❤️ Score: **{love_percent}%**\n"
-        f"`{progress}`\n\n"
+        f"`{progress}`\n"
         f"{status}"
     )
 
