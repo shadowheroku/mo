@@ -21,13 +21,19 @@ DB_PATH = "antinsfw.db"
 conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 cursor = conn.cursor()
 
+# Create base table if not exists
 cursor.execute(
     """CREATE TABLE IF NOT EXISTS antinsfw (
         chat_id INTEGER PRIMARY KEY,
-        enabled INTEGER DEFAULT 0,
-        strict_mode INTEGER DEFAULT 0
+        enabled INTEGER DEFAULT 0
     )"""
 )
+
+# ✅ Add strict_mode column if missing
+cursor.execute("PRAGMA table_info(antinsfw)")
+columns = [col[1] for col in cursor.fetchall()]
+if "strict_mode" not in columns:
+    cursor.execute("ALTER TABLE antinsfw ADD COLUMN strict_mode INTEGER DEFAULT 0")
 
 cursor.execute(
     """CREATE TABLE IF NOT EXISTS nsfw_warnings (
@@ -37,6 +43,7 @@ cursor.execute(
         PRIMARY KEY (user_id, chat_id)
     )"""
 )
+
 conn.commit()
 
 # ======================
