@@ -1,6 +1,8 @@
 import os
 import sqlite3
 import requests
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from pyrogram import filters, enums
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from Powers.bot_class import Gojo
@@ -14,6 +16,9 @@ SIGHTENGINE_API_USER = os.getenv("SIGHTENGINE_API_USER", "862487500")
 SIGHTENGINE_API_SECRET = os.getenv("SIGHTENGINE_API_SECRET", "sc2VeSyJYzKciVhP8X57GtmQvA8kyzCb")
 
 DB_PATH = "antinsfw.db"
+
+# Thread pool for background processing
+executor = ThreadPoolExecutor(max_workers=5)
 
 # ======================
 # DATABASE INIT
@@ -137,6 +142,77 @@ def detect_nsfw(image_path: str) -> tuple:
         return False, 0, {}
 
 # ======================
+# BACKGROUND PROCESSING
+# ======================
+async def process_media_in_background(client: Gojo, message: Message):
+    """Process media in background without blocking"""
+    enabled, strict = get_antinsfw(message.chat.id)
+    if not enabled:
+        return
+
+    # Skip processing for admins
+    try:
+        member = await client.get_chat_member(message.chat.id, message.from_user.id)
+        if member.status in [enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]:
+            return
+    except:
+        pass
+
+    file_path = None
+    try:
+        file_path = await message.download()
+        
+        # Run detection in thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        is_nsfw, confidence, details = await loop.run_in_executor(
+            executor, detect_nsfw, file_path
+        )
+
+        if strict and not is_nsfw:
+            nudity = details.get("nudity", {}).get("sexual_display", 0)
+            suggestive = details.get("nudity", {}).get("suggestive", 0)
+            alcohol = details.get("alcohol", 0)
+            drugs = details.get("drugs", 0)
+            if nudity > 0.5 or suggestive > 0.7 or alcohol > 0.7 or drugs > 0.7:
+                is_nsfw = True
+                confidence = max(nudity, suggestive, alcohol, drugs)
+
+        if is_nsfw:
+            try:
+                await message.delete()
+            except:
+                LOGGER.warning("Could not delete NSFW message (no permissions)")
+
+            add_warning(message.from_user.id, message.chat.id)
+            warnings = get_warnings(message.from_user.id, message.chat.id)
+
+            warn_msg = await client.send_message(
+                message.chat.id,
+                f"🚫 NSFW content detected and removed!\n"
+                f"👤 User: {message.from_user.mention}\n"
+                f"⚠️ Warning {warnings}/3\n"
+                f"🔞 Confidence: {confidence*100:.1f}%"
+            )
+
+            if warnings >= 3:
+                try:
+                    await client.ban_chat_member(message.chat.id, message.from_user.id)
+                    await warn_msg.edit_text(
+                        f"🚫 {message.from_user.mention} has been banned for sending NSFW content (3 warnings)."
+                    )
+                except Exception as ban_error:
+                    LOGGER.error(f"Ban failed: {ban_error}")
+                    await warn_msg.edit_text(
+                        f"🚫 {message.from_user.mention} reached 3 warnings but ban failed."
+                    )
+
+    except Exception as e:
+        LOGGER.error(f"Auto NSFW scan error: {e}")
+    finally:
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+
+# ======================
 # HELP
 # ======================
 __HELP__ = """
@@ -157,6 +233,7 @@ __HELP__ = """
 • `/mynsfwwarns` - Check your warnings  
 
 **⚡ Auto-Actions**
+- Automatically scans all media in background
 - Deletes NSFW content  
 - Issues warnings  
 - Bans after 3 warnings  
@@ -294,7 +371,11 @@ async def scan_nsfw_command(client: Gojo, message: Message):
         file_path = await target.download()
         scan_msg = await message.reply_text("🔍 Scanning...")
 
-        is_nsfw, confidence, details = detect_nsfw(file_path)
+        # Run detection in thread pool
+        loop = asyncio.get_event_loop()
+        is_nsfw, confidence, details = await loop.run_in_executor(
+            executor, detect_nsfw, file_path
+        )
 
         if is_nsfw:
             await scan_msg.edit_text(
@@ -316,63 +397,12 @@ async def scan_nsfw_command(client: Gojo, message: Message):
             os.remove(file_path)
 
 # ======================
-# AUTO SCAN
+# AUTO SCAN - BACKGROUND PROCESSING
 # ======================
 @Gojo.on_message(filters.group & (filters.photo | filters.video | filters.document | filters.animation | filters.sticker))
 async def auto_scan_nsfw(client: Gojo, message: Message):
-    try:
-        member = await client.get_chat_member(message.chat.id, message.from_user.id)
-        if member.status in [enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]:
-            return
-    except:
-        pass
-
-    enabled, strict = get_antinsfw(message.chat.id)
-    if not enabled:
-        return
-
-    file_path = None
-    try:
-        file_path = await message.download()
-        is_nsfw, confidence, details = detect_nsfw(file_path)
-
-        if strict and not is_nsfw:
-            nudity = details.get("nudity", {}).get("sexual_display", 0)
-            suggestive = details.get("nudity", {}).get("suggestive", 0)
-            alcohol = details.get("alcohol", 0)
-            drugs = details.get("drugs", 0)
-            if nudity > 0.5 or suggestive > 0.7 or alcohol > 0.7 or drugs > 0.7:
-                is_nsfw = True
-                confidence = max(nudity, suggestive, alcohol, drugs)
-
-        if is_nsfw:
-            try:
-                await message.delete()
-            except:
-                LOGGER.warning("Could not delete NSFW message (no permissions)")
-
-            add_warning(message.from_user.id, message.chat.id)
-            warnings = get_warnings(message.from_user.id, message.chat.id)
-
-            warn_msg = await message.reply_text(
-                f"🚫 NSFW content removed!\n👤 {message.from_user.mention}\n⚠️ Warning {warnings}/3"
-            )
-
-            if warnings >= 3:
-                try:
-                    await client.ban_chat_member(message.chat.id, message.from_user.id)
-                    await warn_msg.edit_text(f"🚫 {message.from_user.mention} banned (3 warnings).")
-                except Exception as ban_error:
-                    LOGGER.error(f"Ban failed: {ban_error}")
-                    await warn_msg.edit_text(
-                        f"🚫 {message.from_user.mention} reached 3 warnings but ban failed."
-                    )
-
-    except Exception as e:
-        LOGGER.error(f"Auto NSFW scan error: {e}")
-    finally:
-        if file_path and os.path.exists(file_path):
-            os.remove(file_path)
+    # Process media in background without blocking
+    asyncio.create_task(process_media_in_background(client, message))
 
 # ======================
 # CALLBACK
