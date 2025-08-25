@@ -2,10 +2,13 @@ from traceback import format_exc
 
 from pyrogram import filters
 from pyrogram.enums import ChatMemberStatus as CMS
-from pyrogram.types import CallbackQuery, ChatJoinRequest
-from pyrogram.types import InlineKeyboardButton as ikb
-from pyrogram.types import InlineKeyboardMarkup as ikm
-from pyrogram.types import Message
+from pyrogram.types import (
+    Message,
+    ChatJoinRequest,
+    CallbackQuery,
+    InlineKeyboardButton as ikb,
+    InlineKeyboardMarkup as ikm,
+)
 
 from Powers import LOGGER
 from Powers.bot_class import Gojo
@@ -14,76 +17,84 @@ from Powers.supports import get_support_staff
 from Powers.utils.custom_filters import admin_filter, auto_join_filter, command
 
 
+# ── Enable / Disable Auto Join ──
 @Gojo.on_message(command(["joinreq"]) & admin_filter)
 async def accept_join_requests(c: Gojo, m: Message):
-    if m.chat.id == m.from_user.id:
-        await m.reply_text("Use it in groups")
+    if m.chat.type == "private":
+        await m.reply_text("⚠️ This command can only be used in groups.")
         return
 
-    split = m.command
     a_j = AUTOJOIN()
 
     try:
         status = (await m.chat.get_member(c.me.id)).status
         if status != CMS.ADMINISTRATOR:
-            await m.reply_text("I should be admin to accept and reject join requests")
+            await m.reply_text("⚠️ I must be an <b>Admin</b> with rights to manage join requests.")
             return
     except Exception as ef:
-        await m.reply_text(f"Some error occured, report it using `/bug`\n<b>Error:</b> <code>{ef}</code>")
+        await m.reply_text(
+            f"❌ Error while checking admin status.\nReport with `/bug`\n\n<b>Error:</b> <code>{ef}</code>"
+        )
         LOGGER.error(ef)
         LOGGER.error(format_exc())
         return
-    if len(split) == 1:
-        txt = "**USAGE**\n/joinreq [on | off]"
-    else:
-        yes_no = split[1].lower()
-        if yes_no == "on":
-            is_al = a_j.load_autojoin(m.chat.id)
 
-            txt = (
-                "Now I will approve all the join request of the chat\nIf you want that I will just notify admins about the join request use command\n/joinreqmode [manual | auto]"
-                if is_al
-                else "Auto approve join request is already on for this chat\nIf you want that I will just notify admins about the join request use command\n/joinreqmode [manual | auto]"
-            )
-        elif yes_no == "off":
+    if len(m.command) == 1:
+        txt = "**Usage:**\n`/joinreq [on | off]`"
+    else:
+        opt = m.command[1].lower()
+        if opt == "on":
+            already = a_j.load_autojoin(m.chat.id)
+            if already:
+                txt = (
+                    "✅ Auto-join requests are now <b>enabled</b>.\n"
+                    "I will approve all requests automatically.\n\n"
+                    "💡 Use `/joinreqmode [manual | auto]` to switch modes."
+                )
+            else:
+                txt = (
+                    "⚠️ Auto-join was already enabled.\n\n"
+                    "💡 Use `/joinreqmode [manual | auto]` to change mode."
+                )
+        elif opt == "off":
             a_j.remove_autojoin(m.chat.id)
-            txt = "Now I will neither auto approve join request nor notify any admins about it"
+            txt = "❌ Auto-join disabled.\nI will not approve or notify admins of join requests."
         else:
-            txt = "**USAGE**\n/joinreq [on | off]"
+            txt = "**Usage:**\n`/joinreq [on | off]`"
 
     await m.reply_text(txt)
-    return
 
 
+# ── Change Join Request Mode ──
 @Gojo.on_message(command("joinreqmode") & admin_filter)
 async def join_request_mode(c: Gojo, m: Message):
-    if m.chat.id == m.from_user.id:
-        await m.reply_text("Use it in groups")
+    if m.chat.type == "private":
+        await m.reply_text("⚠️ This command can only be used in groups.")
         return
-    u_text = "**USAGE**\n/joinreqmode [auto | manual]\nauto: auto approve joins\nmanual: will notify admin about the join request"
 
-    split = m.command
+    usage = (
+        "**Usage:**\n"
+        "`/joinreqmode [auto | manual]`\n\n"
+        "• <b>auto</b>: Requests will be approved automatically.\n"
+        "• <b>manual</b>: Admins will be notified with Accept/Decline buttons."
+    )
+
     a_j = AUTOJOIN()
 
-    if len(split) == 1:
-        await m.reply_text(u_text)
-    else:
-        auto_manual = split[1]
-        if auto_manual not in ["auto", "manual"]:
-            await m.reply_text(u_text)
-        else:
-            a_j.update_join_type(m.chat.id, auto_manual)
-            txt = "Changed join request type"
-            await m.reply_text(txt)
+    if len(m.command) == 1:
+        await m.reply_text(usage)
+        return
 
-    return
+    opt = m.command[1].lower()
+    if opt not in ["auto", "manual"]:
+        await m.reply_text(usage)
+        return
+
+    a_j.update_join_type(m.chat.id, opt)
+    await m.reply_text(f"✅ Join request mode set to <b>{opt.upper()}</b>.")
 
 
-from pyrogram.types import ChatJoinRequest, CallbackQuery
-from pyrogram import filters
-from pyrogram.enums import ChatMemberStatus as CMS
-
-# ── Join Request Handler ──
+# ── Incoming Join Requests ──
 @Gojo.on_chat_join_request(auto_join_filter)
 async def join_request_handler(c: Gojo, j: ChatJoinRequest):
     user = j.from_user.id
@@ -96,25 +107,22 @@ async def join_request_handler(c: Gojo, j: ChatJoinRequest):
     if not join_type:
         return
 
-    # ── Auto Accept ──
+    # Auto Approve
     if join_type == "auto" or user in SUPPORT_STAFF:
         try:
             await c.approve_chat_join_request(chat, user)
-            await c.send_message(
-                chat,
-                f"✅ Approved join request of {userr.mention}"
-            )
+            await c.send_message(chat, f"✅ Approved join request of {userr.mention}")
             return
         except Exception as ef:
             await c.send_message(
                 chat,
-                f"⚠️ Error approving join request.\nReport with `/bug`.\n\n<b>Error:</b> <code>{ef}</code>"
+                f"⚠️ Error approving join request.\nReport with `/bug`\n\n<b>Error:</b> <code>{ef}</code>",
             )
             LOGGER.error(ef)
             LOGGER.error(format_exc())
             return
 
-    # ── Manual Approval ──
+    # Manual Approval
     elif join_type == "manual":
         txt = (
             "📩 <b>New Join Request</b>\n\n"
@@ -129,35 +137,30 @@ async def join_request_handler(c: Gojo, j: ChatJoinRequest):
         kb = [
             [
                 ikb("✔️ Accept", f"accept_joinreq_{user}"),
-                ikb("❌ Decline", f"decline_joinreq_{user}")
+                ikb("❌ Decline", f"decline_joinreq_{user}"),
             ]
         ]
         await c.send_message(chat, txt, reply_markup=ikm(kb))
-        return
 
 
-# ── Accept / Decline Buttons ──
+# ── Accept / Decline ──
 @Gojo.on_callback_query(filters.regex("^(accept_joinreq_|decline_joinreq_)"))
 async def accept_decline_request(c: Gojo, q: CallbackQuery):
-    user_id = q.from_user.id
+    admin_id = q.from_user.id
     chat = q.message.chat.id
 
-    # Only Admins can use buttons
+    # Ensure only Admins can approve/decline
     try:
-        user_status = (await q.message.chat.get_member(user_id)).status
-        if user_status not in {CMS.OWNER, CMS.ADMINISTRATOR}:
-            await q.answer(
-                "🚫 You’re not an admin here!",
-                show_alert=True,
-            )
+        status = (await q.message.chat.get_member(admin_id)).status
+        if status not in {CMS.OWNER, CMS.ADMINISTRATOR}:
+            await q.answer("🚫 You’re not an admin here!", show_alert=True)
             return
     except Exception:
-        await q.answer("⚠️ Unknown error. Maybe you’re not admin/owner.")
+        await q.answer("⚠️ Could not verify admin status.")
         return
 
-    # Extract callback data
     split = q.data.split("_")
-    action = split[0]     # "accept" or "decline"
+    action = split[0]  # "accept" or "decline"
     user = int(split[-1])
 
     try:
@@ -165,44 +168,44 @@ async def accept_decline_request(c: Gojo, q: CallbackQuery):
     except Exception:
         userr = None
 
-    # ── Accept ──
+    mention = userr.mention if userr else user
+
     if action == "accept":
         try:
             await c.approve_chat_join_request(chat, user)
-            mention = userr.mention if userr else user
             await q.answer(f"✅ Approved: {mention}", True)
             await q.edit_message_text(f"✅ <b>Approved join request of {mention}</b>")
         except Exception as ef:
             await c.send_message(
                 chat,
-                f"⚠️ Error approving join request.\nReport with `/bug`.\n\n<b>Error:</b> <code>{ef}</code>"
+                f"⚠️ Error approving join request.\nReport with `/bug`\n\n<b>Error:</b> <code>{ef}</code>",
             )
             LOGGER.error(ef)
             LOGGER.error(format_exc())
 
-    # ── Decline ──
     elif action == "decline":
         try:
             await c.decline_chat_join_request(chat, user)
-            await q.answer("❌ Declined")
-            await q.edit_message_text(f"❌ <b>Declined join request of {userr.mention if userr else user}</b>")
+            await q.answer("❌ Declined", True)
+            await q.edit_message_text(f"❌ <b>Declined join request of {mention}</b>")
         except Exception as ef:
             await c.send_message(
                 chat,
-                f"⚠️ Error declining join request.\nReport with `/bug`.\n\n<b>Error:</b> <code>{ef}</code>"
+                f"⚠️ Error declining join request.\nReport with `/bug`\n\n<b>Error:</b> <code>{ef}</code>",
             )
             LOGGER.error(ef)
             LOGGER.error(format_exc())
 
 
 __PLUGIN__ = "auto join"
-
 __alt_name__ = ["join_request"]
 
 __HELP__ = """
-**Auto join request**
+**Auto Join Requests**
 
-**Admin commands:**
-• /joinreq [on | off]: To switch on auto accept join request 
-• /joinreqmode [auto | manual]: `auto` to accept join request automatically and `manual` to get notified when new join request is available
+**Admin Commands:**
+• `/joinreq [on | off]` → Enable/disable auto-join.
+• `/joinreqmode [auto | manual]`
+   • `auto` → Approves all requests automatically.
+   • `manual` → Notifies admins with Accept/Decline buttons.
 """
