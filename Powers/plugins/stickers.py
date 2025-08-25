@@ -726,7 +726,7 @@ from pyrogram.errors import (
 
 @Gojo.on_message(command(["getmypacks", "mypacks", "mysets", "stickerset", "stset"]))
 async def get_my_sticker_sets(c: Gojo, m: Message):
-    """Get all sticker packs created by the user"""
+    """Get all sticker packs created by the user using the kang system"""
     # Check if user exists
     if not m.from_user:
         return await m.reply_text("❌ Cannot identify user. Please try again.")
@@ -734,8 +734,8 @@ async def get_my_sticker_sets(c: Gojo, m: Message):
     to_del = await m.reply_text("⏳ Please wait while I fetch all the sticker sets I have created for you...")
     
     try:
-        # Get sticker packs with progress indication
-        txt, kb = await get_all_sticker_packs(c, m.from_user.id)
+        # Get sticker packs with the same naming convention as kang
+        txt, kb = await get_all_sticker_packs(c, m.from_user.id, c.me.username)
         
         await to_del.delete()
         
@@ -766,55 +766,72 @@ async def get_my_sticker_sets(c: Gojo, m: Message):
         await error_msg.delete()
 
 
-async def get_all_sticker_packs(client: Gojo, user_id: int):
-    """Get all sticker packs created for a user"""
+async def get_all_sticker_packs(client: Gojo, user_id: int, bot_username: str):
+    """Get all sticker packs created for a user using the kang naming convention"""
     packs = []
     keyboard = []
     pack_count = 0
-    max_packs_to_show = 50  # Limit to avoid excessive loading
+    max_packs_to_show = MAX_PACKS_PER_USER  # Use the same limit as kang
     
     try:
-        # Try to get user's sticker packs
-        async for sticker_set in client.get_sticker_sets(user_id):
+        # Try to get user's sticker packs using the same pattern as kang
+        packnum = 0
+        found_packs = []
+        
+        # Search for packs with the naming pattern used in kang
+        while packnum < max_packs_to_show:
+            packname = f"CE{user_id}{packnum}_by_{bot_username}"
+            
             try:
-                if pack_count >= max_packs_to_show:
-                    break
-                    
-                pack_name = sticker_set.name
-                pack_title = sticker_set.title
-                stickers_count = sticker_set.count
-                is_animated = sticker_set.is_animated
-                is_video = sticker_set.is_video
-                
-                # Format pack info
-                pack_type = ""
-                if is_video:
-                    pack_type = "🎥 Video"
-                elif is_animated:
-                    pack_type = "✨ Animated"
-                else:
-                    pack_type = "🖼️ Static"
-                
-                pack_info = f"• **{pack_title}**\n  └ {pack_type} | {stickers_count} stickers\n  └ `{pack_name}`\n\n"
-                packs.append(pack_info)
-                pack_count += 1
-                
-                # Add inline button for quick access
-                if len(keyboard) < 5:  # Limit buttons to avoid clutter
-                    keyboard.append([
-                        InlineKeyboardButton(
-                            f"Add {pack_title[:15]}...", 
-                            url=f"t.me/addstickers/{pack_name}"
-                        )
-                    ])
-                    
-            except (StickersetInvalid, AttributeError):
-                # Skip invalid packs
-                continue
+                sticker_set = await client.get_sticker_set(packname)
+                found_packs.append((packname, sticker_set))
+            except StickersetInvalid:
+                # This pack doesn't exist, move to next
+                pass
+            except FloodWait as e:
+                # Handle flood wait
+                raise Exception(f"Please wait {e.value} seconds before trying again.")
             except Exception as e:
-                LOGGER.error(f"Error processing pack: {str(e)}")
-                continue
+                LOGGER.error(f"Error checking pack {packname}: {str(e)}")
+            
+            packnum += 1
+        
+        # Process found packs
+        for packname, sticker_set in found_packs:
+            if pack_count >= max_packs_to_show:
+                break
                 
+            pack_title = sticker_set.title
+            stickers_count = sticker_set.count
+            is_animated = sticker_set.is_animated
+            is_video = sticker_set.is_video
+            
+            # Format pack info
+            pack_type = ""
+            if is_video:
+                pack_type = "🎥 Video"
+            elif is_animated:
+                pack_type = "✨ Animated"
+            else:
+                pack_type = "🖼️ Static"
+            
+            # Check if pack is full
+            is_full = stickers_count >= MAX_STICKERS_PER_PACK
+            full_status = " ✅" if not is_full else " ❌ (FULL)"
+            
+            pack_info = f"• **{pack_title}**\n  └ {pack_type} | {stickers_count}/{MAX_STICKERS_PER_PACK} stickers{full_status}\n  └ `{packname}`\n\n"
+            packs.append(pack_info)
+            pack_count += 1
+            
+            # Add inline button for quick access (max 3 buttons to avoid clutter)
+            if len(keyboard) < 3:
+                keyboard.append([
+                    InlineKeyboardButton(
+                        f"Add {pack_title[:12]}...", 
+                        url=f"t.me/addstickers/{packname}"
+                    )
+                ])
+                    
     except (PeerIdInvalid, UserNotParticipant, ChannelPrivate, ChatAdminRequired):
         # User hasn't created any packs or can't access
         return None, None
@@ -841,13 +858,21 @@ async def get_all_sticker_packs(client: Gojo, user_id: int):
     message = header + "".join(packs) + footer
     
     # Add a "View All" button if there are many packs
-    if total_packs > 5:
+    if total_packs > 3:
         keyboard.append([
             InlineKeyboardButton(
                 "📋 View All Packs", 
                 callback_data=f"view_all_packs_{user_id}"
             )
         ])
+    
+    # Add kang button for convenience
+    keyboard.append([
+        InlineKeyboardButton(
+            "🔄 Create New Pack", 
+            switch_inline_query_current_chat="kang"
+        )
+    ])
     
     reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
     
@@ -868,7 +893,7 @@ async def view_all_packs_callback(c: Gojo, query: CallbackQuery):
     await query.answer("⏳ Loading all packs...")
     
     # Edit message to show all packs
-    txt, kb = await get_all_sticker_packs(c, user_id)
+    txt, kb = await get_all_sticker_packs(c, user_id, c.me.username)
     
     if not txt:
         await query.message.edit_text("❌ No sticker packs found.")
@@ -898,7 +923,7 @@ async def refresh_sticker_packs(c: Gojo, m: Message):
                 del user_cache[m.from_user.id]
         
         # Get updated packs
-        txt, kb = await get_all_sticker_packs(c, m.from_user.id)
+        txt, kb = await get_all_sticker_packs(c, m.from_user.id, c.me.username)
         
         await progress_msg.delete()
         
@@ -914,6 +939,19 @@ async def refresh_sticker_packs(c: Gojo, m: Message):
         await asyncio.sleep(10)
         await error_msg.delete()
 
+
+# Helper function to check if a user has any packs
+async def user_has_packs(client: Gojo, user_id: int, bot_username: str) -> bool:
+    """Check if a user has any sticker packs"""
+    try:
+        # Check just the first pack to see if user has any
+        packname = f"CE{user_id}0_by_{bot_username}"
+        await client.get_sticker_set(packname)
+        return True
+    except StickersetInvalid:
+        return False
+    except Exception:
+        return False
 
 @Gojo.on_message(command(["q", "ss"]))
 async def quote_the_msg(_, m: Message):
