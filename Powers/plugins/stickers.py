@@ -69,20 +69,26 @@ async def sticker_id_gib(c: Gojo, m: Message):
 
 @Gojo.on_message(command(["kang", "steal"]))
 async def kang_sticker(c: Gojo, m: Message):
-    """Kang a sticker into your pack"""
+    """Kang a sticker into your pack with enhanced functionality"""
     # Validate input
     if not m.reply_to_message:
         return await m.reply_text("❌ Reply to a sticker/image/video to kang it.")
 
-    valid_media = (
-        m.reply_to_message.sticker or
-        m.reply_to_message.photo or
-        m.reply_to_message.animation or
-        m.reply_to_message.video or
-        (m.reply_to_message.document and m.reply_to_message.document.mime_type.split("/")[0] in ["image", "video"])
-    )
+    # Check media type
+    media_types = {
+        "sticker": m.reply_to_message.sticker,
+        "photo": m.reply_to_message.photo,
+        "animation": m.reply_to_message.animation,
+        "video": m.reply_to_message.video,
+        "document": (
+            m.reply_to_message.document and 
+            m.reply_to_message.document.mime_type and 
+            m.reply_to_message.document.mime_type.split("/")[0] in ["image", "video"]
+        )
+    }
     
-    if not valid_media:
+    media_type = next((k for k, v in media_types.items() if v), None)
+    if not media_type:
         return await m.reply_text("❌ Unsupported media type.")
 
     if not m.from_user:
@@ -103,75 +109,86 @@ async def kang_sticker(c: Gojo, m: Message):
     # Determine emoji
     args = m.text.split()
     if len(args) > 1:
-        sticker_emoji = args[1]
+        sticker_emoji = args[1].strip()
+        # Validate emoji (at least one emoji character)
+        if not any(char in sticker_emoji for char in ["\U0001F600-\U0001F64F", "\U0001F300-\U0001F5FF", "\U0001F680-\U0001F6FF", "\U0001F1E0-\U0001F1FF"]):
+            sticker_emoji = "🤔"  # Default if invalid
     elif m.reply_to_message.sticker and m.reply_to_message.sticker.emoji:
         sticker_emoji = m.reply_to_message.sticker.emoji
     else:
         ran = ["🤣", "😁", "👍", "🔥", "😍", "😱", "🤖", "👀", "💀", "🫶", "🙌", "😎"]
         sticker_emoji = choice(ran)
+    
+    # Limit to 2 emojis max
+    sticker_emoji = "".join(sticker_emoji.split())[:2]
 
     await msg.edit_text(f"🖌️ Creating sticker with {sticker_emoji} emoji...")
 
     # Process media
+    path = None
     try:
-        is_video = (
-            m.reply_to_message.animation or
-            m.reply_to_message.video or
-            (m.reply_to_message.document and m.reply_to_message.document.mime_type.split("/")[0] == "video")
+        is_video = media_type in ["animation", "video"] or (
+            media_type == "document" and m.reply_to_message.document.mime_type.split("/")[0] == "video"
         )
         
         if is_video:
             path = await Vsticker(c, m.reply_to_message)
             if os.path.getsize(path) > 261120:  # 255KB limit
                 await msg.edit_text("❌ File too large for sticker.")
-                os.remove(path)
+                if path and os.path.exists(path):
+                    os.remove(path)
                 return
-        elif m.reply_to_message.photo or (
-            m.reply_to_message.document and m.reply_to_message.document.mime_type.split("/")[0] == "image"
-        ):
-            size_info = (await get_file_size(m.reply_to_message)).split()
-            if (size_info[1] == "mb" and int(size_info[0]) > 10) or size_info[1] == "gb":
-                return await msg.edit_text("❌ File too large.")
+        elif media_type in ["photo", "document"]:
+            # Check file size
+            file_size = await get_file_size(m.reply_to_message)
+            if isinstance(file_size, str):
+                size_parts = file_size.split()
+                if len(size_parts) >= 2:
+                    size_val, size_unit = float(size_parts[0]), size_parts[1].lower()
+                    if (size_unit == "mb" and size_val > 10) or size_unit == "gb":
+                        return await msg.edit_text("❌ File too large.")
+            
             path = await m.reply_to_message.download()
             path = await resize_file_to_sticker_size(path)
-        elif m.reply_to_message.sticker:
-            sticker = await create_sticker(
-                await get_document_from_file_id(m.reply_to_message.sticker.file_id),
-                sticker_emoji
-            )
-            path = None
+        elif media_type == "sticker":
+            # Directly use the sticker
+            sticker_file = await get_document_from_file_id(m.reply_to_message.sticker.file_id)
+            sticker = await create_sticker(sticker_file, sticker_emoji)
         else:
             return await msg.edit_text("❌ Unsupported media type.")
 
+        # For non-sticker media, create a sticker
         if path:
-            sticker = await create_sticker(
-                await upload_document(c, path, m.chat.id),
-                sticker_emoji
-            )
-            os.remove(path)
+            uploaded_file = await upload_document(c, path, m.chat.id)
+            sticker = await create_sticker(uploaded_file, sticker_emoji)
 
     except ShortnameOccupyFailed:
         return await msg.edit_text("❌ Change your Telegram username and try again.")
     except Exception as e:
-        await msg.edit_text(f"⚠️ Error: {str(e)}")
-        LOGGER.error(format_exc())
+        await msg.edit_text(f"⚠️ Error processing media: {str(e)}")
+        LOGGER.error(f"Kang error: {format_exc()}")
+        if path and os.path.exists(path):
+            os.remove(path)
         return
+
+    # Clean up temporary file
+    finally:
+        if path and os.path.exists(path):
+            os.remove(path)
 
     # Manage sticker packs
     kang_lim = 120  # Max stickers per pack
     packnum = limit = volume = 0
     packname_found = False
+    max_packs = 50  # Maximum packs per user
 
     try:
-        while not packname_found:
+        while not packname_found and limit < max_packs:
             packname = f"CE{m.from_user.id}{packnum}_by_{c.me.username}"
             kangpack = (
                 f"{('@' + m.from_user.username) if m.from_user.username else m.from_user.first_name[:10]}"
                 f" {f'Vol {volume}' if volume else ''} by @{c.me.username}"
             )
-
-            if limit >= 50:
-                return await msg.edit_text("❌ You've reached the 50 pack limit.")
 
             try:
                 sticker_set = await get_sticker_set_by_name(c, packname)
@@ -179,6 +196,7 @@ async def kang_sticker(c: Gojo, m: Message):
                 sticker_set = None
 
             if not sticker_set:
+                # Create new sticker set
                 try:
                     sticker_set = await create_sticker_set(
                         client=c,
@@ -187,19 +205,36 @@ async def kang_sticker(c: Gojo, m: Message):
                         short_name=packname,
                         stickers=[sticker],
                     )
+                    packname_found = True
                 except StickerEmojiInvalid:
                     return await msg.edit_text("❌ Invalid emoji provided.")
-            elif sticker_set.set.count >= kang_lim:
-                packnum += 1
-                limit += 1
-                volume += 1
-                continue
+                except Exception as e:
+                    await msg.edit_text(f"❌ Failed to create sticker set: {str(e)}")
+                    LOGGER.error(f"Sticker set creation error: {format_exc()}")
+                    return
+            else:
+                # Check if sticker set is full
+                if sticker_set.set.count >= kang_lim:
+                    packnum += 1
+                    limit += 1
+                    volume += 1
+                    continue
+                
+                # Add to existing set
+                try:
+                    await add_sticker_to_set(c, sticker_set, sticker)
+                    packname_found = True
+                except StickerEmojiInvalid:
+                    return await msg.edit_text("❌ Invalid emoji provided.")
+                except StickersetInvalid:
+                    # Sticker set might have been deleted, try creating a new one
+                    packnum += 1
+                    limit += 1
+                    volume += 1
+                    continue
 
-            try:
-                await add_sticker_to_set(c, sticker_set, sticker)
-                packname_found = True
-            except StickerEmojiInvalid:
-                return await msg.edit_text("❌ Invalid emoji provided.")
+        if not packname_found:
+            return await msg.edit_text("❌ You've reached the 50 pack limit.")
 
         kb = IKM([[IKB("➕ Add Pack", url=f"t.me/addstickers/{packname}")]])
         await msg.delete()
@@ -221,8 +256,8 @@ async def kang_sticker(c: Gojo, m: Message):
     except StickerVideoNowebm:
         await msg.edit_text("❌ Requires WEBM file.")
     except Exception as e:
-        await msg.edit_text(f"⚠️ Error: {str(e)}")
-        LOGGER.error(format_exc())
+        await msg.edit_text(f"⚠️ Unexpected error: {str(e)}")
+        LOGGER.error(f"Unexpected kang error: {format_exc()}")
 
 
 
