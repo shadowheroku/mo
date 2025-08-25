@@ -67,6 +67,13 @@ def reset_warnings(user_id: int, chat_id: int):
     )
     conn.commit()
 
+def reset_all_warnings(chat_id: int):
+    cursor.execute(
+        "DELETE FROM nsfw_warnings WHERE chat_id = ?",
+        (chat_id,)
+    )
+    conn.commit()
+
 # ======================
 # NSFW DETECTION FUNCTION
 # ======================
@@ -120,20 +127,40 @@ def detect_nsfw(image_path: str) -> tuple:
 # HELP TEXT
 # ======================
 __HELP__ = """
-🔞 **Anti-NSFW System**
+🛡️ **Anti-NSFW Protection System**
 
-Protects your group by detecting & removing NSFW content automatically using AI detection.
+🤖 *AI-Powered Content Moderation*
 
-**Commands:**
-- `/antinsfw [on/off]` → Enable or disable Anti-NSFW in group
-- `/antinsfw strict [on/off]` → Enable or disable strict mode (deletes suggestive content too)
-- `/nsfwscan` → Reply to a media message to scan it manually
-- `/nsfwwarns [user]` → Check NSFW warnings for a user (admins only)
-- `/resetnsfwwarns [user]` → Reset NSFW warnings for a user (admins only)
+**⭐ Admin Controls:**
+• `/antinsfw on` - Enable protection
+• `/antinsfw off` - Disable protection
+• `/antinsfw strict on` - Enable strict mode
+• `/antinsfw strict off` - Disable strict mode
+• `/antinsfw status` - View current settings
 
-**Strict Mode:** When enabled, also deletes suggestive content and alcohol/drug references.
+**🔍 Manual Scanning:**
+• `/nsfwscan` - Reply to any media to check it
 
-When enabled, NSFW media is deleted instantly, the sender is warned, and repeat offenders may be banned.
+**⚠️ Warning Management:**
+• `/nsfwwarns [user]` - Check warnings
+• `/resetnsfwwarns [user]` - Reset warnings
+• `/resetallnsfwwarns` - Reset all warnings
+• `/mynsfwwarns` - Check your own warnings
+
+**📊 Detection Capabilities:**
+- Explicit nudity and sexual content
+- Suggestive/partial nudity (strict mode)
+- Alcohol and drug references
+- Weapon and violence imagery
+- Offensive text content
+
+**⚡ Auto-Actions:**
+- Immediate deletion of NSFW content
+- User warnings with counter
+- Automatic ban after 3 warnings
+- Detailed detection reports
+
+**Note:** Group admins need to enable this protection first. The system may occasionally make mistakes - use manual scan for questionable content.
 """
 
 __MODULE__ = "Anti-NSFW"
@@ -143,7 +170,12 @@ __MODULE__ = "Anti-NSFW"
 # ======================
 @Gojo.on_message(filters.command("antinsfw") & filters.group)
 async def toggle_antinsfw(client: Gojo, message: Message):
-    if not await client.is_admin(message.chat.id, message.from_user.id):
+    # Check if user is admin
+    try:
+        member = await client.get_chat_member(message.chat.id, message.from_user.id)
+        if member.status not in [enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]:
+            return await message.reply_text("❌ You need to be an admin to use this command.", quote=True)
+    except:
         return await message.reply_text("❌ You need to be an admin to use this command.", quote=True)
     
     if len(message.command) < 2:
@@ -168,6 +200,14 @@ async def toggle_antinsfw(client: Gojo, message: Message):
             await message.reply_text("✅ Anti-NSFW strict mode **disabled**!")
         else:
             await message.reply_text("⚙️ Usage: `/antinsfw strict on/off`", quote=True)
+    elif arg1 == "status":
+        status, strict = get_antinsfw(message.chat.id)
+        mode_text = "ON" if status else "OFF"
+        strict_text = "ON" if strict else "OFF"
+        await message.reply_text(
+            f"⚙️ Anti-NSFW Status:\n\nEnabled: {mode_text}\nStrict Mode: {strict_text}",
+            quote=True
+        )
     else:
         if arg1 == "on":
             set_antinsfw(message.chat.id, True)
@@ -183,7 +223,12 @@ async def toggle_antinsfw(client: Gojo, message: Message):
 # ======================
 @Gojo.on_message(filters.command("nsfwwarns") & filters.group)
 async def check_nsfw_warns(client: Gojo, message: Message):
-    if not await client.is_admin(message.chat.id, message.from_user.id):
+    # Check if user is admin
+    try:
+        member = await client.get_chat_member(message.chat.id, message.from_user.id)
+        if member.status not in [enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]:
+            return await message.reply_text("❌ You need to be an admin to use this command.", quote=True)
+    except:
         return await message.reply_text("❌ You need to be an admin to use this command.", quote=True)
     
     if message.reply_to_message:
@@ -204,7 +249,12 @@ async def check_nsfw_warns(client: Gojo, message: Message):
 
 @Gojo.on_message(filters.command("resetnsfwwarns") & filters.group)
 async def reset_nsfw_warns(client: Gojo, message: Message):
-    if not await client.is_admin(message.chat.id, message.from_user.id):
+    # Check if user is admin
+    try:
+        member = await client.get_chat_member(message.chat.id, message.from_user.id)
+        if member.status not in [enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]:
+            return await message.reply_text("❌ You need to be an admin to use this command.", quote=True)
+    except:
         return await message.reply_text("❌ You need to be an admin to use this command.", quote=True)
     
     if message.reply_to_message:
@@ -223,6 +273,30 @@ async def reset_nsfw_warns(client: Gojo, message: Message):
         quote=True
     )
 
+@Gojo.on_message(filters.command("resetallnsfwwarns") & filters.group)
+async def reset_all_nsfw_warns(client: Gojo, message: Message):
+    # Check if user is admin
+    try:
+        member = await client.get_chat_member(message.chat.id, message.from_user.id)
+        if member.status not in [enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]:
+            return await message.reply_text("❌ You need to be an admin to use this command.", quote=True)
+    except:
+        return await message.reply_text("❌ You need to be an admin to use this command.", quote=True)
+    
+    reset_all_warnings(message.chat.id)
+    await message.reply_text(
+        "✅ All NSFW warnings in this group have been reset.",
+        quote=True
+    )
+
+@Gojo.on_message(filters.command("mynsfwwarns") & filters.group)
+async def my_nsfw_warns(client: Gojo, message: Message):
+    warnings = get_warnings(message.from_user.id, message.chat.id)
+    await message.reply_text(
+        f"⚠️ You have {warnings} NSFW warning(s) in this group.",
+        quote=True
+    )
+
 # ======================
 # MANUAL SCAN COMMAND
 # ======================
@@ -232,7 +306,6 @@ async def scan_nsfw_command(client: Gojo, message: Message):
         return await message.reply_text("⚠️ Reply to a media message to scan it.")
     
     target = message.reply_to_message
-    file = None
     file_path = None
 
     try:
@@ -251,11 +324,11 @@ async def scan_nsfw_command(client: Gojo, message: Message):
             return await message.reply_text("⚠️ This file type is not supported for scanning.")
 
         # Scan for NSFW content
-        await message.reply_text("🔍 Scanning media for NSFW content...")
+        scan_msg = await message.reply_text("🔍 Scanning media for NSFW content...")
         is_nsfw, confidence, details = detect_nsfw(file_path)
         
         if is_nsfw:
-            await message.reply_text(
+            await scan_msg.edit_text(
                 f"🚨 NSFW content detected with {confidence*100:.1f}% confidence!\n\n"
                 f"Details:\n"
                 f"Nudity: {details.get('nudity', {}).get('sexual_activity', 0)*100:.1f}%\n"
@@ -266,7 +339,7 @@ async def scan_nsfw_command(client: Gojo, message: Message):
                 ),
             )
         else:
-            await message.reply_text("✅ This media appears to be safe.")
+            await scan_msg.edit_text("✅ This media appears to be safe.")
             
     except Exception as e:
         LOGGER.error(f"Error in NSFW scan: {e}")
@@ -282,6 +355,14 @@ async def scan_nsfw_command(client: Gojo, message: Message):
 # ======================
 @Gojo.on_message(filters.group & (filters.photo | filters.video | filters.document | filters.animation | filters.sticker))
 async def auto_scan_nsfw(client: Gojo, message: Message):
+    # Skip if user is admin
+    try:
+        member = await client.get_chat_member(message.chat.id, message.from_user.id)
+        if member.status in [enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]:
+            return
+    except:
+        pass
+    
     enabled, strict_mode = get_antinsfw(message.chat.id)
     if not enabled:
         return  # Feature disabled
@@ -311,6 +392,7 @@ async def auto_scan_nsfw(client: Gojo, message: Message):
             try:
                 await message.delete()
             except:
+                LOGGER.error("Could not delete NSFW message - insufficient permissions")
                 pass  # Might not have permission to delete
             
             # Add warning for the user
@@ -332,9 +414,10 @@ async def auto_scan_nsfw(client: Gojo, message: Message):
                     await warning_msg.edit_text(
                         f"🚫 User {message.from_user.mention} has been banned for repeated NSFW violations."
                     )
-                except:
+                except Exception as ban_error:
+                    LOGGER.error(f"Could not ban user: {ban_error}")
                     await warning_msg.edit_text(
-                        f"🚫 User {message.from_user.mention} has 3+ NSFW warnings but I couldn't ban them."
+                        f"🚫 User {message.from_user.mention} has 3+ NSFW warnings but I couldn't ban them (insufficient permissions)."
                     )
     
     except Exception as e:
@@ -350,24 +433,20 @@ async def auto_scan_nsfw(client: Gojo, message: Message):
 # ======================
 @Gojo.on_callback_query(filters.regex(r"^del_nsfw_"))
 async def delete_nsfw_callback(client: Gojo, callback_query):
+    # Check if user is admin
+    try:
+        member = await client.get_chat_member(callback_query.message.chat.id, callback_query.from_user.id)
+        if member.status not in [enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]:
+            await callback_query.answer("❌ You need to be an admin to delete messages.", show_alert=True)
+            return
+    except:
+        await callback_query.answer("❌ You need to be an admin to delete messages.", show_alert=True)
+        return
+    
     message_id = int(callback_query.data.split("_")[2])
     try:
         await client.delete_messages(callback_query.message.chat.id, message_id)
         await callback_query.message.edit_text("✅ NSFW message deleted.")
     except:
-        await callback_query.message.edit_text("❌ Could not delete the message.")
+        await callback_query.message.edit_text("❌ Could not delete the message (insufficient permissions).")
     await callback_query.answer()
-
-# ======================
-# ERROR HANDLING
-# ======================
-@Gojo.on_errors()
-async def nsfw_error_handler(client: Gojo, error: Exception, message: Message):
-    if "nsfw" in str(error).lower():
-        LOGGER.error(f"Anti-NSFW error: {error}")
-        await message.reply_text("❌ An error occurred in the Anti-NSFW system. Please try again later.")
-
-
-
-__PLUGIN__ = "Anti-NSFW"
-
