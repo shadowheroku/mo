@@ -19,10 +19,18 @@ SIGHTENGINE_API_SECRET = os.getenv("SIGHTENGINE_API_SECRET", "sc2VeSyJYzKciVhP8X
 # Alternative NSFW detection using DeepAI (fallback)
 DEEPAI_API_KEY = os.getenv("DEEPAI_API_KEY", "")
 
+# Additional NSFW detection service
+HOLARA_API_KEY = os.getenv("HOLARA_API_KEY", "")
+
 DB_PATH = "antinsfw.db"
 
 # Thread pool for background processing
-executor = ThreadPoolExecutor(max_workers=5)
+executor = ThreadPoolExecutor(max_workers=10)
+
+# Detection thresholds
+NSFW_THRESHOLD = 0.75  # Default threshold for NSFW detection
+STRICT_THRESHOLD = 0.65  # Threshold for strict mode
+SUGGESTIVE_THRESHOLD = 0.6  # Threshold for suggestive content in strict mode
 
 # ======================
 # DATABASE INIT & MIGRATION
@@ -51,6 +59,10 @@ def init_db():
     if "log_channel" not in columns:
         cursor.execute("ALTER TABLE antinsfw ADD COLUMN log_channel INTEGER DEFAULT 0")
         LOGGER.info("Added log_channel column to antinsfw table")
+    
+    if "warn_threshold" not in columns:
+        cursor.execute("ALTER TABLE antinsfw ADD COLUMN warn_threshold INTEGER DEFAULT 3")
+        LOGGER.info("Added warn_threshold column to antinsfw table")
 
     cursor.execute(
         """CREATE TABLE IF NOT EXISTS nsfw_warnings (
@@ -71,7 +83,20 @@ def init_db():
             media_type TEXT,
             confidence REAL,
             timestamp INTEGER,
-            action_taken TEXT
+            action_taken TEXT,
+            details TEXT
+        )"""
+    )
+
+    cursor.execute(
+        """CREATE TABLE IF NOT EXISTS nsfw_stats (
+            chat_id INTEGER,
+            date TEXT,
+            detected_count INTEGER DEFAULT 0,
+            deleted_count INTEGER DEFAULT 0,
+            warned_count INTEGER DEFAULT 0,
+            banned_count INTEGER DEFAULT 0,
+            PRIMARY KEY (chat_id, date)
         )"""
     )
 
@@ -83,20 +108,21 @@ conn, cursor = init_db()
 # ======================
 # DATABASE FUNCTIONS
 # ======================
-def set_antinsfw(chat_id: int, enabled: bool, strict_mode: bool = False, action_type: str = "delete", log_channel: int = 0):
+def set_antinsfw(chat_id: int, enabled: bool, strict_mode: bool = False, 
+                action_type: str = "delete", log_channel: int = 0, warn_threshold: int = 3):
     cursor.execute(
-        "INSERT OR REPLACE INTO antinsfw (chat_id, enabled, strict_mode, action_type, log_channel) VALUES (?, ?, ?, ?, ?)",
-        (chat_id, 1 if enabled else 0, 1 if strict_mode else 0, action_type, log_channel),
+        "INSERT OR REPLACE INTO antinsfw (chat_id, enabled, strict_mode, action_type, log_channel, warn_threshold) VALUES (?, ?, ?, ?, ?, ?)",
+        (chat_id, 1 if enabled else 0, 1 if strict_mode else 0, action_type, log_channel, warn_threshold),
     )
     conn.commit()
 
 
 def get_antinsfw(chat_id: int) -> tuple:
-    cursor.execute("SELECT enabled, strict_mode, action_type, log_channel FROM antinsfw WHERE chat_id = ?", (chat_id,))
+    cursor.execute("SELECT enabled, strict_mode, action_type, log_channel, warn_threshold FROM antinsfw WHERE chat_id = ?", (chat_id,))
     row = cursor.fetchone()
     if row:
-        return bool(row[0]), bool(row[1]), row[2], row[3]
-    return False, False, "delete", 0
+        return bool(row[0]), bool(row[1]), row[2], row[3], row[4]
+    return False, False, "delete", 0, 3
 
 
 def add_warning(user_id: int, chat_id: int):
@@ -125,11 +151,39 @@ def reset_all_warnings(chat_id: int):
     conn.commit()
 
 
-def log_nsfw_action(chat_id: int, user_id: int, message_id: int, media_type: str, confidence: float, action_taken: str):
+def log_nsfw_action(chat_id: int, user_id: int, message_id: int, media_type: str, 
+                   confidence: float, action_taken: str, details: str = ""):
     timestamp = int(time.time())
     cursor.execute(
-        "INSERT INTO nsfw_logs (chat_id, user_id, message_id, media_type, confidence, timestamp, action_taken) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (chat_id, user_id, message_id, media_type, confidence, timestamp, action_taken)
+        "INSERT INTO nsfw_logs (chat_id, user_id, message_id, media_type, confidence, timestamp, action_taken, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (chat_id, user_id, message_id, media_type, confidence, timestamp, action_taken, details)
+    )
+    
+    # Update stats
+    today = time.strftime("%Y-%m-%d")
+    cursor.execute(
+        """INSERT INTO nsfw_stats (chat_id, date, detected_count) 
+           VALUES (?, ?, 1)
+           ON CONFLICT(chat_id, date) DO UPDATE SET detected_count = detected_count + 1""",
+        (chat_id, today)
+    )
+    
+    if action_taken == "deleted":
+        cursor.execute(
+            "UPDATE nsfw_stats SET deleted_count = deleted_count + 1 WHERE chat_id = ? AND date = ?",
+            (chat_id, today)
+        )
+    
+    conn.commit()
+
+
+def update_stats(chat_id: int, field: str):
+    today = time.strftime("%Y-%m-%d")
+    cursor.execute(
+        f"""INSERT INTO nsfw_stats (chat_id, date, {field}) 
+           VALUES (?, ?, 1)
+           ON CONFLICT(chat_id, date) DO UPDATE SET {field} = {field} + 1""",
+        (chat_id, today)
     )
     conn.commit()
 
@@ -155,7 +209,7 @@ def detect_nsfw_sightengine(image_path: str) -> tuple:
                     "api_user": SIGHTENGINE_API_USER,
                     "api_secret": SIGHTENGINE_API_SECRET,
                 },
-                timeout=30
+                timeout=15
             )
 
         result = response.json()
@@ -165,21 +219,27 @@ def detect_nsfw_sightengine(image_path: str) -> tuple:
             LOGGER.error(f"SightEngine API error: {error_msg}")
             return False, 0, {}
 
-        nudity_score = result.get("nudity", {}).get("sexual_activity", 0) + result.get("nudity", {}).get("sexual_display", 0)
+        nudity_score = max(
+            result.get("nudity", {}).get("sexual_activity", 0),
+            result.get("nudity", {}).get("sexual_display", 0),
+            result.get("nudity", {}).get("erotica", 0)
+        )
+        
+        suggestive_score = result.get("nudity", {}).get("suggestive", 0)
         offensive_score = result.get("offensive", {}).get("prob", 0)
         weapon_score = result.get("weapon", 0)
         alcohol_score = result.get("alcohol", 0)
         drugs_score = result.get("drugs", 0)
 
+        # Weighted total score with nudity having highest priority
         total_score = (
-            nudity_score * 0.5
-            + offensive_score * 0.2
-            + weapon_score * 0.1
-            + alcohol_score * 0.1
-            + drugs_score * 0.1
+            nudity_score * 0.6
+            + suggestive_score * 0.2
+            + offensive_score * 0.1
+            + max(weapon_score, alcohol_score, drugs_score) * 0.1
         )
 
-        is_nsfw = total_score > 0.7 or nudity_score > 0.8
+        is_nsfw = total_score > NSFW_THRESHOLD or nudity_score > NSFW_THRESHOLD
         return is_nsfw, total_score, result
 
     except Exception as e:
@@ -201,7 +261,7 @@ def detect_nsfw_deepai(image_path: str) -> tuple:
                 "https://api.deepai.org/api/nsfw-detector",
                 files={"image": media},
                 headers={"api-key": DEEPAI_API_KEY},
-                timeout=30
+                timeout=15
             )
 
         result = response.json()
@@ -211,7 +271,7 @@ def detect_nsfw_deepai(image_path: str) -> tuple:
             return False, 0, {}
             
         nsfw_score = result.get("output", {}).get("nsfw_score", 0)
-        is_nsfw = nsfw_score > 0.7
+        is_nsfw = nsfw_score > NSFW_THRESHOLD
         return is_nsfw, nsfw_score, result
 
     except Exception as e:
@@ -219,18 +279,67 @@ def detect_nsfw_deepai(image_path: str) -> tuple:
         return False, 0, {}
 
 
+def detect_nsfw_holara(image_path: str) -> tuple:
+    """
+    Alternative NSFW detection using Holara API
+    """
+    try:
+        if not HOLARA_API_KEY:
+            LOGGER.error("Holara API key not configured")
+            return False, 0, {}
+            
+        with open(image_path, "rb") as media:
+            response = requests.post(
+                "https://api.holara.ai/nsfw-detection",
+                files={"image": media},
+                headers={"Authorization": f"Bearer {HOLARA_API_KEY}"},
+                timeout=15
+            )
+
+        result = response.json()
+        
+        if response.status_code != 200:
+            LOGGER.error(f"Holara API error: {result.get('error', 'Unknown error')}")
+            return False, 0, {}
+            
+        nsfw_score = result.get("nsfw_probability", 0)
+        is_nsfw = nsfw_score > NSFW_THRESHOLD
+        return is_nsfw, nsfw_score, result
+
+    except Exception as e:
+        LOGGER.error(f"Error in Holara NSFW detection: {e}")
+        return False, 0, {}
+
+
 def detect_nsfw(image_path: str) -> tuple:
     """
-    Main NSFW detection function with fallback
+    Main NSFW detection function with multiple fallbacks
     """
-    # Try SightEngine first
-    is_nsfw, score, details = detect_nsfw_sightengine(image_path)
+    detection_services = [
+        detect_nsfw_sightengine,
+        detect_nsfw_deepai,
+        detect_nsfw_holara
+    ]
     
-    # If SightEngine fails or not configured, try DeepAI
-    if not SIGHTENGINE_API_USER or not SIGHTENGINE_API_SECRET or (not is_nsfw and score == 0):
-        is_nsfw, score, details = detect_nsfw_deepai(image_path)
-        
-    return is_nsfw, score, details
+    best_score = 0
+    best_result = {}
+    any_nsfw = False
+    
+    for service in detection_services:
+        try:
+            is_nsfw, score, details = service(image_path)
+            if is_nsfw and score > best_score:
+                best_score = score
+                best_result = details
+                any_nsfw = True
+            elif score > best_score:
+                best_score = score
+                best_result = details
+        except Exception as e:
+            LOGGER.warning(f"NSFW detection service failed: {e}")
+            continue
+    
+    return any_nsfw, best_score, best_result
 
 # ======================
 # UTILITY FUNCTIONS
@@ -244,39 +353,126 @@ async def is_user_admin(client: Gojo, chat_id: int, user_id: int) -> bool:
         return False
 
 
-async def log_nsfw_event(client: Gojo, chat_id: int, log_channel: int, message: Message, confidence: float, action: str):
+async def log_nsfw_event(client: Gojo, chat_id: int, log_channel: int, message: Message, confidence: float, action: str, details: dict = None):
     """Log NSFW event to the specified channel"""
     if not log_channel:
         return
         
     try:
+        # Create detailed log text
         log_text = (
             f"🚨 **NSFW Content Detected**\n\n"
             f"**Chat:** {message.chat.title} (`{message.chat.id}`)\n"
             f"**User:** {message.from_user.mention} (`{message.from_user.id}`)\n"
             f"**Confidence:** {confidence*100:.1f}%\n"
             f"**Action:** {action}\n"
-            f"**Time:** {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}"
+            f"**Time:** {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}\n"
         )
+        
+        # Add details if available
+        if details and 'nudity' in details:
+            nudity = details['nudity']
+            log_text += f"**Nudity Score:** {max(nudity.get('sexual_activity', 0), nudity.get('sexual_display', 0))*100:.1f}%\n"
         
         # Try to forward the media if possible
         if message.photo or message.video or message.document:
             try:
                 forwarded = await message.forward(log_channel)
-                await forwarded.reply_text(log_text)
+                await forwarded.reply_text(log_text, parse_mode=enums.ParseMode.MARKDOWN)
             except:
-                await client.send_message(log_channel, log_text)
+                await client.send_message(log_channel, log_text, parse_mode=enums.ParseMode.MARKDOWN)
         else:
-            await client.send_message(log_channel, log_text)
+            await client.send_message(log_channel, log_text, parse_mode=enums.ParseMode.MARKDOWN)
     except Exception as e:
         LOGGER.error(f"Failed to log NSFW event: {e}")
+
+
+async def take_action(client: Gojo, message: Message, action_type: str, warn_threshold: int, confidence: float, details: dict):
+    """Take appropriate action based on settings"""
+    action_taken = "none"
+    
+    # Delete message if action is set to delete
+    if action_type == "delete":
+        try:
+            await message.delete()
+            action_taken = "deleted"
+            LOGGER.info(f"Deleted NSFW message from {message.from_user.id} in chat {message.chat.id}")
+        except Exception as e:
+            LOGGER.warning(f"Could not delete NSFW message: {e}")
+            action_taken = "delete_failed"
+    
+    # Log the action
+    media_type = "photo" if message.photo else "video" if message.video else "document" if message.document else "unknown"
+    log_nsfw_action(message.chat.id, message.from_user.id, message.id, media_type, confidence, action_taken, str(details))
+    
+    # Log to channel if configured
+    enabled, strict, action_type, log_channel, warn_threshold = get_antinsfw(message.chat.id)
+    await log_nsfw_event(client, message.chat.id, log_channel, message, confidence, action_taken, details)
+    
+    # Only warn if message was successfully deleted
+    if action_taken == "deleted":
+        add_warning(message.from_user.id, message.chat.id)
+        warnings = get_warnings(message.from_user.id, message.chat.id)
+        update_stats(message.chat.id, "warned_count")
+
+        warn_msg_text = (
+            f"🚫 NSFW content detected and removed!\n"
+            f"👤 User: {message.from_user.mention}\n"
+            f"⚠️ Warning {warnings}/{warn_threshold}\n"
+            f"🔞 Confidence: {confidence*100:.1f}%"
+        )
+        
+        # Add button to disable warnings for user if admin
+        keyboard = []
+        if await is_user_admin(client, message.chat.id, (await client.get_me()).id):
+            keyboard.append([InlineKeyboardButton("❌ Ban User", callback_data=f"ban_nsfw_{message.from_user.id}")])
+            keyboard.append([InlineKeyboardButton("⚠️ Reset Warnings", callback_data=f"reset_warn_{message.from_user.id}")])
+        
+        try:
+            warn_msg = await client.send_message(
+                message.chat.id,
+                warn_msg_text,
+                reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+            )
+            
+            # Auto-delete warning message after 30 seconds
+            await asyncio.sleep(30)
+            await warn_msg.delete()
+        except Exception as e:
+            LOGGER.error(f"Failed to send warning message: {e}")
+
+        if warnings >= warn_threshold:
+            try:
+                await client.ban_chat_member(message.chat.id, message.from_user.id)
+                update_stats(message.chat.id, "banned_count")
+                ban_msg = await client.send_message(
+                    message.chat.id,
+                    f"🚫 {message.from_user.mention} has been banned for sending NSFW content ({warn_threshold} warnings)."
+                )
+                # Auto-delete ban message after 30 seconds
+                await asyncio.sleep(30)
+                await ban_msg.delete()
+            except Exception as ban_error:
+                LOGGER.error(f"Ban failed: {ban_error}")
+                try:
+                    ban_fail_msg = await client.send_message(
+                        message.chat.id,
+                        f"🚫 {message.from_user.mention} reached {warn_threshold} warnings but ban failed (insufficient permissions)."
+                    )
+                    # Auto-delete ban failure message after 30 seconds
+                    await asyncio.sleep(30)
+                    await ban_fail_msg.delete()
+                except:
+                    pass
+    
+    return action_taken
 
 # ======================
 # BACKGROUND PROCESSING
 # ======================
 async def process_media_in_background(client: Gojo, message: Message):
     """Process media in background without blocking"""
-    enabled, strict, action_type, log_channel = get_antinsfw(message.chat.id)
+    enabled, strict, action_type, log_channel, warn_threshold = get_antinsfw(message.chat.id)
     if not enabled:
         return
 
@@ -286,8 +482,12 @@ async def process_media_in_background(client: Gojo, message: Message):
 
     file_path = None
     try:
-        # Check file size limit (max 5MB for API calls)
-        if message.document and message.document.file_size > 5 * 1024 * 1024:
+        # Check file size limit (max 10MB for API calls)
+        max_size = 10 * 1024 * 1024
+        if (message.document and message.document.file_size > max_size) or \
+           (message.video and message.video.file_size > max_size) or \
+           (message.photo and message.photo.file_size > max_size if hasattr(message.photo, 'file_size') else False):
+            LOGGER.info(f"Skipping large file ({message.id}) in chat {message.chat.id}")
             return
             
         file_path = await message.download()
@@ -303,68 +503,22 @@ async def process_media_in_background(client: Gojo, message: Message):
 
         # Apply strict mode if enabled
         if strict and not is_nsfw:
-            nudity = details.get("nudity", {}).get("sexual_display", 0)
-            suggestive = details.get("nudity", {}).get("suggestive", 0)
+            nudity = details.get("nudity", {})
+            nudity_score = max(
+                nudity.get("sexual_activity", 0),
+                nudity.get("sexual_display", 0),
+                nudity.get("erotica", 0)
+            )
+            suggestive = nudity.get("suggestive", 0)
             alcohol = details.get("alcohol", 0)
             drugs = details.get("drugs", 0)
-            if nudity > 0.5 or suggestive > 0.7 or alcohol > 0.7 or drugs > 0.7:
+            
+            if nudity_score > STRICT_THRESHOLD or suggestive > SUGGESTIVE_THRESHOLD or alcohol > 0.7 or drugs > 0.7:
                 is_nsfw = True
-                confidence = max(nudity, suggestive, alcohol, drugs)
+                confidence = max(nudity_score, suggestive, alcohol, drugs)
 
         if is_nsfw:
-            action_taken = "none"
-            
-            # Take action based on settings
-            if action_type == "delete":
-                try:
-                    await message.delete()
-                    action_taken = "deleted"
-                except Exception as e:
-                    LOGGER.warning(f"Could not delete NSFW message: {e}")
-                    action_taken = "delete_failed"
-            
-            # Log the action
-            media_type = "photo" if message.photo else "video" if message.video else "document" if message.document else "unknown"
-            log_nsfw_action(message.chat.id, message.from_user.id, message.id, media_type, confidence, action_taken)
-            
-            # Log to channel if configured
-            await log_nsfw_event(client, message.chat.id, log_channel, message, confidence, action_taken)
-            
-            # Only warn if message was successfully deleted
-            if action_taken == "deleted":
-                add_warning(message.from_user.id, message.chat.id)
-                warnings = get_warnings(message.from_user.id, message.chat.id)
-
-                warn_msg_text = (
-                    f"🚫 NSFW content detected and removed!\n"
-                    f"👤 User: {message.from_user.mention}\n"
-                    f"⚠️ Warning {warnings}/3\n"
-                    f"🔞 Confidence: {confidence*100:.1f}%"
-                )
-                
-                # Add button to disable warnings for user if admin
-                keyboard = []
-                if await is_user_admin(client, message.chat.id, (await client.get_me()).id):
-                    keyboard.append([InlineKeyboardButton("❌ Ban User", callback_data=f"ban_nsfw_{message.from_user.id}")])
-                    keyboard.append([InlineKeyboardButton("⚠️ Reset Warnings", callback_data=f"reset_warn_{message.from_user.id}")])
-                
-                warn_msg = await client.send_message(
-                    message.chat.id,
-                    warn_msg_text,
-                    reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
-                )
-
-                if warnings >= 3:
-                    try:
-                        await client.ban_chat_member(message.chat.id, message.from_user.id)
-                        await warn_msg.edit_text(
-                            f"🚫 {message.from_user.mention} has been banned for sending NSFW content (3 warnings)."
-                        )
-                    except Exception as ban_error:
-                        LOGGER.error(f"Ban failed: {ban_error}")
-                        await warn_msg.edit_text(
-                            f"🚫 {message.from_user.mention} reached 3 warnings but ban failed (insufficient permissions)."
-                        )
+            await take_action(client, message, action_type, warn_threshold, confidence, details)
 
     except Exception as e:
         LOGGER.error(f"Auto NSFW scan error: {e}")
@@ -383,6 +537,7 @@ __HELP__ = """
 • `/antinsfw strict on|off` - Toggle strict mode  
 • `/antinsfw action delete|warn` - Set action type
 • `/antinsfw logchannel` - Set log channel
+• `/antinsfw warnthreshold [number]` - Set warning threshold (default: 3)
 • `/antinsfw status` - View settings  
 
 **🔍 Manual Scan**
@@ -401,7 +556,7 @@ __HELP__ = """
 - Automatically scans all media in background
 - Deletes NSFW content  
 - Issues warnings  
-- Bans after 3 warnings  
+- Bans after configured warnings  
 """
 
 __MODULE__ = "Anti-NSFW"
@@ -415,15 +570,16 @@ async def toggle_antinsfw(client: Gojo, message: Message):
         return await message.reply_text("❌ Only admins can use this command.")
 
     if len(message.command) < 2:
-        status, strict, action_type, log_channel = get_antinsfw(message.chat.id)
+        status, strict, action_type, log_channel, warn_threshold = get_antinsfw(message.chat.id)
         log_info = f"Log channel: {log_channel}" if log_channel else "Logging: disabled"
         return await message.reply_text(
             f"⚙️ Anti-NSFW Settings:\n\n"
             f"Status: {'ON' if status else 'OFF'}\n"
             f"Strict Mode: {'ON' if strict else 'OFF'}\n"
             f"Action: {action_type}\n"
+            f"Warning Threshold: {warn_threshold}\n"
             f"{log_info}\n\n"
-            "Usage: `/antinsfw on/off`, `/antinsfw strict on/off`, `/antinsfw action delete/warn`, `/antinsfw logchannel`",
+            "Usage: `/antinsfw on/off`, `/antinsfw strict on/off`, `/antinsfw action delete/warn`, `/antinsfw logchannel`, `/antinsfw warnthreshold [number]`",
         )
 
     arg1 = message.command[1].lower()
@@ -431,8 +587,8 @@ async def toggle_antinsfw(client: Gojo, message: Message):
     if arg1 == "strict" and len(message.command) > 2:
         arg2 = message.command[2].lower()
         if arg2 in ["on", "off"]:
-            enabled, _, action_type, log_channel = get_antinsfw(message.chat.id)
-            set_antinsfw(message.chat.id, enabled, arg2 == "on", action_type, log_channel)
+            enabled, _, action_type, log_channel, warn_threshold = get_antinsfw(message.chat.id)
+            set_antinsfw(message.chat.id, enabled, arg2 == "on", action_type, log_channel, warn_threshold)
             return await message.reply_text(f"✅ Strict mode {'enabled' if arg2 == 'on' else 'disabled'}!")
         else:
             return await message.reply_text("⚙️ Usage: `/antinsfw strict on/off`")
@@ -440,8 +596,8 @@ async def toggle_antinsfw(client: Gojo, message: Message):
     elif arg1 == "action" and len(message.command) > 2:
         arg2 = message.command[2].lower()
         if arg2 in ["delete", "warn"]:
-            enabled, strict, _, log_channel = get_antinsfw(message.chat.id)
-            set_antinsfw(message.chat.id, enabled, strict, arg2, log_channel)
+            enabled, strict, _, log_channel, warn_threshold = get_antinsfw(message.chat.id)
+            set_antinsfw(message.chat.id, enabled, strict, arg2, log_channel, warn_threshold)
             return await message.reply_text(f"✅ Action type set to '{arg2}'!")
         else:
             return await message.reply_text("⚙️ Usage: `/antinsfw action delete/warn`")
@@ -457,31 +613,44 @@ async def toggle_antinsfw(client: Gojo, message: Message):
         else:
             return await message.reply_text("⚙️ Usage: Reply to a channel message or provide channel ID: `/antinsfw logchannel [channel_id]`")
         
-        enabled, strict, action_type, _ = get_antinsfw(message.chat.id)
-        set_antinsfw(message.chat.id, enabled, strict, action_type, log_channel)
+        enabled, strict, action_type, _, warn_threshold = get_antinsfw(message.chat.id)
+        set_antinsfw(message.chat.id, enabled, strict, action_type, log_channel, warn_threshold)
         return await message.reply_text(f"✅ Log channel set to {log_channel}!")
+    
+    elif arg1 == "warnthreshold" and len(message.command) > 2:
+        try:
+            threshold = int(message.command[2])
+            if threshold < 1 or threshold > 10:
+                return await message.reply_text("❌ Warning threshold must be between 1 and 10.")
+            
+            enabled, strict, action_type, log_channel, _ = get_antinsfw(message.chat.id)
+            set_antinsfw(message.chat.id, enabled, strict, action_type, log_channel, threshold)
+            return await message.reply_text(f"✅ Warning threshold set to {threshold}!")
+        except ValueError:
+            return await message.reply_text("❌ Please provide a valid number for the warning threshold.")
 
     elif arg1 == "status":
-        status, strict, action_type, log_channel = get_antinsfw(message.chat.id)
+        status, strict, action_type, log_channel, warn_threshold = get_antinsfw(message.chat.id)
         log_info = f"Log channel: {log_channel}" if log_channel else "Logging: disabled"
         return await message.reply_text(
             f"⚙️ Status: {'ON' if status else 'OFF'}\n"
             f"Strict Mode: {'ON' if strict else 'OFF'}\n"
             f"Action: {action_type}\n"
+            f"Warning Threshold: {warn_threshold}\n"
             f"{log_info}"
         )
 
     elif arg1 == "on":
-        _, strict, action_type, log_channel = get_antinsfw(message.chat.id)
-        set_antinsfw(message.chat.id, True, strict, action_type, log_channel)
+        _, strict, action_type, log_channel, warn_threshold = get_antinsfw(message.chat.id)
+        set_antinsfw(message.chat.id, True, strict, action_type, log_channel, warn_threshold)
         return await message.reply_text("✅ Anti-NSFW enabled in this group!")
         
     elif arg1 == "off":
-        _, strict, action_type, log_channel = get_antinsfw(message.chat.id)
-        set_antinsfw(message.chat.id, False, strict, action_type, log_channel)
+        _, strict, action_type, log_channel, warn_threshold = get_antinsfw(message.chat.id)
+        set_antinsfw(message.chat.id, False, strict, action_type, log_channel, warn_threshold)
         return await message.reply_text("❌ Anti-NSFW disabled in this group!")
 
-    return await message.reply_text("⚙️ Usage: `/antinsfw on/off`, `/antinsfw strict on/off`, `/antinsfw action delete/warn`, `/antinsfw logchannel`")
+    return await message.reply_text("⚙️ Usage: `/antinsfw on/off`, `/antinsfw strict on/off`, `/antinsfw action delete/warn`, `/antinsfw logchannel`, `/antinsfw warnthreshold [number]`")
 
 # ======================
 # WARNINGS COMMANDS
@@ -503,7 +672,8 @@ async def check_nsfw_warns(client: Gojo, message: Message):
         return await message.reply_text("⚠️ Reply to a user or provide their ID/username.")
 
     warnings = get_warnings(target_user.id, message.chat.id)
-    await message.reply_text(f"⚠️ {target_user.mention} has {warnings} NSFW warning(s).")
+    _, _, _, _, warn_threshold = get_antinsfw(message.chat.id)
+    await message.reply_text(f"⚠️ {target_user.mention} has {warnings}/{warn_threshold} NSFW warning(s).")
 
 
 @Gojo.on_message(filters.command("resetnsfwwarns") & filters.group)
@@ -538,7 +708,8 @@ async def reset_all_nsfw_warns(client: Gojo, message: Message):
 @Gojo.on_message(filters.command("mynsfwwarns") & filters.group)
 async def my_nsfw_warns(client: Gojo, message: Message):
     warnings = get_warnings(message.from_user.id, message.chat.id)
-    await message.reply_text(f"⚠️ You have {warnings} NSFW warning(s) in this group.")
+    _, _, _, _, warn_threshold = get_antinsfw(message.chat.id)
+    await message.reply_text(f"⚠️ You have {warnings}/{warn_threshold} NSFW warning(s) in this group.")
 
 # ======================
 # STATS COMMAND
@@ -566,11 +737,25 @@ async def nsfw_stats(client: Gojo, message: Message):
     )
     unique_users = cursor.fetchone()[0] or 0
     
+    # Get today's stats
+    today = time.strftime("%Y-%m-%d")
+    cursor.execute(
+        "SELECT detected_count, deleted_count, warned_count, banned_count FROM nsfw_stats WHERE chat_id = ? AND date = ?",
+        (message.chat.id, today)
+    )
+    today_stats = cursor.fetchone() or (0, 0, 0, 0)
+    
     await message.reply_text(
-        f"📊 NSFW Detection Stats (Last 7 days):\n\n"
+        f"📊 NSFW Detection Stats:\n\n"
+        f"**Last 7 days:**\n"
         f"• Detected incidents: {count}\n"
         f"• Unique users: {unique_users}\n"
-        f"• Average confidence: {avg_confidence*100:.1f}%"
+        f"• Average confidence: {avg_confidence*100:.1f}%\n\n"
+        f"**Today ({today}):**\n"
+        f"• Detected: {today_stats[0]}\n"
+        f"• Deleted: {today_stats[1]}\n"
+        f"• Warned: {today_stats[2]}\n"
+        f"• Banned: {today_stats[3]}"
     )
 
 # ======================
@@ -586,8 +771,8 @@ async def scan_nsfw_command(client: Gojo, message: Message):
 
     try:
         # Check file size limit
-        if target.document and target.document.file_size > 5 * 1024 * 1024:
-            return await message.reply_text("❌ File is too large (max 5MB).")
+        if target.document and target.document.file_size > 10 * 1024 * 1024:
+            return await message.reply_text("❌ File is too large (max 10MB).")
             
         file_path = await target.download()
         scan_msg = await message.reply_text("🔍 Scanning...")
@@ -606,7 +791,7 @@ async def scan_nsfw_command(client: Gojo, message: Message):
             # Add details if available
             if details.get("nudity"):
                 nudity = details.get("nudity", {})
-                response_text += f"• Nudity: {nudity.get('sexual_activity', 0)*100:.1f}%\n"
+                response_text += f"• Nudity: {max(nudity.get('sexual_activity', 0), nudity.get('sexual_display', 0))*100:.1f}%\n"
                 response_text += f"• Suggestive: {nudity.get('suggestive', 0)*100:.1f}%\n"
                 
             if details.get("offensive", {}).get("prob", 0) > 0:
@@ -629,62 +814,112 @@ async def scan_nsfw_command(client: Gojo, message: Message):
             await scan_msg.edit_text("✅ This media appears safe.")
 
     except Exception as e:
-        LOGGER.error(f"Error scanning NSFW: {e}")
-        await message.reply_text("❌ Scan failed. Please try again.")
+        LOGGER
+                LOGGER.error(f"Manual NSFW scan error: {e}")
+        await scan_msg.edit_text("❌ Error scanning media. Please try again.")
     finally:
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
 
 # ======================
-# AUTO SCAN - BACKGROUND PROCESSING
-# ======================
-@Gojo.on_message(filters.group & (filters.photo | filters.video | filters.document))
-async def auto_scan_nsfw(client: Gojo, message: Message):
-    # Process media in background without blocking
-    asyncio.create_task(process_media_in_background(client, message))
-
-# ======================
 # CALLBACK HANDLERS
 # ======================
 @Gojo.on_callback_query(filters.regex(r"^del_nsfw_"))
-async def delete_nsfw_callback(client: Gojo, cq):
-    if not await is_user_admin(client, cq.message.chat.id, cq.from_user.id):
-        return await cq.answer("❌ Only admins can delete messages.", show_alert=True)
-
+async def delete_nsfw_callback(client: Gojo, callback_query):
+    """Callback for manual delete button"""
     try:
-        msg_id = int(cq.data.split("_")[2])
-        await client.delete_messages(cq.message.chat.id, msg_id)
-        await cq.message.edit_text("✅ NSFW message deleted.")
-    except:
-        await cq.message.edit_text("❌ Could not delete the message.")
-    await cq.answer()
+        message_id = int(callback_query.data.split("_")[2])
+        if await is_user_admin(client, callback_query.message.chat.id, callback_query.from_user.id):
+            await client.delete_messages(callback_query.message.chat.id, message_id)
+            await callback_query.answer("Message deleted!")
+            await callback_query.message.edit_text("✅ Message deleted successfully.")
+        else:
+            await callback_query.answer("You need to be admin to delete messages.", show_alert=True)
+    except Exception as e:
+        LOGGER.error(f"Delete callback error: {e}")
+        await callback_query.answer("Error deleting message.", show_alert=True)
 
 
 @Gojo.on_callback_query(filters.regex(r"^ban_nsfw_"))
-async def ban_user_callback(client: Gojo, cq):
-    if not await is_user_admin(client, cq.message.chat.id, cq.from_user.id):
-        return await cq.answer("❌ Only admins can ban users.", show_alert=True)
-
+async def ban_user_callback(client: Gojo, callback_query):
+    """Callback for banning user"""
     try:
-        user_id = int(cq.data.split("_")[2])
-        await client.ban_chat_member(cq.message.chat.id, user_id)
-        await cq.message.edit_text(f"✅ User has been banned.")
+        user_id = int(callback_query.data.split("_")[2])
+        if await is_user_admin(client, callback_query.message.chat.id, callback_query.from_user.id):
+            await client.ban_chat_member(callback_query.message.chat.id, user_id)
+            update_stats(callback_query.message.chat.id, "banned_count")
+            await callback_query.answer("User banned!")
+            await callback_query.message.edit_text("✅ User has been banned.")
+        else:
+            await callback_query.answer("You need to be admin to ban users.", show_alert=True)
     except Exception as e:
-        LOGGER.error(f"Ban from callback failed: {e}")
-        await cq.message.edit_text("❌ Could not ban user.")
-    await cq.answer()
+        LOGGER.error(f"Ban callback error: {e}")
+        await callback_query.answer("Error banning user.", show_alert=True)
 
 
 @Gojo.on_callback_query(filters.regex(r"^reset_warn_"))
-async def reset_warnings_callback(client: Gojo, cq):
-    if not await is_user_admin(client, cq.message.chat.id, cq.from_user.id):
-        return await cq.answer("❌ Only admins can reset warnings.", show_alert=True)
-
+async def reset_warnings_callback(client: Gojo, callback_query):
+    """Callback for resetting warnings"""
     try:
-        user_id = int(cq.data.split("_")[2])
-        reset_warnings(user_id, cq.message.chat.id)
-        await cq.message.edit_text(f"✅ Warnings for user have been reset.")
+        user_id = int(callback_query.data.split("_")[2])
+        if await is_user_admin(client, callback_query.message.chat.id, callback_query.from_user.id):
+            reset_warnings(user_id, callback_query.message.chat.id)
+            await callback_query.answer("Warnings reset!")
+            await callback_query.message.edit_text("✅ User warnings have been reset.")
+        else:
+            await callback_query.answer("You need to be admin to reset warnings.", show_alert=True)
     except Exception as e:
-        LOGGER.error(f"Reset warnings failed: {e}")
-        await cq.message.edit_text("❌ Could not reset warnings.")
-    await cq.answer()
+        LOGGER.error(f"Reset warnings callback error: {e}")
+        await callback_query.answer("Error resetting warnings.", show_alert=True)
+
+# ======================
+# MESSAGE HANDLERS
+# ======================
+@Gojo.on_message(
+    (filters.photo | filters.video | filters.document) & filters.group,
+    group=5
+)
+async def auto_nsfw_check(client: Gojo, message: Message):
+    """Automatically check media for NSFW content"""
+    # Skip if anti-NSFW is not enabled
+    enabled, _, _, _, _ = get_antinsfw(message.chat.id)
+    if not enabled:
+        return
+    
+    # Skip processing for admins and anonymous channel posts
+    if not message.from_user or await is_user_admin(client, message.chat.id, message.from_user.id):
+        return
+    
+    # Process in background to avoid blocking
+    asyncio.create_task(process_media_in_background(client, message))
+
+# ======================
+# MIGRATION ON STARTUP
+# ======================
+async def migrate_database():
+    """Run database migrations on startup"""
+    # Check if we need to add any new columns
+    cursor.execute("PRAGMA table_info(antinsfw)")
+    columns = [col[1] for col in cursor.fetchall()]
+    
+    # Add any missing columns that might have been added in updates
+    if "action_type" not in columns:
+        cursor.execute("ALTER TABLE antinsfw ADD COLUMN action_type TEXT DEFAULT 'delete'")
+        LOGGER.info("Added action_type column to antinsfw table")
+    
+    if "log_channel" not in columns:
+        cursor.execute("ALTER TABLE antinsfw ADD COLUMN log_channel INTEGER DEFAULT 0")
+        LOGGER.info("Added log_channel column to antinsfw table")
+    
+    if "warn_threshold" not in columns:
+        cursor.execute("ALTER TABLE antinsfw ADD COLUMN warn_threshold INTEGER DEFAULT 3")
+        LOGGER.info("Added warn_threshold column to antinsfw table")
+    
+    conn.commit()
+
+# Run migration on import
+asyncio.create_task(migrate_database())
+
+LOGGER.info("Anti-NSFW module loaded successfully!")
+
+coninue after this
