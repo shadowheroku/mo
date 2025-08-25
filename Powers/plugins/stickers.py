@@ -404,234 +404,171 @@ async def remove_sticker_from_pack(c: Gojo, m: Message):
 
 import os
 import asyncio
+import tempfile
+from textwrap import wrap
 from traceback import format_exc
 from PIL import Image, ImageDraw, ImageFont, ImageOps
-from textwrap import wrap
-import tempfile
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-@Gojo.on_message(command(["mmfb", "mmfw", "mmf"]))
+from Powers.bot_class import Gojo
+from Powers.utils.custom_filters import command
+
+
+# ─── FONT CONFIG ───
+FONTS = ["arialbd.ttf", "arial.ttf"]  # Try bold, then regular
+DEFAULT_FONT_SIZE = 42
+
+
+# ─── MAIN COMMAND ───
+@Gojo.on_message(command(["mmf", "mmfb", "mmfw"]))
 async def memify_it(c: Gojo, m: Message):
     """
-    Memify images or stickers by adding text
-    Supports black (mmfb) and white (mmfw) text options
+    Memify images/stickers with text overlay
+    Supports black (/mmfb) and white (/mmfw) text
     """
     try:
-        # Validate message reply
+        # Must reply to media
         if not m.reply_to_message:
-            await m.reply_text("❌ Please reply to an image or sticker to memify it.")
-            return
+            return await m.reply_text("❌ Reply to an image/sticker with some text.")
 
         rep_to = m.reply_to_message
-        kb = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("You might like", url="https://t.me/me_and_ghost")
-                ]
-            ]
-        )
 
-        # Validate media type
+        # Supported media: photo, static sticker, or image document
         valid_media = (
             (rep_to.photo) or
             (rep_to.sticker and not rep_to.sticker.is_animated and not rep_to.sticker.is_video) or
-            (rep_to.document and rep_to.document.mime_type and "image" in rep_to.document.mime_type.split("/"))
+            (rep_to.document and rep_to.document.mime_type and rep_to.document.mime_type.startswith("image/"))
         )
-        
         if not valid_media:
-            await m.reply_text("❌ I only support normal stickers and static images for now.", reply_markup=kb)
-            return
+            return await m.reply_text("❌ Only static images & stickers are supported.")
 
-        # Validate command arguments
+        # Text to put on meme
         if len(m.command) == 1:
-            await m.reply_text("❌ Give me some text to add to the image!\nExample: `/mmfb Hello World`", reply_markup=kb)
-            return
+            return await m.reply_text("❌ Give me some text!\nExample: `/mmfb Hello World`")
 
-        # Determine text color
-        filll = m.command[0][-1]
-        fill_color = "black" if filll == "b" else "white"
-
-        # Extract meme text
         meme_text = m.text.split(None, 1)[1].strip()
         if not meme_text:
-            await m.reply_text("❌ Please provide some text to add to the image.", reply_markup=kb)
-            return
+            return await m.reply_text("❌ Meme text cannot be empty.")
 
-        # Limit text length
         if len(meme_text) > 200:
-            await m.reply_text("❌ Text is too long! Maximum 200 characters allowed.", reply_markup=kb)
-            return
+            return await m.reply_text("❌ Text too long! (max 200 chars)")
 
-        x = await m.reply_text("🖌️ Memifying your image...")
+        # Determine color
+        fill_color = "black" if m.command[0].endswith("b") else "white"
 
-        # Create temporary directory for processing
-        with tempfile.TemporaryDirectory() as temp_dir:
-            try:
-                # Download the media
-                input_path = os.path.join(temp_dir, f"input_{m.id}")
-                await rep_to.download(input_path)
-                
-                # Check if file was downloaded successfully
-                if not os.path.exists(input_path) or os.path.getsize(input_path) == 0:
-                    await x.edit_text("❌ Failed to download the media.")
-                    return
+        # Processing notice
+        status = await m.reply_text("🖌️ Memifying...")
 
-                # Process the image
-                is_sticker = bool(rep_to.sticker)
-                output_paths = await draw_meme(input_path, meme_text, is_sticker, fill_color, temp_dir)
-                
-                if not output_paths or len(output_paths) < 2:
-                    await x.edit_text("❌ Failed to process the image.")
-                    return
+        # Temp workspace
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_path = os.path.join(tmpdir, f"in_{m.id}")
+            await rep_to.download(input_path)
 
-                # Send results
-                await x.delete()
-                
-                # Send as photo
-                photo_msg = await m.reply_photo(
-                    output_paths[0], 
-                    caption=f"Memified with: `{meme_text}`",
-                    reply_markup=kb
+            if not os.path.exists(input_path) or os.path.getsize(input_path) == 0:
+                return await status.edit_text("❌ Failed to download media.")
+
+            output_paths = await draw_meme(input_path, meme_text, bool(rep_to.sticker), fill_color, tmpdir)
+
+            if not output_paths:
+                return await status.edit_text("❌ Failed to generate meme.")
+
+            await status.delete()
+
+            # Send as photo
+            photo_msg = await m.reply_photo(
+                output_paths[0],
+                caption=f"🖼️ Meme: `{meme_text}`",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("🔥 Channel", url="https://t.me/me_and_ghost")]]
                 )
-                
-                # Send as sticker with a delay to avoid flooding
-                await asyncio.sleep(1)
-                sticker_msg = await m.reply_sticker(output_paths[1], reply_markup=kb)
-                
-                # Auto-delete after some time (optional)
-                await asyncio.sleep(300)  # 5 minutes
-                try:
-                    await photo_msg.delete()
-                    await sticker_msg.delete()
-                except:
-                    pass
+            )
 
-            except Exception as e:
-                await x.edit_text(f"❌ Error processing image: {str(e)}")
-                LOGGER.error(f"Memify error: {str(e)}\n{format_exc()}")
-            finally:
-                # Cleanup temporary files
-                for file_path in [input_path] + (output_paths if 'output_paths' in locals() else []):
-                    try:
-                        if file_path and os.path.exists(file_path):
-                            os.remove(file_path)
-                    except:
-                        pass
+            # Delay → send as sticker
+            await asyncio.sleep(1)
+            sticker_msg = await m.reply_sticker(output_paths[1])
+
+            # Cleanup (optional auto-delete after 5 mins)
+            await asyncio.sleep(300)
+            try:
+                await photo_msg.delete()
+                await sticker_msg.delete()
+            except:
+                pass
 
     except Exception as e:
-        error_msg = await m.reply_text(f"❌ Unexpected error: {str(e)}")
-        LOGGER.error(f"Unexpected memify error: {str(e)}\n{format_exc()}")
-        await asyncio.sleep(10)
-        await error_msg.delete()
+        await m.reply_text(f"❌ Error: {str(e)}")
+        LOGGER.error(f"Memify error: {str(e)}\n{format_exc()}")
 
 
-async def draw_meme(input_path: str, text: str, is_sticker: bool, fill_color: str, temp_dir: str) -> list:
-    """
-    Add text to an image and create both photo and sticker versions
-    Returns list of paths: [photo_path, sticker_path]
-    """
+# ─── DRAW MEME FUNCTION ───
+async def draw_meme(input_path: str, text: str, is_sticker: bool, fill_color: str, tmpdir: str) -> list:
     try:
-        # Open and validate image
         with Image.open(input_path) as img:
-            # Convert to RGB if needed
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
-            
-            # Resize if needed (max 1024px on the longest side for stickers)
+            # Ensure RGB
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+
+            # Resize
             max_size = (512, 512) if is_sticker else (1024, 1024)
             img.thumbnail(max_size, Image.Resampling.LANCZOS)
-            
-            # Prepare for drawing
+
+            # Prepare drawing
             draw = ImageDraw.Draw(img)
-            img_width, img_height = img.size
-            
-            # Determine font size based on image size and text length
-            font_size = max(12, min(50, int(img_height / 15)))
-            
-            try:
-                # Try to use a bold font
-                font = ImageFont.truetype("arialbd.ttf", font_size)
-            except:
+            w, h = img.size
+            font_size = max(15, min(60, h // 12))
+
+            # Load font
+            for f in FONTS:
                 try:
-                    # Fallback to regular font
-                    font = ImageFont.truetype("arial.ttf", font_size)
+                    font = ImageFont.truetype(f, font_size)
+                    break
                 except:
-                    # Final fallback to default font
-                    font = ImageFont.load_default()
-            
-            # Wrap text to fit image width
-            avg_char_width = font_size * 0.6
-            max_chars_per_line = int(img_width / avg_char_width)
-            wrapped_text = wrap(text, width=max(max_chars_per_line, 10))
-            
-            # Calculate text position (center of image)
-            line_height = font_size * 1.2
-            total_text_height = len(wrapped_text) * line_height
-            y_position = (img_height - total_text_height) / 2
-            
-            # Add text with outline for better visibility
-            for line in wrapped_text:
-                # Get text dimensions
-                bbox = draw.textbbox((0, 0), line, font=font)
-                text_width = bbox[2] - bbox[0]
-                text_height = bbox[3] - bbox[1]
-                
-                # Calculate x position (centered)
-                x_position = (img_width - text_width) / 2
-                
-                # Draw text outline (opposite color)
-                outline_color = "white" if fill_color == "black" else "black"
-                for x_offset in [-2, 2]:
-                    for y_offset in [-2, 2]:
-                        draw.text(
-                            (x_position + x_offset, y_position + y_offset), 
-                            line, 
-                            font=font, 
-                            fill=outline_color
-                        )
-                
-                # Draw main text
-                draw.text((x_position, y_position), line, font=font, fill=fill_color)
-                y_position += line_height
-            
-            # Create output paths
-            photo_path = os.path.join(temp_dir, f"photo_{os.path.basename(input_path)}.jpg")
-            sticker_path = os.path.join(temp_dir, f"sticker_{os.path.basename(input_path)}.webp")
-            
-            # Save as photo (JPEG)
-            img.save(photo_path, "JPEG", quality=95)
-            
-            # Save as sticker (WEBP)
-            if is_sticker:
-                # Ensure exact 512x512 for stickers
-                sticker_img = ImageOps.fit(img, (512, 512), method=Image.Resampling.LANCZOS)
-                sticker_img.save(sticker_path, "WEBP", quality=95)
+                    continue
             else:
-                img.save(sticker_path, "WEBP", quality=95)
-            
-            return [photo_path, sticker_path]
-            
+                font = ImageFont.load_default()
+
+            # Wrap text
+            max_chars = int(w / (font_size * 0.6))
+            wrapped = wrap(text, width=max(max_chars, 10))
+
+            # Center vertically
+            line_h = font_size * 1.2
+            total_h = len(wrapped) * line_h
+            y = (h - total_h) / 2
+
+            # Draw lines
+            outline_color = "white" if fill_color == "black" else "black"
+            for line in wrapped:
+                bbox = draw.textbbox((0, 0), line, font=font)
+                text_w = bbox[2] - bbox[0]
+                x = (w - text_w) / 2
+
+                # Outline
+                for dx in [-2, 2]:
+                    for dy in [-2, 2]:
+                        draw.text((x + dx, y + dy), line, font=font, fill=outline_color)
+
+                # Main text
+                draw.text((x, y), line, font=font, fill=fill_color)
+                y += line_h
+
+            # Save outputs
+            photo_out = os.path.join(tmpdir, "out_photo.jpg")
+            sticker_out = os.path.join(tmpdir, "out_sticker.webp")
+
+            img.save(photo_out, "JPEG", quality=95)
+
+            if is_sticker:
+                s_img = ImageOps.fit(img, (512, 512), method=Image.Resampling.LANCZOS)
+                s_img.save(sticker_out, "WEBP", quality=95)
+            else:
+                img.save(sticker_out, "WEBP", quality=95)
+
+            return [photo_out, sticker_out]
+
     except Exception as e:
         LOGGER.error(f"Draw meme error: {str(e)}\n{format_exc()}")
         return []
-
-
-async def validate_media_size(file_path: str, max_size_mb: int = 10) -> bool:
-    """Validate that media file size is within limits"""
-    try:
-        file_size = os.path.getsize(file_path)
-        return file_size <= max_size_mb * 1024 * 1024
-    except:
-        return False
-
-
-async def is_valid_image(file_path: str) -> bool:
-    """Validate that the file is a valid image"""
-    try:
-        with Image.open(file_path) as img:
-            img.verify()
-        return True
-    except:
-        return False
 
 
 @Gojo.on_message(command(["getsticker", "getst"]))
