@@ -402,46 +402,236 @@ async def remove_sticker_from_pack(c: Gojo, m: Message):
     return
 
 
+import os
+import asyncio
+from traceback import format_exc
+from PIL import Image, ImageDraw, ImageFont, ImageOps
+from textwrap import wrap
+import tempfile
+
 @Gojo.on_message(command(["mmfb", "mmfw", "mmf"]))
 async def memify_it(c: Gojo, m: Message):
-    if not m.reply_to_message:
-        await m.reply_text("Invalid type.")
-        return
-    rep_to = m.reply_to_message
-    if not (rep_to.sticker or rep_to.photo or (rep_to.document and "image" in rep_to.document.mime_type.split("/"))):
-        await m.reply_text("I only support memifying of normal sticker and photos for now")
-        return
-    if rep_to.sticker and (rep_to.sticker.is_animated or rep_to.sticker.is_video):
-        await m.reply_text("I only support memifying of normal sticker and photos for now")
-        return
-    kb = IKM(
-        [
-            [
-                IKB("You might like", url="https://t.me/me_and_ghost")
-            ]
-        ]
-    )
-    if len(m.command) == 1:
-        await m.reply_text("Give me something to write")
-        return
-    filll = m.command[0][-1]
-    fiil = "black" if filll == "b" else "white"
-    x = await m.reply_text("Memifying...")
-    meme = m.text.split(None, 1)[1].strip()
-    name = f"@memesofdank_{m.id}.png"
-    path = await rep_to.download(name)
-    is_sticker = bool(rep_to.sticker)
-    output = await draw_meme(path, meme, is_sticker, fiil)
-    await x.delete()
-    xNx = await m.reply_photo(output[0], reply_markup=kb)
-    await xNx.reply_sticker(output[1], reply_markup=kb)
+    """
+    Memify images or stickers by adding text
+    Supports black (mmfb) and white (mmfw) text options
+    """
     try:
-        os.remove(output[0])
-        os.remove(output[1])
+        # Validate message reply
+        if not m.reply_to_message:
+            await m.reply_text("❌ Please reply to an image or sticker to memify it.")
+            return
+
+        rep_to = m.reply_to_message
+        kb = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("You might like", url="https://t.me/me_and_ghost")
+                ]
+            ]
+        )
+
+        # Validate media type
+        valid_media = (
+            (rep_to.photo) or
+            (rep_to.sticker and not rep_to.sticker.is_animated and not rep_to.sticker.is_video) or
+            (rep_to.document and rep_to.document.mime_type and "image" in rep_to.document.mime_type.split("/"))
+        )
+        
+        if not valid_media:
+            await m.reply_text("❌ I only support normal stickers and static images for now.", reply_markup=kb)
+            return
+
+        # Validate command arguments
+        if len(m.command) == 1:
+            await m.reply_text("❌ Give me some text to add to the image!\nExample: `/mmfb Hello World`", reply_markup=kb)
+            return
+
+        # Determine text color
+        filll = m.command[0][-1]
+        fill_color = "black" if filll == "b" else "white"
+
+        # Extract meme text
+        meme_text = m.text.split(None, 1)[1].strip()
+        if not meme_text:
+            await m.reply_text("❌ Please provide some text to add to the image.", reply_markup=kb)
+            return
+
+        # Limit text length
+        if len(meme_text) > 200:
+            await m.reply_text("❌ Text is too long! Maximum 200 characters allowed.", reply_markup=kb)
+            return
+
+        x = await m.reply_text("🖌️ Memifying your image...")
+
+        # Create temporary directory for processing
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                # Download the media
+                input_path = os.path.join(temp_dir, f"input_{m.id}")
+                await rep_to.download(input_path)
+                
+                # Check if file was downloaded successfully
+                if not os.path.exists(input_path) or os.path.getsize(input_path) == 0:
+                    await x.edit_text("❌ Failed to download the media.")
+                    return
+
+                # Process the image
+                is_sticker = bool(rep_to.sticker)
+                output_paths = await draw_meme(input_path, meme_text, is_sticker, fill_color, temp_dir)
+                
+                if not output_paths or len(output_paths) < 2:
+                    await x.edit_text("❌ Failed to process the image.")
+                    return
+
+                # Send results
+                await x.delete()
+                
+                # Send as photo
+                photo_msg = await m.reply_photo(
+                    output_paths[0], 
+                    caption=f"Memified with: `{meme_text}`",
+                    reply_markup=kb
+                )
+                
+                # Send as sticker with a delay to avoid flooding
+                await asyncio.sleep(1)
+                sticker_msg = await m.reply_sticker(output_paths[1], reply_markup=kb)
+                
+                # Auto-delete after some time (optional)
+                await asyncio.sleep(300)  # 5 minutes
+                try:
+                    await photo_msg.delete()
+                    await sticker_msg.delete()
+                except:
+                    pass
+
+            except Exception as e:
+                await x.edit_text(f"❌ Error processing image: {str(e)}")
+                LOGGER.error(f"Memify error: {str(e)}\n{format_exc()}")
+            finally:
+                # Cleanup temporary files
+                for file_path in [input_path] + (output_paths if 'output_paths' in locals() else []):
+                    try:
+                        if file_path and os.path.exists(file_path):
+                            os.remove(file_path)
+                    except:
+                        pass
+
     except Exception as e:
-        LOGGER.error(e)
-        LOGGER.error(format_exc())
-    return
+        error_msg = await m.reply_text(f"❌ Unexpected error: {str(e)}")
+        LOGGER.error(f"Unexpected memify error: {str(e)}\n{format_exc()}")
+        await asyncio.sleep(10)
+        await error_msg.delete()
+
+
+async def draw_meme(input_path: str, text: str, is_sticker: bool, fill_color: str, temp_dir: str) -> list:
+    """
+    Add text to an image and create both photo and sticker versions
+    Returns list of paths: [photo_path, sticker_path]
+    """
+    try:
+        # Open and validate image
+        with Image.open(input_path) as img:
+            # Convert to RGB if needed
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Resize if needed (max 1024px on the longest side for stickers)
+            max_size = (512, 512) if is_sticker else (1024, 1024)
+            img.thumbnail(max_size, Image.Resampling.LANCZOS)
+            
+            # Prepare for drawing
+            draw = ImageDraw.Draw(img)
+            img_width, img_height = img.size
+            
+            # Determine font size based on image size and text length
+            font_size = max(12, min(50, int(img_height / 15)))
+            
+            try:
+                # Try to use a bold font
+                font = ImageFont.truetype("arialbd.ttf", font_size)
+            except:
+                try:
+                    # Fallback to regular font
+                    font = ImageFont.truetype("arial.ttf", font_size)
+                except:
+                    # Final fallback to default font
+                    font = ImageFont.load_default()
+            
+            # Wrap text to fit image width
+            avg_char_width = font_size * 0.6
+            max_chars_per_line = int(img_width / avg_char_width)
+            wrapped_text = wrap(text, width=max(max_chars_per_line, 10))
+            
+            # Calculate text position (center of image)
+            line_height = font_size * 1.2
+            total_text_height = len(wrapped_text) * line_height
+            y_position = (img_height - total_text_height) / 2
+            
+            # Add text with outline for better visibility
+            for line in wrapped_text:
+                # Get text dimensions
+                bbox = draw.textbbox((0, 0), line, font=font)
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
+                
+                # Calculate x position (centered)
+                x_position = (img_width - text_width) / 2
+                
+                # Draw text outline (opposite color)
+                outline_color = "white" if fill_color == "black" else "black"
+                for x_offset in [-2, 2]:
+                    for y_offset in [-2, 2]:
+                        draw.text(
+                            (x_position + x_offset, y_position + y_offset), 
+                            line, 
+                            font=font, 
+                            fill=outline_color
+                        )
+                
+                # Draw main text
+                draw.text((x_position, y_position), line, font=font, fill=fill_color)
+                y_position += line_height
+            
+            # Create output paths
+            photo_path = os.path.join(temp_dir, f"photo_{os.path.basename(input_path)}.jpg")
+            sticker_path = os.path.join(temp_dir, f"sticker_{os.path.basename(input_path)}.webp")
+            
+            # Save as photo (JPEG)
+            img.save(photo_path, "JPEG", quality=95)
+            
+            # Save as sticker (WEBP)
+            if is_sticker:
+                # Ensure exact 512x512 for stickers
+                sticker_img = ImageOps.fit(img, (512, 512), method=Image.Resampling.LANCZOS)
+                sticker_img.save(sticker_path, "WEBP", quality=95)
+            else:
+                img.save(sticker_path, "WEBP", quality=95)
+            
+            return [photo_path, sticker_path]
+            
+    except Exception as e:
+        LOGGER.error(f"Draw meme error: {str(e)}\n{format_exc()}")
+        return []
+
+
+async def validate_media_size(file_path: str, max_size_mb: int = 10) -> bool:
+    """Validate that media file size is within limits"""
+    try:
+        file_size = os.path.getsize(file_path)
+        return file_size <= max_size_mb * 1024 * 1024
+    except:
+        return False
+
+
+async def is_valid_image(file_path: str) -> bool:
+    """Validate that the file is a valid image"""
+    try:
+        with Image.open(file_path) as img:
+            img.verify()
+        return True
+    except:
+        return False
 
 
 @Gojo.on_message(command(["getsticker", "getst"]))
@@ -527,17 +717,202 @@ async def remove_from_MY_pack(c: Gojo, m: Message):
         return
 
 
+import asyncio
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.errors import (
+    FloodWait, UserNotParticipant, ChannelPrivate, 
+    ChatAdminRequired, PeerIdInvalid, StickersetInvalid
+)
+
 @Gojo.on_message(command(["getmypacks", "mypacks", "mysets", "stickerset", "stset"]))
 async def get_my_sticker_sets(c: Gojo, m: Message):
-    to_del = await m.reply_text("Please wait while I fetch all the sticker set I have created for you.")
+    """Get all sticker packs created by the user"""
+    # Check if user exists
+    if not m.from_user:
+        return await m.reply_text("❌ Cannot identify user. Please try again.")
+    
+    to_del = await m.reply_text("⏳ Please wait while I fetch all the sticker sets I have created for you...")
+    
+    try:
+        # Get sticker packs with progress indication
+        txt, kb = await get_all_sticker_packs(c, m.from_user.id)
+        
+        await to_del.delete()
+        
+        if not txt:
+            no_packs_msg = await m.reply_text(
+                "📭 Looks like you haven't made any stickers using me yet!\n\n"
+                "Use /kang command to create your first sticker pack."
+            )
+            # Auto delete after 10 seconds
+            await asyncio.sleep(10)
+            await no_packs_msg.delete()
+            return
+            
+        # Split long messages (Telegram has 4096 character limit)
+        if len(txt) > 4000:
+            parts = [txt[i:i+4000] for i in range(0, len(txt), 4000)]
+            for part in parts:
+                await m.reply_text(part, reply_markup=kb if part == parts[-1] else None)
+                await asyncio.sleep(0.5)  # Avoid flooding
+        else:
+            await m.reply_text(txt, reply_markup=kb)
+            
+    except Exception as e:
+        await to_del.delete()
+        error_msg = await m.reply_text(f"❌ Error fetching sticker packs: {str(e)}")
+        LOGGER.error(f"Sticker pack error: {str(e)}\n{format_exc()}")
+        await asyncio.sleep(10)
+        await error_msg.delete()
 
-    txt, kb = await get_all_sticker_packs(c, m.from_user.id)
 
-    await to_del.delete()
-    if not txt:
-        await m.reply_text("Looks like you haven't made any sticker using me...")
+async def get_all_sticker_packs(client: Gojo, user_id: int):
+    """Get all sticker packs created for a user"""
+    packs = []
+    keyboard = []
+    pack_count = 0
+    max_packs_to_show = 50  # Limit to avoid excessive loading
+    
+    try:
+        # Try to get user's sticker packs
+        async for sticker_set in client.get_sticker_sets(user_id):
+            try:
+                if pack_count >= max_packs_to_show:
+                    break
+                    
+                pack_name = sticker_set.name
+                pack_title = sticker_set.title
+                stickers_count = sticker_set.count
+                is_animated = sticker_set.is_animated
+                is_video = sticker_set.is_video
+                
+                # Format pack info
+                pack_type = ""
+                if is_video:
+                    pack_type = "🎥 Video"
+                elif is_animated:
+                    pack_type = "✨ Animated"
+                else:
+                    pack_type = "🖼️ Static"
+                
+                pack_info = f"• **{pack_title}**\n  └ {pack_type} | {stickers_count} stickers\n  └ `{pack_name}`\n\n"
+                packs.append(pack_info)
+                pack_count += 1
+                
+                # Add inline button for quick access
+                if len(keyboard) < 5:  # Limit buttons to avoid clutter
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            f"Add {pack_title[:15]}...", 
+                            url=f"t.me/addstickers/{pack_name}"
+                        )
+                    ])
+                    
+            except (StickersetInvalid, AttributeError):
+                # Skip invalid packs
+                continue
+            except Exception as e:
+                LOGGER.error(f"Error processing pack: {str(e)}")
+                continue
+                
+    except (PeerIdInvalid, UserNotParticipant, ChannelPrivate, ChatAdminRequired):
+        # User hasn't created any packs or can't access
+        return None, None
+    except FloodWait as e:
+        # Handle flood wait
+        LOGGER.warning(f"Flood wait: {e.value} seconds")
+        raise Exception(f"Please wait {e.value} seconds before trying again.")
+    except Exception as e:
+        LOGGER.error(f"Error getting sticker sets: {str(e)}")
+        return None, None
+    
+    if not packs:
+        return None, None
+    
+    # Format final message
+    total_packs = len(packs)
+    header = f"📦 **Your Sticker Packs** ({total_packs})\n\n"
+    footer = f"\n✨ **Total:** {total_packs} packs"
+    
+    # If we hit the limit, show a message
+    if total_packs >= max_packs_to_show:
+        footer += f"\n⚠️ Showing first {max_packs_to_show} packs only"
+    
+    message = header + "".join(packs) + footer
+    
+    # Add a "View All" button if there are many packs
+    if total_packs > 5:
+        keyboard.append([
+            InlineKeyboardButton(
+                "📋 View All Packs", 
+                callback_data=f"view_all_packs_{user_id}"
+            )
+        ])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+    
+    return message, reply_markup
+
+
+# Callback handler for viewing all packs
+@Gojo.on_callback_query(filters.regex(r"^view_all_packs_"))
+async def view_all_packs_callback(c: Gojo, query: CallbackQuery):
+    """Handle callback for viewing all packs"""
+    user_id = int(query.data.split("_")[-1])
+    
+    # Verify the callback is from the same user
+    if query.from_user.id != user_id:
+        await query.answer("❌ This is not for you!", show_alert=True)
         return
-    await m.reply_text(txt, reply_markup=kb)
+    
+    await query.answer("⏳ Loading all packs...")
+    
+    # Edit message to show all packs
+    txt, kb = await get_all_sticker_packs(c, user_id)
+    
+    if not txt:
+        await query.message.edit_text("❌ No sticker packs found.")
+        return
+    
+    try:
+        await query.message.edit_text(txt, reply_markup=kb)
+    except Exception as e:
+        LOGGER.error(f"Error editing message: {str(e)}")
+        await query.message.reply_text("❌ Error displaying packs. Please try again.")
+
+
+# Additional command to refresh packs
+@Gojo.on_message(command(["refreshpacks", "updatepacks"]))
+async def refresh_sticker_packs(c: Gojo, m: Message):
+    """Refresh and update sticker packs list"""
+    if not m.from_user:
+        return await m.reply_text("❌ Cannot identify user.")
+    
+    progress_msg = await m.reply_text("🔄 Refreshing your sticker packs...")
+    
+    try:
+        # Clear any cache if exists
+        if hasattr(c, '_sticker_cache'):
+            user_cache = getattr(c, '_sticker_cache', {})
+            if m.from_user.id in user_cache:
+                del user_cache[m.from_user.id]
+        
+        # Get updated packs
+        txt, kb = await get_all_sticker_packs(c, m.from_user.id)
+        
+        await progress_msg.delete()
+        
+        if not txt:
+            await m.reply_text("❌ No sticker packs found after refresh.")
+            return
+        
+        await m.reply_text("✅ Packs refreshed!\n\n" + txt, reply_markup=kb)
+        
+    except Exception as e:
+        await progress_msg.delete()
+        error_msg = await m.reply_text(f"❌ Error refreshing packs: {str(e)}")
+        await asyncio.sleep(10)
+        await error_msg.delete()
 
 
 @Gojo.on_message(command(["q", "ss"]))
