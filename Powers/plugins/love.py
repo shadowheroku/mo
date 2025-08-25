@@ -23,8 +23,7 @@ async def love_calc(c: Gojo, m: Message):
     # ─── Simple processing animation ───
     stages = [
         "Analyzing compatibility...",
-        "Measuring connection...",
-        "Finalizing result..."
+        "Measuring connection..."
     ]
 
     for stage in stages:
