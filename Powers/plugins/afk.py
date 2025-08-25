@@ -12,6 +12,7 @@ from Powers.utils.cmd_senders import send_cmd
 from Powers.utils.custom_filters import afk_filter, command
 from Powers.utils.msg_types import Types, get_afk_type
 
+# ─── AFK RESPONSES ───
 res = [
     "{first} is resting for a while...",
     "{first} living his real life, go and live yours.",
@@ -26,11 +27,12 @@ res = [
 back = [
     "{first} is finally back to life",
     "{first} welcome back",
-    "{first} the spy is back watch what you talk about"
+    "{first} the spy is back watch what you talk about",
     "{first} is now finally back from the dead"
 ]
 
 
+# ─── SET AFK ───
 @Gojo.on_message(command(["afk", "brb"]) & ~filters.private)
 async def going_afk(c: Gojo, m: Message):
     user = m.from_user.id
@@ -42,7 +44,6 @@ async def going_afk(c: Gojo, m: Message):
 
     if len(m.command) == 1:
         text = choice(res)
-
     elif len(m.command) > 1:
         text = m.text.markdown.split(None, 1)[1]
 
@@ -52,10 +53,10 @@ async def going_afk(c: Gojo, m: Message):
     afk.insert_afk(chat, user, str(time), text, data_type, content)
 
     await m.reply_text(f"{m.from_user.mention} is now AFK")
-
     return
 
 
+# ─── FORMAT HOURS ───
 async def get_hours(hour: str):
     tim = hour.strip().split(":")
     txt = ""
@@ -65,10 +66,10 @@ async def get_hours(hour: str):
         txt += f"{tim[1]} minutes "
     if int(round(float(tim[2]))):
         txt += f"{str(round(float(tim[2])))} seconds"
-
     return txt
 
 
+# ─── AFK CHECKER ───
 @Gojo.on_message(afk_filter & filters.group)
 async def afk_checker(c: Gojo, m: Message):
     afk = AFK()
@@ -77,9 +78,11 @@ async def afk_checker(c: Gojo, m: Message):
     chat = m.chat.id
     repl = m.reply_to_message
 
+    # ── If replying to AFK user ──
     rep_user = repl.from_user.id if repl and repl.from_user else False
     is_afk = afk.check_afk(chat, user)
     is_rep_afk = afk.check_afk(chat, rep_user) if rep_user else False
+
     if is_rep_afk and rep_user != user:
         con = afk.get_afk(chat, rep_user)
         time = till_date(con["time"])
@@ -92,11 +95,13 @@ async def afk_checker(c: Gojo, m: Message):
             tims = tim
         elif len(tim_) == 2:
             tims = f"{tim_[0]} {tim}"
+
         reason = f"{repl.from_user.first_name} is afk since {tims}\n"
         if con['reason'] not in res:
             reason += f"\nDue to: {con['reason'].format(first=repl.from_user.first_name)}"
         else:
             reason += f"\n{con['reason'].format(first=repl.from_user.first_name)}"
+
         txt = reason
 
         if media_type == Types.TEXT:
@@ -115,35 +120,33 @@ async def afk_checker(c: Gojo, m: Message):
                 reply_to_message_id=repl.id
             )
 
+    # ── If AFK user sends a message ──
     if is_afk:
-        txt = False
-        try:
-            txt = m.command[0]
-        except Exception:
-            pass
-
-        if txt and txt in ["afk", "brb"]:
+        # Ignore if they are just setting AFK again
+        if m.text and m.text.split()[0].lower() in ["/afk", "/brb"]:
             raise ContinuePropagation
-        else:
-            con = afk.get_afk(chat, user)
-            time = till_date(con["time"])
-            tim_ = datetime.now() - time
-            tim_ = str(tim_).split(",")
-            tim = await get_hours(tim_[-1])
-            if len(tim_) == 1:
-                tims = tim
-            elif len(tim_) == 2:
-                tims = f"{tim_[0]} {tim}"
-            txt = f"{back_.format(first=m.from_user.mention)}\n\nAfk for: {tims}"
-            await m.reply_text(txt)
+
+        con = afk.get_afk(chat, user)
+        time = till_date(con["time"])
+        tim_ = datetime.now() - time
+        tim_ = str(tim_).split(",")
+        tim = await get_hours(tim_[-1])
+        if len(tim_) == 1:
+            tims = tim
+        elif len(tim_) == 2:
+            tims = f"{tim_[0]} {tim}"
+
+        txt = f"{back_.format(first=m.from_user.mention)}\n\nAfk for: {tims}"
+        await m.reply_text(txt)
+
         afk.delete_afk(chat, user)
+
     raise ContinuePropagation
 
 
+# ─── PLUGIN INFO ───
 __PLUGIN__ = "afk"
-
 _DISABLE_CMDS_ = ["afk", "brb"]
-
 __alt_name__ = ["brb"]
 
 __HELP__ = """
