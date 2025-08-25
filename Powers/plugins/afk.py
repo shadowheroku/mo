@@ -9,8 +9,9 @@ from Powers.bot_class import Gojo
 from Powers.database.afk_db import AFK
 from Powers.plugins import till_date
 from Powers.utils.cmd_senders import send_cmd
-from Powers.utils.custom_filters import afk_filter, command
+from Powers.utils.custom_filters import command
 from Powers.utils.msg_types import Types, get_afk_type
+
 
 # ─── AFK RESPONSES ───
 res = [
@@ -45,7 +46,7 @@ async def going_afk(c: Gojo, m: Message):
     if len(m.command) == 1:
         text = choice(res)
     elif len(m.command) > 1:
-        text = m.text.markdown.split(None, 1)[1]
+        text = m.text.split(None, 1)[1]
 
     if not data_type:
         data_type = Types.TEXT
@@ -53,7 +54,6 @@ async def going_afk(c: Gojo, m: Message):
     afk.insert_afk(chat, user, str(time), text, data_type, content)
 
     await m.reply_text(f"{m.from_user.mention} is now AFK")
-    return
 
 
 # ─── FORMAT HOURS ───
@@ -69,25 +69,24 @@ async def get_hours(hour: str):
     return txt
 
 
-# ─── AFK CHECKER ───
-@Gojo.on_message(afk_filter & filters.group)
-async def afk_checker(c: Gojo, m: Message):
+# ─── AFK RETURN (Yukki-style: triggers on ANY message) ───
+@Gojo.on_message(filters.group & ~filters.bot & ~filters.via_bot)
+async def afk_return(c: Gojo, m: Message):
+    if not m.from_user:  # ignore channel posts etc
+        return
+
     afk = AFK()
-    back_ = choice(back)
     user = m.from_user.id
     chat = m.chat.id
-    repl = m.reply_to_message
 
-    # ── If replying to AFK user ──
-    rep_user = repl.from_user.id if repl and repl.from_user else False
-    is_afk = afk.check_afk(chat, user)
-    is_rep_afk = afk.check_afk(chat, rep_user) if rep_user else False
+    # don’t trigger return if user is setting AFK again
+    if m.text and m.text.split()[0].lower() in ["/afk", "/brb"]:
+        return
 
-    if is_rep_afk and rep_user != user:
-        con = afk.get_afk(chat, rep_user)
+    # if user was AFK → remove
+    if afk.check_afk(chat, user):
+        con = afk.get_afk(chat, user)
         time = till_date(con["time"])
-        media = con["media"]
-        media_type = con["media_type"]
         tim_ = datetime.now() - time
         tim_ = str(tim_).split(",")
         tim = await get_hours(tim_[-1])
@@ -96,11 +95,37 @@ async def afk_checker(c: Gojo, m: Message):
         elif len(tim_) == 2:
             tims = f"{tim_[0]} {tim}"
 
-        reason = f"{repl.from_user.first_name} is afk since {tims}\n"
+        txt = f"{choice(back).format(first=m.from_user.mention)}\n\nAfk for: {tims}"
+        await m.reply_text(txt)
+        afk.delete_afk(chat, user)
+
+
+# ─── AFK NOTIFIER (when replying to an AFK user) ───
+@Gojo.on_message(filters.group & filters.reply)
+async def afk_notifier(c: Gojo, m: Message):
+    if not m.reply_to_message or not m.reply_to_message.from_user:
+        return
+
+    afk = AFK()
+    rep_user = m.reply_to_message.from_user.id
+    chat = m.chat.id
+
+    if afk.check_afk(chat, rep_user):
+        con = afk.get_afk(chat, rep_user)
+        time = till_date(con["time"])
+        media = con["media"]
+        media_type = con["media_type"]
+
+        tim_ = datetime.now() - time
+        tim_ = str(tim_).split(",")
+        tim = await get_hours(tim_[-1])
+        tims = tim if len(tim_) == 1 else f"{tim_[0]} {tim}"
+
+        reason = f"{m.reply_to_message.from_user.first_name} is afk since {tims}\n"
         if con['reason'] not in res:
-            reason += f"\nDue to: {con['reason'].format(first=repl.from_user.first_name)}"
+            reason += f"\nDue to: {con['reason'].format(first=m.reply_to_message.from_user.first_name)}"
         else:
-            reason += f"\n{con['reason'].format(first=repl.from_user.first_name)}"
+            reason += f"\n{con['reason'].format(first=m.reply_to_message.from_user.first_name)}"
 
         txt = reason
 
@@ -117,31 +142,8 @@ async def afk_checker(c: Gojo, m: Message):
                 media,
                 txt,
                 parse_mode=PM.MARKDOWN,
-                reply_to_message_id=repl.id
+                reply_to_message_id=m.id,
             )
-
-    # ── If AFK user sends a message ──
-    if is_afk:
-        # Ignore if they are just setting AFK again
-        if m.text and m.text.split()[0].lower() in ["/afk", "/brb"]:
-            raise ContinuePropagation
-
-        con = afk.get_afk(chat, user)
-        time = till_date(con["time"])
-        tim_ = datetime.now() - time
-        tim_ = str(tim_).split(",")
-        tim = await get_hours(tim_[-1])
-        if len(tim_) == 1:
-            tims = tim
-        elif len(tim_) == 2:
-            tims = f"{tim_[0]} {tim}"
-
-        txt = f"{back_.format(first=m.from_user.mention)}\n\nAfk for: {tims}"
-        await m.reply_text(txt)
-
-        afk.delete_afk(chat, user)
-
-    raise ContinuePropagation
 
 
 # ─── PLUGIN INFO ───
