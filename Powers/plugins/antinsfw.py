@@ -212,7 +212,7 @@ async def antinsfw_callback(c: Gojo, q: CallbackQuery):
 
     # require admin
     if action != "status" and not await is_chat_admin(c, chat_id, user_id):
-        return await q.answer("Only group admins can change Anti-NSFW.", show_alert=True)
+        return await q.answer("Only group admins with add admin permission and Owner of the group can change Anti-NSFW.", show_alert=True)
 
     if action == "on":
         ANTINSFW[chat_id_str] = True
@@ -245,7 +245,7 @@ async def free_user(c: Gojo, m: Message):
         return await m.reply_text("⚠️ Reply to a user's message to /free them from scans.")
 
     if not await is_chat_admin(c, m.chat.id, m.from_user.id):
-        return await m.reply_text("❌ Only group admins can free users.")
+        return await m.reply_text("❌ Only group admins with add admin permission and Owner of the group can free users.")
 
     target = m.reply_to_message.from_user
     target_id_str = str(target.id)
@@ -282,7 +282,7 @@ async def free_buttons(c: Gojo, q: CallbackQuery):
 
     # only admins
     if not await is_chat_admin(c, chat_id, user_id):
-        return await q.answer("Only group admins can use this.", show_alert=True)
+        return await q.answer("Only group admins with add admin permission and Owner of the group can use this.", show_alert=True)
 
     if action == "unfree":
         if target_id_str in FREE_USERS.get(chat_id_str, []):
@@ -307,7 +307,7 @@ async def unfree_user_cmd(c: Gojo, m: Message):
         return await m.reply_text("⚠️ Reply to a user's message to /unfree them.")
 
     if not await is_chat_admin(c, m.chat.id, m.from_user.id):
-        return await m.reply_text("🚫 Only group admins can unfree users.")
+        return await m.reply_text("🚫 Only group admins with add admin permission and Owner of the group can unfree users.")
 
     target = m.reply_to_message.from_user
     target_id_str = str(target.id)
@@ -445,7 +445,7 @@ async def mod_buttons(c: Gojo, q: CallbackQuery):
 
     # restrict to admins
     if not await is_chat_admin(c, chat_id, user_id):
-        return await q.answer("Only admins can use moderation actions.", show_alert=True)
+        return await q.answer("Only admins with add admin permission and Owner of the group can use moderation actions.", show_alert=True)
 
     if action == "dismiss":
         try:
