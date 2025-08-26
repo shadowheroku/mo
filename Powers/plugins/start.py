@@ -52,6 +52,9 @@ def paginate_buttons(buttons: list, page: int = 1, per_page: int = 9):
         nav.append(InlineKeyboardButton("Next ▶️", callback_data=f"help_page_{page+1}"))
     if nav:
         rows.append(nav)
+    
+    # Add back button
+    rows.append([InlineKeyboardButton("« Back to Start", callback_data="start_back")])
 
     return InlineKeyboardMarkup(rows)
 
@@ -167,23 +170,27 @@ Join my [News Channel](http://t.me/shadowbotshq) to get information on all the l
 # ─── Commands ───
 @Gojo.on_callback_query(filters.regex("^commands$"))
 async def commands_menu(c: Gojo, q: CallbackQuery):
-    ou = await gen_cmds_kb(q.message)
-    keyboard = ikb(ou, True)
-    cpt = f"""
+    # Create the same interface as the help command
+    modules = sorted(list(HELP_COMMANDS.keys()))
+    buttons = [
+        InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}")
+        for x in modules
+    ]
+    keyboard = paginate_buttons(buttons, page=1)
+    
+    msg = f"""
 Hey **[{q.from_user.first_name}](http://t.me/{q.from_user.username})**! I am {c.me.first_name}✨.
 I'm here to help you manage your group(s)!
-Commands available:
-× /start: Start the bot
-× /help: Give's you this message.
 
-You can use {", ".join(PREFIX_HANDLER)} as your prefix handler
-"""
+**Available Modules:**
+Choose a module from below to get detailed help."""
+
     try:
-        await q.edit_message_caption(caption=cpt, reply_markup=keyboard)
+        await q.edit_message_caption(caption=msg, reply_markup=keyboard)
     except MessageNotModified:
         pass
     except QueryIdInvalid:
-        await q.message.reply_photo(photo=str(choice(StartPic)), caption=cpt, reply_markup=keyboard)
+        await q.message.reply_photo(photo=str(choice(StartPic)), caption=msg, reply_markup=keyboard)
     await q.answer()
 
 
@@ -228,9 +235,9 @@ async def help_menu(c: Gojo, m: Message):
             msg = f"""
 Hey **[{m.from_user.first_name}](http://t.me/{m.from_user.username})**! I am {c.me.first_name}✨.
 I'm here to help you manage your group(s)!
-Commands available:
-× /start: Start the bot
-× /help: Give's you this message."""
+
+**Available Modules:**
+Choose a module from below to get detailed help."""
         else:
             keyboard = InlineKeyboardMarkup(
                 [[InlineKeyboardButton("Help", url=f"t.me/{c.me.username}?start=start_help")]]
