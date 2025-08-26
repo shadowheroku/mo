@@ -88,14 +88,25 @@ FREE_USERS = _data.get("free_users", {}) # {chat_id_str: [user_id_str,...]}
 
 
 # ─── HELPERS ───
+from pyrogram.enums import ChatMemberStatus
+
 async def is_chat_admin(c: Gojo, chat_id: int, user_id: int) -> bool:
-    """Return True if user is admin or owner in the chat."""
+    """Return True if user is owner or admin with 'add new admins' rights."""
     try:
         member = await c.get_chat_member(chat_id, user_id)
-        # member.status is an enum ChatMemberStatus
-        return member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER)
+
+        # Group Owner always allowed
+        if member.status == ChatMemberStatus.OWNER:
+            return True
+
+        # Admin with 'can_promote_members' (add new admins permission)
+        if member.status == ChatMemberStatus.ADMINISTRATOR and getattr(member.privileges, "can_promote_members", False):
+            return True
+
+        return False
     except Exception:
         return False
+
 
 async def scan_nsfw(file_path: str):
     """
