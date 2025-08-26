@@ -14,8 +14,8 @@ from Powers import LOGGER
 # ======================
 # CONFIGURATION
 # ======================
-SIGHTENGINE_API_USER = os.getenv("SIGHTENGINE_API_USER", "your_sightengine_user")
-SIGHTENGINE_API_SECRET = os.getenv("SIGHTENGINE_API_SECRET", "your_sightengine_secret")
+SIGHTENGINE_API_USER = os.getenv("SIGHTENGINE_API_USER", "862487500")
+SIGHTENGINE_API_SECRET = os.getenv("SIGHTENGINE_API_SECRET", "sc2VeSyJYzKciVhP8X57GtmQvA8kyzCb")
 DB_PATH = "antinsfw.db"
 NSFW_THRESHOLD = 0.75
 STRICT_THRESHOLD = 0.65
@@ -23,7 +23,33 @@ SUGGESTIVE_THRESHOLD = 0.6
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 # ======================
-# DATABASE
+# DATABASE MIGRATION
+# ======================
+def migrate_database():
+    """Check and migrate database schema if needed."""
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    cursor = conn.cursor()
+    
+    # Check if warn_threshold column exists
+    cursor.execute("PRAGMA table_info(antinsfw)")
+    columns = [col[1] for col in cursor.fetchall()]
+    
+    if 'warn_threshold' not in columns:
+        LOGGER.info("Adding missing column: warn_threshold")
+        cursor.execute("ALTER TABLE antinsfw ADD COLUMN warn_threshold INTEGER DEFAULT 3")
+    
+    # Check other columns that might be missing
+    for column in ['scan_photos', 'scan_videos', 'scan_documents']:
+        if column not in columns:
+            LOGGER.info(f"Adding missing column: {column}")
+            default_value = 1 if column in ['scan_photos', 'scan_videos'] else 0
+            cursor.execute(f"ALTER TABLE antinsfw ADD COLUMN {column} INTEGER DEFAULT {default_value}")
+    
+    conn.commit()
+    conn.close()
+
+# ======================
+# DATABASE FUNCTIONS
 # ======================
 def get_db_connection():
     """Get a new database connection (thread-safe)."""
@@ -94,34 +120,44 @@ def init_db():
     """)
     conn.commit()
     conn.close()
+    
+    # Run migration after creating tables
+    migrate_database()
 
 def get_antinsfw(chat_id: int) -> Tuple[bool, bool, str, int, int, bool, bool, bool]:
     """Get anti-NSFW configuration for a chat."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute(
-        """
-        SELECT enabled, strict_mode, action_type, log_channel, warn_threshold, 
-               scan_photos, scan_videos, scan_documents
-        FROM antinsfw WHERE chat_id = ?
-        """,
-        (chat_id,),
-    )
-    row = cursor.fetchone()
-    conn.close()
-    
-    if row:
-        return (
-            bool(row[0]),
-            bool(row[1]),
-            row[2] or "delete",
-            row[3] or 0,
-            row[4] or 3,
-            bool(row[5]),
-            bool(row[6]),
-            bool(row[7]),
+    try:
+        cursor.execute(
+            """
+            SELECT enabled, strict_mode, action_type, log_channel, warn_threshold, 
+                   scan_photos, scan_videos, scan_documents
+            FROM antinsfw WHERE chat_id = ?
+            """,
+            (chat_id,),
         )
+        row = cursor.fetchone()
+        
+        if row:
+            return (
+                bool(row[0]),
+                bool(row[1]),
+                row[2] or "delete",
+                row[3] or 0,
+                row[4] if row[4] is not None else 3,
+                bool(row[5]) if row[5] is not None else True,
+                bool(row[6]) if row[6] is not None else True,
+                bool(row[7]) if row[7] is not None else False,
+            )
+    except sqlite3.Error as e:
+        LOGGER.error(f"Database error in get_antinsfw: {e}")
+        # Return defaults if there's an error
+        return False, False, "delete", 0, 3, True, True, False
+    finally:
+        conn.close()
+    
     return False, False, "delete", 0, 3, True, True, False
 
 def set_antinsfw(
@@ -139,28 +175,60 @@ def set_antinsfw(
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute(
-        """
-        INSERT OR REPLACE INTO antinsfw
-        (chat_id, enabled, strict_mode, action_type, log_channel, warn_threshold, 
-         scan_photos, scan_videos, scan_documents, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            chat_id,
-            1 if enabled else 0,
-            1 if strict_mode else 0,
-            action_type,
-            log_channel,
-            warn_threshold,
-            1 if scan_photos else 0,
-            1 if scan_videos else 0,
-            1 if scan_documents else 0,
-            int(time.time()),
-        ),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO antinsfw
+            (chat_id, enabled, strict_mode, action_type, log_channel, warn_threshold, 
+             scan_photos, scan_videos, scan_documents, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                chat_id,
+                1 if enabled else 0,
+                1 if strict_mode else 0,
+                action_type,
+                log_channel,
+                warn_threshold,
+                1 if scan_photos else 0,
+                1 if scan_videos else 0,
+                1 if scan_documents else 0,
+                int(time.time()),
+            ),
+        )
+        conn.commit()
+    except sqlite3.Error as e:
+        LOGGER.error(f"Database error in set_antinsfw: {e}")
+        # Try to create the table if it doesn't exist
+        try:
+            init_db()
+            # Retry the operation
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO antinsfw
+                (chat_id, enabled, strict_mode, action_type, log_channel, warn_threshold, 
+                 scan_photos, scan_videos, scan_documents, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    chat_id,
+                    1 if enabled else 0,
+                    1 if strict_mode else 0,
+                    action_type,
+                    log_channel,
+                    warn_threshold,
+                    1 if scan_photos else 0,
+                    1 if scan_videos else 0,
+                    1 if scan_documents else 0,
+                    int(time.time()),
+                ),
+            )
+            conn.commit()
+        except Exception as e2:
+            LOGGER.error(f"Failed to create table and retry: {e2}")
+    finally:
+        conn.close()
+
 
 def add_warning(user_id: int, chat_id: int):
     """Add a warning for a user in a chat."""
@@ -609,11 +677,21 @@ async def process_media_in_background(client: Gojo, message: Message):
 @Gojo.on_message(filters.command("antinsfw") & filters.group)
 async def toggle_antinsfw(client: Gojo, message: Message):
     try:
+        if not message.from_user:
+            return await message.reply_text("❌ Could not identify user.")
+            
         if not await is_user_admin(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admins can use this command.")
 
         if len(message.command) < 2:
-            status, strict, action_type, log_channel, warn_threshold, scan_photos, scan_videos, scan_documents = get_antinsfw(message.chat.id)
+            # Get current settings with error handling
+            try:
+                status, strict, action_type, log_channel, warn_threshold, scan_photos, scan_videos, scan_documents = get_antinsfw(message.chat.id)
+            except Exception as e:
+                LOGGER.error(f"Error getting antinsfw settings: {e}")
+                # Set default values and try to initialize the database
+                set_antinsfw(message.chat.id, False)
+                status, strict, action_type, log_channel, warn_threshold, scan_photos, scan_videos, scan_documents = get_antinsfw(message.chat.id)
             
             media_types = []
             if scan_photos:
@@ -660,6 +738,8 @@ async def toggle_antinsfw(client: Gojo, message: Message):
                 enabled, _, action_type, log_channel, warn_threshold, scan_photos, scan_videos, scan_documents = get_antinsfw(message.chat.id)
                 set_antinsfw(message.chat.id, enabled, arg2 == "on", action_type, log_channel, warn_threshold, scan_photos, scan_videos, scan_documents)
                 return await message.reply_text(f"✅ Strict mode {'enabled' if arg2 == 'on' else 'disabled'}!")
+            else:
+                return await message.reply_text("❌ Usage: `/antinsfw strict on/off`")
                 
         elif arg1 == "action" and len(message.command) > 2:
             arg2 = message.command[2].lower()
@@ -667,6 +747,8 @@ async def toggle_antinsfw(client: Gojo, message: Message):
                 enabled, strict, _, log_channel, warn_threshold, scan_photos, scan_videos, scan_documents = get_antinsfw(message.chat.id)
                 set_antinsfw(message.chat.id, enabled, strict, arg2, log_channel, warn_threshold, scan_photos, scan_videos, scan_documents)
                 return await message.reply_text(f"✅ Action type set to '{arg2}'!")
+            else:
+                return await message.reply_text("❌ Usage: `/antinsfw action delete/warn`")
                 
         elif arg1 == "logchannel" and len(message.command) > 2:
             try:
@@ -746,30 +828,11 @@ async def toggle_antinsfw(client: Gojo, message: Message):
             
     except Exception as e:
         LOGGER.error(f"Error in antinsfw command: {e}")
-        return await message.reply_text("❌ An error occurred while processing the command.")
-
-# ======================
-# MESSAGE HANDLERS
-# ======================
-@Gojo.on_message(
-    (filters.photo | filters.video | filters.document) & filters.group,
-    group=5
-)
-async def auto_nsfw_check(client: Gojo, message: Message):
-    """Automatically check media for NSFW content."""
-    try:
-        enabled, _, _, _, _, _, _, _ = get_antinsfw(message.chat.id)
-        if not enabled:
-            return
-            
-        # Process in background to avoid blocking
-        asyncio.create_task(process_media_in_background(client, message))
-        
-    except Exception as e:
-        LOGGER.error(f"Error in auto_nsfw_check: {e}")
+        return await message.reply_text("❌ An error occurred while processing the command. The database might need to be updated. Try using the command again.")
 
 # ======================
 # INITIALIZATION
 # ======================
+# Run initialization and migration
 init_db()
 LOGGER.info("Anti-NSFW module loaded successfully!")
