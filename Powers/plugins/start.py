@@ -298,52 +298,50 @@ async def get_module_info(c: Gojo, q: CallbackQuery):
 # ─── Staffs ───
 @Gojo.on_callback_query(filters.regex("^give_bot_staffs$"))
 async def give_bot_staffs(c: Gojo, q: CallbackQuery):
-    reply = ""
     try:
         owner = await c.get_users(OWNER_ID)
         reply = f"<b>🌟 Owner:</b> {(await mention_html(owner.first_name, OWNER_ID))} (<code>{OWNER_ID}</code>)\n"
     except RPCError:
         pass
-
     true_dev = get_support_staff("dev")
     reply += "\n<b>Developers ⚡️:</b>\n"
     if not true_dev:
         reply += "No Dev Users\n"
     else:
         for each_user in true_dev:
+            user_id = int(each_user)
             try:
-                user = await c.get_users(int(each_user))
-                reply += f"• {(await mention_html(user.first_name, user.id))} (<code>{user.id}</code>)\n"
+                user = await c.get_users(user_id)
+                reply += f"• {(await mention_html(user.first_name, user_id))} (<code>{user_id}</code>)\n"
             except RPCError:
                 pass
-
     true_sudo = get_support_staff("sudo")
     reply += "\n<b>Sudo Users 🐉:</b>\n"
     if not true_sudo:
         reply += "No Sudo Users\n"
     else:
         for each_user in true_sudo:
+            user_id = int(each_user)
             try:
-                user = await c.get_users(int(each_user))
-                reply += f"• {(await mention_html(user.first_name, user.id))} (<code>{user.id}</code>)\n"
+                user = await c.get_users(user_id)
+                reply += f"• {(await mention_html(user.first_name, user_id))} (<code>{user_id}</code>)\n"
             except RPCError:
                 pass
-
     reply += "\n<b>Whitelisted Users 🐺:</b>\n"
-    wl = get_support_staff("whitelist")
-    if not wl:
+    if not get_support_staff("whitelist"):
         reply += "No additional whitelisted users\n"
     else:
-        for each_user in wl:
+        for each_user in get_support_staff("whitelist"):
+            user_id = int(each_user)
             try:
-                user = await c.get_users(int(each_user))
-                reply += f"• {(await mention_html(user.first_name, user.id))} (<code>{user.id}</code>)\n"
+                user = await c.get_users(user_id)
+                reply += f"• {(await mention_html(user.first_name, user_id))} (<code>{user_id}</code>)\n"
             except RPCError:
                 pass
 
     await q.edit_message_caption(reply,
                                  reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back", "start_back")]]))
-
+    return
 
 # ─── Delete ───
 @Gojo.on_callback_query(filters.regex("^DELETEEEE$"))
