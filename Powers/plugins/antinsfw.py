@@ -5,7 +5,28 @@ import tempfile
 import traceback
 
 from datetime import datetime
+import os
+import json
+import asyncio
+import tempfile
+import traceback
 
+from datetime import datetime
+
+# async http client preferred
+try:
+    import httpx
+    HAS_HTTPX = True
+except Exception:
+    import requests
+    HAS_HTTPX = False
+
+from pyrogram import filters, ContinuePropagation
+from pyrogram.enums import ParseMode as PM, ChatMemberStatus
+from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+
+from Powers.bot_class import Gojo
+from Powers.utils.custom_filters import command
 # try async HTTP first, fallback to requests in a thread
 try:
     import httpx
