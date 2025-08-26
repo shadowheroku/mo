@@ -296,53 +296,76 @@ async def get_module_info(c: Gojo, q: CallbackQuery):
 
 
 # ─── Staffs ───
+# ─── Staffs ───
 @Gojo.on_callback_query(filters.regex("^give_bot_staffs$"))
 async def give_bot_staffs(c: Gojo, q: CallbackQuery):
+    reply = ""
+    
+    # Owner information
     try:
         owner = await c.get_users(OWNER_ID)
-        reply = f"<b>🌟 Owner:</b> {(await mention_html(owner.first_name, OWNER_ID))} (<code>{OWNER_ID}</code>)\n"
-    except RPCError:
-        pass
+        owner_name = owner.first_name or "The Creator"
+        reply = f"<b>👑 Supreme Commander:</b> {(await mention_html(owner_name, OWNER_ID))} (<code>{OWNER_ID}</code>)\n"
+    except RPCError as e:
+        LOGGER.error(f"Error getting owner info: {e}")
+        reply = f"<b>👑 Supreme Commander:</b> <code>{OWNER_ID}</code>\n"
+    
+    # Developers information
     true_dev = get_support_staff("dev")
-    reply += "\n<b>Developers ⚡️:</b>\n"
+    reply += "\n<b>⚡️ Code Wizards:</b>\n"
     if not true_dev:
-        reply += "No Dev Users\n"
+        reply += "No mystical coders found\n"
     else:
         for each_user in true_dev:
-            user_id = int(each_user)
             try:
+                user_id = int(each_user)
                 user = await c.get_users(user_id)
-                reply += f"• {(await mention_html(user.first_name, user_id))} (<code>{user_id}</code>)\n"
-            except RPCError:
-                pass
+                user_name = user.first_name or "Anonymous Coder"
+                reply += f"• {(await mention_html(user_name, user_id))} (<code>{user_id}</code>)\n"
+            except RPCError as e:
+                LOGGER.error(f"Error getting dev user {each_user}: {e}")
+                reply += f"• <code>{each_user}</code>\n"
+    
+    # Sudo users information
     true_sudo = get_support_staff("sudo")
-    reply += "\n<b>Sudo Users 🐉:</b>\n"
+    reply += "\n<b>🐲 Dragon Riders:</b>\n"
     if not true_sudo:
-        reply += "No Sudo Users\n"
+        reply += "No dragon masters available\n"
     else:
         for each_user in true_sudo:
-            user_id = int(each_user)
             try:
+                user_id = int(each_user)
                 user = await c.get_users(user_id)
-                reply += f"• {(await mention_html(user.first_name, user_id))} (<code>{user_id}</code>)\n"
-            except RPCError:
-                pass
-    reply += "\n<b>Whitelisted Users 🐺:</b>\n"
-    if not get_support_staff("whitelist"):
-        reply += "No additional whitelisted users\n"
+                user_name = user.first_name or "Mysterious Rider"
+                reply += f"• {(await mention_html(user_name, user_id))} (<code>{user_id}</code>)\n"
+            except RPCError as e:
+                LOGGER.error(f"Error getting sudo user {each_user}: {e}")
+                reply += f"• <code>{each_user}</code>\n"
+    
+    # Whitelisted users information
+    wl = get_support_staff("whitelist")
+    reply += "\n<b>🦊 Shadow Agents:</b>\n"
+    if not wl:
+        reply += "No covert operatives deployed\n"
     else:
-        for each_user in get_support_staff("whitelist"):
-            user_id = int(each_user)
+        for each_user in wl:
             try:
+                user_id = int(each_user)
                 user = await c.get_users(user_id)
-                reply += f"• {(await mention_html(user.first_name, user_id))} (<code>{user_id}</code>)\n"
-            except RPCError:
-                pass
+                user_name = user.first_name or "Secret Agent"
+                reply += f"• {(await mention_html(user_name, user_id))} (<code>{user_id}</code>)\n"
+            except RPCError as e:
+                LOGGER.error(f"Error getting whitelisted user {each_user}: {e}")
+                reply += f"• <code>{each_user}</code>\n"
 
-    await q.edit_message_caption(reply,
-                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back", "start_back")]]))
-    return
+    # Add some flavor text
+    reply += "\n\n<i>These are the chosen ones who wield the bot's power across the digital realm!</i> ✨"
 
+    await q.edit_message_caption(
+        caption=reply,
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back to Start", "start_back")]])
+    )
+    await q.answer()
 # ─── Delete ───
 @Gojo.on_callback_query(filters.regex("^DELETEEEE$"))
 async def delete_back(_, q: CallbackQuery):
