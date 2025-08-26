@@ -452,4 +452,4 @@ __HELP__ = """
 **Anti-NSFW**
 • /antinsfw → Open inline buttons to enable/disable scanner (admin only)
 • /free (reply) → Free a user from scans (admin only)
-• /unfree (reply) → Remove user from free list (admin only)
+• /unfree (reply) → Remove user from free list (admin only)"""
