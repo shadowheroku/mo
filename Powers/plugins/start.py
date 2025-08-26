@@ -297,6 +297,7 @@ async def get_module_info(c: Gojo, q: CallbackQuery):
 
 # ─── Staffs ───
 # ─── Staffs ───
+# ─── Staffs ───
 @Gojo.on_callback_query(filters.regex("^give_bot_staffs$"))
 async def give_bot_staffs(c: Gojo, q: CallbackQuery):
     reply = ""
@@ -310,53 +311,85 @@ async def give_bot_staffs(c: Gojo, q: CallbackQuery):
         LOGGER.error(f"Error getting owner info: {e}")
         reply = f"<b>👑 Supreme Commander:</b> <code>{OWNER_ID}</code>\n"
     
-    # Developers information
+    # Developers information (excluding owner)
     true_dev = get_support_staff("dev")
     reply += "\n<b>⚡️ Code Wizards:</b>\n"
     if not true_dev:
         reply += "No mystical coders found\n"
     else:
+        dev_count = 0
         for each_user in true_dev:
+            user_id = int(each_user)
+            # Skip if this is the owner
+            if user_id == OWNER_ID:
+                continue
+                
             try:
-                user_id = int(each_user)
                 user = await c.get_users(user_id)
                 user_name = user.first_name or "Anonymous Coder"
                 reply += f"• {(await mention_html(user_name, user_id))} (<code>{user_id}</code>)\n"
+                dev_count += 1
             except RPCError as e:
                 LOGGER.error(f"Error getting dev user {each_user}: {e}")
                 reply += f"• <code>{each_user}</code>\n"
+                dev_count += 1
+        
+        if dev_count == 0:
+            reply += "No mystical coders found\n"
     
-    # Sudo users information
+    # Sudo users information (excluding owner and developers)
     true_sudo = get_support_staff("sudo")
     reply += "\n<b>🐲 Dragon Riders:</b>\n"
     if not true_sudo:
         reply += "No dragon masters available\n"
     else:
+        sudo_count = 0
         for each_user in true_sudo:
+            user_id = int(each_user)
+            # Skip if this is the owner or a developer
+            if user_id == OWNER_ID or (true_dev and str(user_id) in true_dev):
+                continue
+                
             try:
-                user_id = int(each_user)
                 user = await c.get_users(user_id)
                 user_name = user.first_name or "Mysterious Rider"
                 reply += f"• {(await mention_html(user_name, user_id))} (<code>{user_id}</code>)\n"
+                sudo_count += 1
             except RPCError as e:
                 LOGGER.error(f"Error getting sudo user {each_user}: {e}")
                 reply += f"• <code>{each_user}</code>\n"
+                sudo_count += 1
+        
+        if sudo_count == 0:
+            reply += "No dragon masters available\n"
     
-    # Whitelisted users information
+    # Whitelisted users information (excluding owner, developers, and sudo users)
     wl = get_support_staff("whitelist")
     reply += "\n<b>🦊 Shadow Agents:</b>\n"
     if not wl:
         reply += "No covert operatives deployed\n"
     else:
+        wl_count = 0
         for each_user in wl:
+            user_id = int(each_user)
+            # Skip if this user is in higher privilege groups
+            if (user_id == OWNER_ID or 
+                (true_dev and str(user_id) in true_dev) or 
+                (true_sudo and str(user_id) in true_sudo)):
+                continue
+                
             try:
-                user_id = int(each_user)
                 user = await c.get_users(user_id)
                 user_name = user.first_name or "Secret Agent"
                 reply += f"• {(await mention_html(user_name, user_id))} (<code>{user_id}</code>)\n"
+                wl_count += 1
             except RPCError as e:
                 LOGGER.error(f"Error getting whitelisted user {each_user}: {e}")
                 reply += f"• <code>{each_user}</code>\n"
+                wl_count += 1
+        
+        if wl_count == 0:
+            reply += "No covert operatives deployed\n"
 
     # Add some flavor text
     reply += "\n\n<i>These are the chosen ones who wield the bot's power across the digital realm!</i> ✨"
@@ -366,6 +399,8 @@ async def give_bot_staffs(c: Gojo, q: CallbackQuery):
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back to Start", "start_back")]])
     )
     await q.answer()
+
+
 # ─── Delete ───
 @Gojo.on_callback_query(filters.regex("^DELETEEEE$"))
 async def delete_back(_, q: CallbackQuery):
