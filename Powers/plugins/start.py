@@ -82,24 +82,26 @@ async def close_admin_callback(_, q: CallbackQuery):
 import asyncio
 from pyrogram.types import Message
 
+import asyncio
+from pyrogram.types import Message
+
 async def send_loading_animation(m: Message):
-    """Send a fire emoji followed by a loading animation, then delete."""
-    
-    # Step 1: Send fire emoji
-    fire_msg = await m.reply_text("🔥", quote=True)
+    """
+    Display a fire emoji, then a loading animation on the same message,
+    and finally show a 'Done' checkmark.
+    """
+    # Step 1: Send fire emoji and wait
+    fire_msg = await m.reply_text("⚡", quote=True)
     await asyncio.sleep(1.5)
-    
-    # Delete fire emoji
     await fire_msg.delete()
-    
-    # Step 2: Edit the original message with loading animation
-    for _ in range(3):  # Repeat the cycle 3 times
-        for i in range(1, 4):  # Loading dots 1 → 3
-            loading_text = "ʟᴏᴀᴅɪɴɢ" + ("." * i)
-            await m.edit_text(loading_text)
+
+    # Step 2: Loading animation (edit same message)
+    for _ in range(3):  # Repeat 3 cycles
+        for dots in range(1, 4):  # 1 to 3 dots
+            await m.edit_text(f"ʟᴏᴀᴅɪɴɢ{'.' * dots}")
             await asyncio.sleep(0.8)
-    
-    # Step 3: Final text (optional)
+
+    # Step 3: Final confirmation
     await m.edit_text("✅ Done!")
 
 
