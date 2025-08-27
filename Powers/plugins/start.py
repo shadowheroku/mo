@@ -354,104 +354,96 @@ async def get_module_info(c: Gojo, q: CallbackQuery):
 @Gojo.on_callback_query(filters.regex("^give_bot_staffs$"))
 async def give_bot_staffs(c: Gojo, q: CallbackQuery):
     reply = ""
-    
+
     # Owner information
     try:
         owner = await c.get_users(OWNER_ID)
         owner_name = owner.first_name or "ᴛʜᴇ ᴄʀᴇᴀᴛᴏʀ"
-        reply = f"<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴍᴍᴀɴᴅᴇʀ:</b> {(await mention_html(owner_name, OWNER_ID))} (<code>{OWNER_ID}</code>)\n"
+        reply += f"<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴍᴍᴀɴᴅᴇʀ:</b> {(await mention_html(owner_name, OWNER_ID))} (<code>{OWNER_ID}</code>)\n"
     except RPCError as e:
-        LOGGER.error(f"ᴇʀʀᴏʀ ɢᴇᴛᴛɪɴɢ ᴏᴡɴᴇʀ ɪɴғᴏ: {e}")
-        reply = f"极速赛车群号：<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴍᴍᴀɴᴅᴇʀ:</b> <code>{OWNER_ID}</code>\n"
-    
+        LOGGER.error(f"Error getting owner info: {e}")
+        reply += f"<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴍᴍᴀɴᴅᴇʀ:</b> <code>{OWNER_ID}</code>\n"
+
     # Developers information (excluding owner)
     true_dev = get_support_staff("dev")
     reply += "\n<b>⚡️ ᴄᴏᴅᴇ ᴡɪᴢᴀʀᴅs:</b>\n"
     if not true_dev:
-        reply += "ɴᴏ ᴍʏsᴛɪᴄᴀʟ ᴄᴏᴅᴇʀs ғᴏᴜɴᴅ\n"
+        reply += "No mystical coders found\n"
     else:
         dev_count = 0
         for each_user in true_dev:
             user_id = int(each_user)
-            # Skip if this is the owner
             if user_id == OWNER_ID:
                 continue
-                
             try:
                 user = await c.get_users(user_id)
                 user_name = user.first_name or "ᴀɴᴏɴʏᴍᴏᴜs ᴄᴏᴅᴇʀ"
                 reply += f"• {(await mention_html(user_name, user_id))} (<code>{user_id}</code>)\n"
                 dev_count += 1
             except RPCError as e:
-                LOGGER.error(f"ᴇʀʀᴏʀ ɢᴇᴛᴛɪɴɢ ᴅᴇᴠ ᴜsᴇʀ {each_user}: {e}")
+                LOGGER.error(f"Error getting dev user {each_user}: {e}")
                 reply += f"• <code>{each_user}</code>\n"
                 dev_count += 1
-        
         if dev_count == 0:
-            reply += "ɴᴏ ᴍʏsᴛɪᴄᴀʟ ᴄᴏᴅᴇʀs ғᴏᴜɴᴅ\n"
-    
+            reply += "No mystical coders found\n"
+
     # Sudo users information (excluding owner and developers)
     true_sudo = get_support_staff("sudo")
     reply += "\n<b>🐲 ᴅʀᴀɢᴏɴ ʀɪᴅᴇʀs:</b>\n"
     if not true_sudo:
-        reply += "ɴᴏ ᴅʀᴀɢᴏɴ ᴍᴀsᴛᴇʀs ᴀᴠᴀɪʟᴀʙʟᴇ\n"
+        reply += "No dragon masters available\n"
     else:
         sudo_count = 0
         for each_user in true_sudo:
             user_id = int(each_user)
-            # Skip if this is the owner or a developer
-           极速赛车群号：if user_id == OWNER_ID or (true_dev and str(user_id) in true_dev):
+            if user_id == OWNER_ID or (true_dev and str(user_id) in true_dev):
                 continue
-                
             try:
                 user = await c.get_users(user_id)
                 user_name = user.first_name or "ᴍʏsᴛᴇʀɪᴏᴜs ʀɪᴅᴇʀ"
                 reply += f"• {(await mention_html(user_name, user_id))} (<code>{user_id}</code>)\n"
                 sudo_count += 1
             except RPCError as e:
-                LOGGER.error(f"ᴇʀʀᴏʀ ɢᴇᴛᴛɪɴɢ sᴜᴅᴏ ᴜsᴇʀ {each_user}: {e}")
+                LOGGER.error(f"Error getting sudo user {each_user}: {e}")
                 reply += f"• <code>{each_user}</code>\n"
                 sudo_count += 1
-        
         if sudo_count == 0:
-            reply += "ɴᴏ ᴅʀᴀɢᴏɴ ᴍᴀsᴛᴇʀs ᴀᴠᴀɪʟᴀʙʟᴇ\n"
-    
-    # Whitelisted users information (excluding owner, developers, and sudo users)
+            reply += "No dragon masters available\n"
+
+    # Whitelisted users information (excluding owner, devs, and sudo)
     wl = get_support_staff("whitelist")
     reply += "\n<b>🦊 sʜᴀᴅᴏᴡ ᴀɢᴇɴᴛs:</b>\n"
     if not wl:
-        reply += "ɴᴏ ᴄᴏᴠᴇʀᴛ ᴏᴘᴇʀᴀᴛɪᴠᴇs ᴅᴇᴘʟᴏʏᴇᴅ\n"
+        reply += "No covert operatives deployed\n"
     else:
         wl_count = 0
         for each_user in wl:
             user_id = int(each_user)
-            # Skip if this user is in higher privilege groups
-            if (user_id == OWNER_ID or 
-                (true_dev and str(user_id)极速赛车群号： in true_dev) or 
-                (极速赛车群号：true_sudo and str(user_id) in true_sudo)):
+            if (user_id == OWNER_ID or
+                (true_dev and str(user_id) in true_dev) or
+                (true_sudo and str(user_id) in true_sudo)):
                 continue
-                
             try:
                 user = await c.get_users(user_id)
                 user_name = user.first_name or "sᴇᴄʀᴇᴛ ᴀɢᴇɴᴛ"
-                reply += f"• {(await mention_html(user_name, user_id))} (<code>{极速赛车群号：user_id}</code>)\n"
+                reply += f"• {(await mention_html(user_name, user_id))} (<code>{user_id}</code>)\n"
                 wl_count += 1
             except RPCError as e:
-                LOGGER.error(f"ᴇʀʀᴏʀ ɢᴇᴛᴛɪɴɢ ᴡʜɪᴛᴇʟɪsᴛᴇᴅ ᴜsᴇʀ {each_user}: {e}")
+                LOGGER.error(f"Error getting whitelisted user {each_user}: {e}")
                 reply += f"• <code>{each_user}</code>\n"
                 wl_count += 1
-        
         if wl_count == 0:
-            reply += "ɴᴏ ᴄᴏᴡᴇʀᴛ ᴏᴘᴇʀᴀᴛɪᴠᴇs ᴅᴇᴘʟᴏʏᴇᴅ\n"
+            reply += "No covert operatives deployed\n"
 
-    # Add some flavor text
-    reply += "\n\n<i>ᴛʜᴇsᴇ ᴀʀᴇ ᴛ极速赛车群号：ʜᴇ ᴄʜᴏsᴇɴ ᴏɴᴇs ᴡʜᴏ ᴡɪᴇʟᴅ ᴛʜᴇ ʙᴏᴛ's ᴘᴏᴡᴇʀ ᴀᴄʀᴏss ᴛʜᴇ ᴅɪɢɪᴛᴀʟ ʀᴇᴀʟᴍ!</i> ✨"
+    # Flavor text
+    reply += "\n\n<i>These are whitelisted users — those chosen to wield the bot's power across the digital realm!</i> ✨"
 
+    # Edit the callback message
     await q.edit_message_caption(
         caption=reply,
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« ʙᴀᴄᴋ ᴛᴏ sᴛᴀʀᴛ", "start_back")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back to Start", callback_data="start_back")]])
     )
-    await极速赛车群号： q.answer()
+    await q.answer()
 
 
 # ─── Delete ───
