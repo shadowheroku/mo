@@ -129,11 +129,12 @@ async def rps_play(c: Gojo, q: CallbackQuery):
         del rps_games[chat_id]
 
 
-__PLUGIN__ = "rps"
+__PLUGIN__ = "ʀᴏᴄᴋ–ᴘᴀᴘᴇʀ–sᴄɪssᴏʀs"
 _DISABLE_CMDS_ = ["rps"]
 
 __HELP__ = """
-🎮 Rock–Paper–Scissors
-• /rps → Play with Bot  
-• Reply /rps → Challenge another player  
+🎮 ʀᴏᴄᴋ–ᴘᴀᴘᴇʀ–sᴄɪssᴏʀs
+• /rps → ᴘʟᴀʏ ᴡɪᴛʜ ʙᴏᴛ  
+• ʀᴇᴘʟʏ /rps → ᴄʜᴀʟʟᴇɴɢᴇ ᴀɴᴏᴛʜᴇʀ ᴘʟᴀʏᴇʀ  
 """
+
