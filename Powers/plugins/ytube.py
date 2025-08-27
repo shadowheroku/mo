@@ -149,16 +149,17 @@ async def yt_video_cmd(c: Gojo, m: Message):
             os.remove(f)
 
 
-__PLUGIN__ = "yt_video"
+__PLUGIN__ = "ʏᴏᴜᴛᴜʙᴇ"
 
 _DISABLE_CMDS_ = ["yt", "video"]
 
 __HELP__ = """
-**YouTube Video Downloader** 🎥
+**ʏᴏᴜᴛᴜʙᴇ ᴠɪᴅᴇᴏ ᴅᴏᴡɴʟᴏᴀᴅᴇʀ** 🎥
 
-• /yt <query>  
-   Search & download a YouTube video  
+• /yt <ǫᴜᴇʀʏ>  
+   sᴇᴀʀᴄʜ & ᴅᴏᴡɴʟᴏᴀᴅ ᴀ ʏᴏᴜᴛᴜʙᴇ ᴠɪᴅᴇᴏ  
 
-• /video <query>  
-   Same as `/yt`
+• /video <ǫᴜᴇʀʏ>  
+   sᴀᴍᴇ ᴀs `/yt`
 """
+
