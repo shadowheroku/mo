@@ -283,41 +283,44 @@ async def filters_watcher(c: Gojo, m: Message):
     return
 
 
-__PLUGIN__ = "filters"
+__PLUGIN__ = "ғɪʟᴛᴇʀs"
 
 _DISABLE_CMDS_ = ["filters"]
 
 __alt_name__ = ["filters", "autoreply"]
 
 __HELP__ = """
-**Filters**
+**ғɪʟᴛᴇʀs**
 
-• /filters: List all active filters saved in the chat.
+• /filters: ʟɪsᴛ ᴀʟʟ ᴀᴄᴛɪᴠᴇ ғɪʟᴛᴇʀs sᴀᴠᴇᴅ ɪɴ ᴛʜᴇ ᴄʜᴀᴛ.
 
-**Admin only:**
-• /filter "`<keyword>`" `<reply message>`: Add a filter to this chat. The bot will now reply that message whenever 'keyword'
-is mentioned. If you reply to a sticker with a keyword, the bot will reply with that sticker.
+**ᴀᴅᴍɪɴ ᴏɴʟʏ:**
+• /filter "`<keyword>`" `<reply message>`: ᴀᴅᴅ ᴀ ғɪʟᴛᴇʀ ᴛᴏ ᴛʜɪs ᴄʜᴀᴛ. ᴛʜᴇ ʙᴏᴛ ᴡɪʟʟ ɴᴏᴡ ʀᴇᴘʟʏ ᴛʜᴀᴛ ᴍᴇssᴀɢᴇ ᴡʜᴇɴᴇᴠᴇʀ 'ᴋᴇʏᴡᴏʀᴅ' ɪs ᴍᴇɴᴛɪᴏɴᴇᴅ. ɪғ ʏᴏᴜ ʀᴇᴘʟʏ ᴛᴏ ᴀ sᴛɪᴄᴋᴇʀ ᴡɪᴛʜ ᴀ ᴋᴇʏᴡᴏʀᴅ, ᴛʜᴇ ʙᴏᴛ ᴡɪʟʟ ʀᴇᴘʟʏ ᴡɪᴛʜ ᴛʜᴀᴛ sᴛɪᴄᴋᴇʀ.
 
-If you want your keyword to be a sentence, use quotes. eg: /filter "hey there" How are you doin?
-**Example:**
-`/filter "filtername" Reply Text`
+ɪғ ʏᴏᴜ ᴡᴀɴᴛ ʏᴏᴜʀ ᴋᴇʏᴡᴏʀᴅ ᴛᴏ ʙᴇ ᴀ sᴇɴᴛᴇɴᴄᴇ, ᴜsᴇ ǫᴜᴏᴛᴇs. ᴇɢ: /filter "ʜᴇʏ ᴛʜᴇʀᴇ" ʜᴏᴡ ᴀʀᴇ ʏᴏᴜ ᴅᴏɪɴ?
 
-Aliases for filters can be too set, just put '|' between the filternames you want.
-**Example:**
-`/filter "filtername1|filtername2" Reply Text`
-Using the you can make a single filter work on 2 filternames without manually adding another one.
+**ᴇxᴀᴍᴘʟᴇ:**
+`/filter "ғɪʟᴛᴇʀɴᴀᴍᴇ" ʀᴇᴘʟʏ ᴛᴇxᴛ`
 
-• /stop `<filter keyword>`: Stop that filter.
+ᴀʟɪᴀsᴇs ғᴏʀ ғɪʟᴛᴇʀs ᴄᴀɴ ʙᴇ ᴛᴏᴏ sᴇᴛ, ᴊᴜsᴛ ᴘᴜᴛ '|' ʙᴇᴛᴡᴇᴇɴ ᴛʜᴇ ғɪʟᴛᴇʀɴᴀᴍᴇs ʏᴏᴜ ᴡᴀɴᴛ.
 
-**Note:**
-For filters with aliases, if you stop one alias, the filter will stop working on other aliases too.
+**ᴇxᴀᴍᴘʟᴇ:**
+`/filter "ғɪʟᴛᴇʀɴᴀᴍᴇ1|ғɪʟᴛᴇʀɴᴀᴍᴇ2" ʀᴇᴘʟʏ ᴛᴇxᴛ`
 
-**For Example:**
-If you stop the "filtername1" from above example, the bot will not respond to "filtername2".
+ᴜsɪɴɢ ᴛʜɪs, ʏᴏᴜ ᴄᴀɴ ᴍᴀᴋᴇ ᴀ sɪɴɢʟᴇ ғɪʟᴛᴇʀ ᴡᴏʀᴋ ᴏɴ 2 ғɪʟᴛᴇʀɴᴀᴍᴇs ᴡɪᴛʜᴏᴜᴛ ᴍᴀɴᴜᴀʟʟʏ ᴀᴅᴅɪɴɢ ᴀɴᴏᴛʜᴇʀ ᴏɴᴇ.
 
-**Chat creator only:**
-• /removeallfilters: Remove all chat filters at once.
+• /stop `<filter keyword>`: sᴛᴏᴘ ᴛʜᴀᴛ ғɪʟᴛᴇʀ.
 
-**Note:**
-Currently there is a limit of 50 filters and 120 aliases per chat.
-All filter keywords are in lowercase."""
+**ɴᴏᴛᴇ:**
+ғᴏʀ ғɪʟᴛᴇʀs ᴡɪᴛʜ ᴀʟɪᴀsᴇs, ɪғ ʏᴏᴜ sᴛᴏᴘ ᴏɴᴇ ᴀʟɪᴀs, ᴛʜᴇ ғɪʟᴛᴇʀ ᴡɪʟʟ sᴛᴏᴘ ᴡᴏʀᴋɪɴɢ ᴏɴ ᴏᴛʜᴇʀ ᴀʟɪᴀsᴇs ᴛᴏᴏ.
+
+**ғᴏʀ ᴇxᴀᴍᴘʟᴇ:**
+ɪғ ʏᴏᴜ sᴛᴏᴘ ᴛʜᴇ "ғɪʟᴛᴇʀɴᴀᴍᴇ1" ғʀᴏᴍ ᴀʙᴏᴠᴇ ᴇxᴀᴍᴘʟᴇ, ᴛʜᴇ ʙᴏᴛ ᴡɪʟʟ ɴᴏᴛ ʀᴇsᴘᴏɴᴅ ᴛᴏ "ғɪʟᴛᴇʀɴᴀᴍᴇ2".
+
+**ᴄʜᴀᴛ ᴄʀᴇᴀᴛᴏʀ ᴏɴʟʏ:**
+• /removeallfilters: ʀᴇᴍᴏᴠᴇ ᴀʟʟ ᴄʜᴀᴛ ғɪʟᴛᴇʀs ᴀᴛ ᴏɴᴄᴇ.
+
+**ɴᴏᴛᴇ:**
+ᴄᴜʀʀᴇɴᴛʟʏ ᴛʜᴇʀᴇ ɪs ᴀ ʟɪᴍɪᴛ ᴏғ 50 ғɪʟᴛᴇʀs ᴀɴᴅ 120 ᴀʟɪᴀsᴇs ᴘᴇʀ ᴄʜᴀᴛ.
+ᴀʟʟ ғɪʟᴛᴇʀ ᴋᴇʏᴡᴏʀᴅs ᴀʀᴇ ɪɴ ʟᴏᴡᴇʀᴄᴀsᴇ.
+"""
