@@ -635,22 +635,25 @@ async def flood_watcher(c: Gojo, m: Message):
         return
 
 
-__PLUGIN__ = "flood"
+__PLUGIN__ = "ᴀɴᴛɪ ғʟᴏᴏᴅ"
 __alt_name__ = [
     "anit-flood",
     "flood",
     "spam",
     "anti-spam",
 ]
+
 __HELP__ = """
-**Anti Flood**
-**User Commands:**
-• /flood: to check weather the group is protected from spam or not.
+**ᴀɴᴛɪ ғʟᴏᴏᴅ**
 
-**Admin only:**
-• /setflood `on/off`: To activate or deactivate the flood protection
-• /floodaction: To customize the flood settings.
+**ᴜsᴇʀ ᴄᴏᴍᴍᴀɴᴅs:**
+• /flood: ᴛᴏ ᴄʜᴇᴄᴋ ᴡʜᴇᴛʜᴇʀ ᴛʜᴇ ɢʀᴏᴜᴘ ɪs ᴘʀᴏᴛᴇᴄᴛᴇᴅ ғʀᴏᴍ sᴘᴀᴍ ᴏʀ ɴᴏᴛ.
 
-**Example:**
+**ᴀᴅᴍɪɴ ᴏɴʟʏ:**
+• /setflood `on/off`: ᴛᴏ ᴀᴄᴛɪᴠᴀᴛᴇ ᴏʀ ᴅᴇᴀᴄᴛɪᴠᴀᴛᴇ ᴛʜᴇ ғʟᴏᴏᴅ ᴘʀᴏᴛᴇᴄᴛɪᴏɴ.
+• /floodaction: ᴛᴏ ᴄᴜsᴛᴏᴍɪᴢᴇ ᴛʜᴇ ғʟᴏᴏᴅ sᴇᴛᴛɪɴɢs.
+
+**ᴇxᴀᴍᴘʟᴇ:**
 `/setflood on`
 """
+
