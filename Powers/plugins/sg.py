@@ -90,9 +90,11 @@ async def sg_cmd(c: Gojo, m: Message):
 
     await status.delete()
 
-__PLUGIN__ = "sangmata"
+__PLUGIN__ = "sᴀɴɢᴍᴀᴛᴀ"
+
 __HELP__ = """
-**🕵️ Sangmata Command 🕵️**
-• `/sg` username / user_id / reply  
-   Get a user’s past names & usernames using Sangmata.
+**🕵️ sᴀɴɢᴍᴀᴛᴀ ᴄᴏᴍᴍᴀɴᴅ 🕵️**
+• `/sg` ᴜsᴇʀɴᴀᴍᴇ / ᴜsᴇʀ_ɪᴅ / ʀᴇᴘʟʏ  
+   ɢᴇᴛ ᴀ ᴜsᴇʀ’s ᴘᴀsᴛ ɴᴀᴍᴇs & ᴜsᴇʀɴᴀᴍᴇs ᴜsɪɴɢ sᴀɴɢᴍᴀᴛᴀ.
 """
+
