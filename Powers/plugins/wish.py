@@ -81,17 +81,18 @@ async def cute_cmd(c: Gojo, m: Message):
     )
 
 
-__PLUGIN__ = "fun_wish"
+__PLUGIN__ = "ᴡɪsʜ & ᴄᴜᴛᴇ"
 
 _DISABLE_CMDS_ = ["wish", "cute"]
 
 __HELP__ = """
-**Wish & Cute**
+**ᴡɪsʜ & ᴄᴜᴛᴇ**
 
-• /wish <your wish>  
-   Check how possible your wish is ✨  
-   Example: `/wish I want a new iPhone`
+• /wish <ʏᴏᴜʀ ᴡɪsʜ>  
+   ᴄʜᴇᴄᴋ ʜᴏᴡ ᴘᴏssɪʙʟᴇ ʏᴏᴜʀ ᴡɪsʜ ɪs ✨  
+   ᴇxᴀᴍᴘʟᴇ: `/wish I want a new iPhone`
 
-• /cute (or reply to a user)  
-   Check how much cute you or your friend is 🍑
+• /cute (ᴏʀ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴜsᴇʀ)  
+   ᴄʜᴇᴄᴋ ʜᴏᴡ ᴍᴜᴄʜ ᴄᴜᴛᴇ ʏᴏᴜ ᴏʀ ʏᴏᴜʀ ꜰʀɪᴇɴᴅ ɪs 🍑
 """
+
