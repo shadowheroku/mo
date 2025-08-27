@@ -42,17 +42,17 @@ async def calc_handler(c: Gojo, m: Message):
         )
 
 
-__PLUGIN__ = "calc"
+__PLUGIN__ = "ᴄᴀʟᴄᴜʟᴀᴛᴏʀ"
 
 _DISABLE_CMDS_ = []
 
 __alt_name__ = []
 
 __HELP__ = """
-**Calculator**
-Just send a math expression in chat and I’ll solve it.
+**ᴄᴀʟᴄᴜʟᴀᴛᴏʀ**
+ᴊᴜsᴛ sᴇɴᴅ ᴀ ᴍᴀᴛʜ ᴇxᴘʀᴇssɪᴏɴ ɪɴ ᴄʜᴀᴛ ᴀɴᴅ ɪ’ʟʟ sᴏʟᴠᴇ ɪᴛ.
 
-Examples:
+ᴇxᴀᴍᴘʟᴇs:
 • `2+2`
 • `(10*5)/2`
 • `50%5`
