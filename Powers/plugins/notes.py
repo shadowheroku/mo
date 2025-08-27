@@ -401,39 +401,41 @@ async def clearallnotes_callback(_, q: CallbackQuery):
     return
 
 
-__PLUGIN__ = "notes"
+__PLUGIN__ = "ɴᴏᴛᴇs"
 
 _DISABLE_CMDS_ = ["notes"]
 
 __alt_name__ = ["groupnotes", "snips", "notes"]
 
 __HELP__ = """
-**Notes**
+**ɴᴏᴛᴇs**
 
-Save a note, get that, even you can delete that note.
-This note only avaiable for your whole group!
-Only admins can save and deletenotes, anyone can get them.
+sᴀᴠᴇ ᴀ ɴᴏᴛᴇ, ɢᴇᴛ ᴛʜᴀᴛ, ᴇᴠᴇɴ ʏᴏᴜ ᴄᴀɴ ᴅᴇʟᴇᴛᴇ ᴛʜᴀᴛ ɴᴏᴛᴇ.
+ᴛʜɪs ɴᴏᴛᴇ ᴏɴʟʏ ᴀᴠᴀɪʟᴀʙʟᴇ ғᴏʀ ʏᴏᴜʀ ᴡʜᴏʟᴇ ɢʀᴏᴜᴘ!
+ᴏɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ sᴀᴠᴇ ᴀɴᴅ ᴅᴇʟᴇᴛᴇɴᴏᴛᴇs, ᴀɴʏᴏɴᴇ ᴄᴀɴ ɢᴇᴛ ᴛʜᴇᴍ.
 
-• /save `<notename>` <`note content or reply to message>`
-    Save a note, you can get or delete that later.
+• /save `<notename>` <`note content or reply to message`>
+    sᴀᴠᴇ ᴀ ɴᴏᴛᴇ, ʏᴏᴜ ᴄᴀɴ ɢᴇᴛ ᴏʀ ᴅᴇʟᴇᴛᴇ ᴛʜᴀᴛ ʟᴀᴛᴇʀ.
 
 • /get `<note>` or #<note>
-    Get that note, if avaiable.
+    ɢᴇᴛ ᴛʜᴀᴛ ɴᴏᴛᴇ, ɪꜰ ᴀᴠᴀɪʟᴀʙʟᴇ.
 
 • /get `<note>` noformat or /get `<note>` raw
-    Get that note in raw format, so you can edit and update it.
+    ɢᴇᴛ ᴛʜᴀᴛ ɴᴏᴛᴇ ɪɴ ʀᴀᴡ ғᴏʀᴍᴀᴛ, sᴏ ʏᴏᴜ ᴄᴀɴ ᴇᴅɪᴛ ᴀɴᴅ ᴜᴘᴅᴀᴛᴇ ɪᴛ.
 
 • /clear `<note>`
-    Delete that note, if avaiable.
+    ᴅᴇʟᴇᴛᴇ ᴛʜᴀᴛ ɴᴏᴛᴇ, ɪꜰ ᴀᴠᴀɪʟᴀʙʟᴇ.
 
 • /clearall
-    Clears all notes in the chat!
-    **NOTE:** Can only be used by owner of chat!
+    ᴄʟᴇᴀʀs ᴀʟʟ ɴᴏᴛᴇs ɪɴ ᴛʜᴇ ᴄʜᴀᴛ!
+    **ɴᴏᴛᴇ:** ᴄᴀɴ ᴏɴʟʏ ʙᴇ ᴜsᴇᴅ ʙʏ ᴏᴡɴᴇʀ ᴏꜰ ᴛʜᴇ ᴄʜᴀᴛ!
 
 • /saved or /notes
-    Get all your notes, if too much notes, please use this in your saved message instead!
+    ɢᴇᴛ ᴀʟʟ ʏᴏᴜʀ ɴᴏᴛᴇs, ɪꜰ ᴛᴏᴏ ᴍᴜᴄʜ ɴᴏᴛᴇs, ᴘʟᴇᴀsᴇ ᴜsᴇ ᴛʜɪs ɪɴ ʏᴏᴜʀ sᴀᴠᴇᴅ ᴍᴇssᴀɢᴇ ɪɴsᴛᴇᴀᴅ!
 
-• /privatenotes `<on/yes/no/off>`: Whether to turn private rules on or off, prevents spam in chat when people use notes command.
+• /privatenotes `<on/yes/no/off>`: ᴡʜᴇᴛʜᴇʀ ᴛᴏ ᴛᴜʀɴ ᴘʀɪᴠᴀᴛᴇ ʀᴜʟᴇs ᴏɴ ᴏʀ ᴏғғ, ᴘʀᴇᴠᴇɴᴛs sᴘᴀᴍ ɪɴ ᴄʜᴀᴛ ᴡʜᴇɴ ᴘᴇᴏᴘʟᴇ ᴜsᴇ ɴᴏᴛᴇs ᴄᴏᴍᴍᴀɴᴅ.
 
-**Note Format**
-    Check /markdownhelp for help related to formatting!"""
+**ɴᴏᴛᴇ ғᴏʀᴍᴀᴛ**
+    ᴄʜᴇᴄᴋ /markdownhelp ғᴏʀ ʜᴇʟᴘ ʀᴇʟᴀᴛᴇᴅ ᴛᴏ ғᴏʀᴍᴀᴛᴛɪɴɢ!
+"""
+
