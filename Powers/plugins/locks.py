@@ -587,26 +587,29 @@ async def lock_types_callback(c: Gojo, q: CallbackQuery):
             reply_markup=kb
         )
 
-__PLUGIN__ = "locks"
+__PLUGIN__ = "ʟᴏᴄᴋs"
 
 __alt_name__ = ["grouplock", "lock", "grouplocks"]
 
 __buttons__ = [
     [
-        ("Lock Types", "LOCK_TYPES"),
-    ], ]
+        ("ʟᴏᴄᴋ ᴛʏᴘᴇs", "LOCK_TYPES"),
+    ],
+]
 
 __HELP__ = """
-**Locks**
+**ʟᴏᴄᴋs**
 
-Use this to lock group permissions.
-Allows you to lock and unlock permission types in the chat.
+ᴜsᴇ ᴛʜɪs ᴛᴏ ʟᴏᴄᴋ ɢʀᴏᴜᴘ ᴘᴇʀᴍɪssɪᴏɴs.
+ᴀʟʟᴏᴡs ʏᴏᴜ ᴛᴏ ʟᴏᴄᴋ ᴀɴᴅ ᴜɴʟᴏᴄᴋ ᴘᴇʀᴍɪssɪᴏɴ ᴛʏᴘᴇs ɪɴ ᴛʜᴇ ᴄʜᴀᴛ.
 
-**Usage:**
-• /lock `<type>`: Lock Chat permission.
-• /unlock `<type>`: Unlock Chat permission.
-• /locks: View Chat permission.
-• /locktypes: Check available lock types!
+**ᴜsᴀɢᴇ:**
+• /lock `<type>`: ʟᴏᴄᴋ ᴄʜᴀᴛ ᴘᴇʀᴍɪssɪᴏɴ.
+• /unlock `<type>`: ᴜɴʟᴏᴄᴋ ᴄʜᴀᴛ ᴘᴇʀᴍɪssɪᴏɴ.
+• /locks: ᴠɪᴇᴡ ᴄʜᴀᴛ ᴘᴇʀᴍɪssɪᴏɴ.
+• /locktypes: ᴄʜᴇᴄᴋ ᴀᴠᴀɪʟᴀʙʟᴇ ʟᴏᴄᴋ ᴛʏᴘᴇs!
 
-**Example:**
-`/lock media`: this locks all the media messages in the chat."""
+**ᴇxᴀᴍᴘʟᴇ:**
+`/lock media`: ᴛʜɪs ʟᴏᴄᴋs ᴀʟʟ ᴛʜᴇ ᴍᴇᴅɪᴀ ᴍᴇssᴀɢᴇs ɪɴ ᴛʜᴇ ᴄʜᴀᴛ.
+"""
+
