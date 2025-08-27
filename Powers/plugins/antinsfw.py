@@ -3,11 +3,23 @@ import json
 import asyncio
 import tempfile
 import traceback
-import time
-from typing import Dict, List, Tuple
-import numpy as np
-from PIL import Image
-import io
+
+from datetime import datetime
+import os
+import json
+import asyncio
+import tempfile
+import traceback
+
+from datetime import datetime
+
+# async http client preferred
+try:
+    import httpx
+    HAS_HTTPX = True
+except Exception:
+    import requests
+    HAS_HTTPX = False
 
 from pyrogram import filters, ContinuePropagation
 from pyrogram.enums import ParseMode as PM, ChatMemberStatus
@@ -15,210 +27,136 @@ from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineK
 
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
+# try async HTTP first, fallback to requests in a thread
+try:
+    import httpx
+    HAS_HTTPX = True
+except Exception:
+    import requests
+    HAS_HTTPX = False
+
+from pyrogram import filters, ContinuePropagation
+from pyrogram.enums import ParseMode as PM
+from pyrogram.types import Message
+
+from Powers.bot_class import Gojo
+from Powers.utils.custom_filters import command
+from Powers.utils.msg_types import Types
 
 # ─── CONFIG ───
-DATA_FILE = os.path.join(os.getcwd(), "antinsfw.json")
-MODEL_PATH = os.path.join(os.getcwd(), "nsfw_model")
+SIGHTENGINE_API_USER = os.getenv("SIGHTENGINE_API_USER", "862487500")
+SIGHTENGINE_API_SECRET = os.getenv("SIGHTENGINE_API_SECRET", "sc2VeSyJYzKciVhP8X57GtmQvA8kyzCb")
 
-# Rate limiting
-MAX_SCANS_PER_HOUR = 100  # Local model can handle more
-RATE_LIMIT = {}
+DATA_FILE = os.path.join(os.getcwd(), "antinsfw.json")  # file will be created next to cwd
 
-# ─── LOAD/SAVE DATA ───
+# ─── UTIL: load/save JSON (atomic save) ───
+def _normalize_loaded(d):
+    ant = {}
+    free = {}
+    for k, v in (d.get("antinsfw") or {}).items():
+        ant[str(k)] = bool(v)
+    for k, v in (d.get("free_users") or {}).items():
+        free[str(k)] = [str(uid) for uid in (v or [])]
+    return {"antinsfw": ant, "free_users": free}
+
 def load_data():
     if not os.path.exists(DATA_FILE):
         return {"antinsfw": {}, "free_users": {}}
     try:
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-        # Normalize data
-        ant = {str(k): bool(v) for k, v in data.get("antinsfw", {}).items()}
-        free = {str(k): [str(uid) for uid in v] for k, v in data.get("free_users", {}).items()}
-        return {"antinsfw": ant, "free_users": free}
+        return _normalize_loaded(data)
     except Exception:
         return {"antinsfw": {}, "free_users": {}}
 
 def save_data():
+    # atomic save: write to temp and replace
+    tmp_fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(DATA_FILE) or ".")
     try:
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump({"antinsfw": ANTINSFW, "free_users": FREE_USERS}, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        print(f"Error saving data: {e}")
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as tmpf:
+            json.dump({"antinsfw": ANTINSFW, "free_users": FREE_USERS}, tmpf, indent=2, ensure_ascii=False)
+        os.replace(tmp_path, DATA_FILE)
+    except Exception:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
 
-# Load initial data
 _data = load_data()
-ANTINSFW = _data.get("antinsfw", {})
-FREE_USERS = _data.get("free_users", {})
+ANTINSFW = _data.get("antinsfw", {})     # {chat_id_str: True/False}
+FREE_USERS = _data.get("free_users", {}) # {chat_id_str: [user_id_str,...]}
 
-# ─── SIMPLE NSFW DETECTION (No external API) ───
-class SimpleNSFWDetector:
-    def __init__(self):
-        self.initialized = False
-        self.model = None
-        self.labels = ['drawings', 'hentai', 'neutral', 'porn', 'sexy']
-        
-    async def initialize(self):
-        """Initialize the detector - will use simple heuristics if TensorFlow fails"""
-        try:
-            # Try to import TensorFlow
-            import tensorflow as tf
-            from tensorflow.keras.models import load_model
-            from tensorflow.keras.preprocessing import image
-            
-            # Check if model exists
-            if os.path.exists(MODEL_PATH):
-                self.model = load_model(MODEL_PATH)
-                print("✅ Loaded TensorFlow NSFW model")
-            else:
-                print("⚠️ No local model found, using heuristic detection")
-            
-            self.initialized = True
-            return True
-            
-        except ImportError:
-            print("⚠️ TensorFlow not available, using heuristic detection")
-            self.initialized = True
-            return True
-        except Exception as e:
-            print(f"⚠️ Model loading failed: {e}, using heuristic detection")
-            self.initialized = True
-            return True
-    
-    async def detect_nsfw(self, image_path: str) -> Tuple[bool, float]:
-        """Detect NSFW content using multiple methods"""
-        if not self.initialized:
-            await self.initialize()
-        
-        try:
-            # Method 1: Try TensorFlow model if available
-            if self.model:
-                return await self._detect_with_model(image_path)
-            
-            # Method 2: Simple heuristic detection (no dependencies)
-            return await self._detect_heuristic(image_path)
-            
-        except Exception as e:
-            print(f"NSFW detection error: {e}")
-            return False, 0.0
-    
-    async def _detect_with_model(self, image_path: str) -> Tuple[bool, float]:
-        """Use TensorFlow model for detection"""
-        try:
-            from tensorflow.keras.preprocessing import image as tf_image
-            import tensorflow as tf
-            
-            # Load and preprocess image
-            img = tf_image.load_img(image_path, target_size=(299, 299))
-            img_array = tf_image.img_to_array(img)
-            img_array = tf.expand_dims(img_array, axis=0)
-            img_array = tf.keras.applications.inception_v3.preprocess_input(img_array)
-            
-            # Predict
-            predictions = self.model.predict(img_array)
-            confidence = float(np.max(predictions))
-            predicted_class = self.labels[np.argmax(predictions)]
-            
-            # Consider porn, hentai, sexy as NSFW
-            is_nsfw = predicted_class in ['porn', 'hentai', 'sexy'] and confidence > 0.6
-            
-            return is_nsfw, confidence
-            
-        except Exception as e:
-            print(f"Model detection failed: {e}")
-            # Fallback to heuristic
-            return await self._detect_heuristic(image_path)
-    
-    async def _detect_heuristic(self, image_path: str) -> Tuple[bool, float]:
-        """Simple heuristic-based NSFW detection"""
-        try:
-            with Image.open(image_path) as img:
-                # Convert to RGB if necessary
-                if img.mode != 'RGB':
-                    img = img.convert('RGB')
-                
-                # Get image data
-                img_array = np.array(img)
-                
-                # Simple heuristics (can be expanded)
-                nsfw_score = 0.0
-                
-                # 1. Check for skin tone pixels
-                skin_pixels = self._detect_skin_tone(img_array)
-                skin_ratio = skin_pixels / (img_array.shape[0] * img_array.shape[1])
-                
-                if skin_ratio > 0.3:  # More than 30% skin tones
-                    nsfw_score += 0.4
-                
-                # 2. Check image brightness (dark images often indicate NSFW)
-                brightness = np.mean(img_array) / 255.0
-                if brightness < 0.4:  # Dark image
-                    nsfw_score += 0.3
-                
-                # 3. Check color saturation
-                saturation = self._calculate_saturation(img_array)
-                if saturation > 0.6:  # Highly saturated
-                    nsfw_score += 0.3
-                
-                # Cap score at 1.0
-                nsfw_score = min(nsfw_score, 1.0)
-                
-                return nsfw_score > 0.6, nsfw_score
-                
-        except Exception as e:
-            print(f"Heuristic detection failed: {e}")
-            return False, 0.0
-    
-    def _detect_skin_tone(self, img_array: np.array) -> int:
-        """Detect skin tone pixels using simple color ranges"""
-        # Simple skin tone detection in RGB
-        r, g, b = img_array[:,:,0], img_array[:,:,1], img_array[:,:,2]
-        
-        # Skin tone conditions (can be adjusted)
-        skin_mask = (
-            (r > 120) & (g > 80) & (b > 60) & 
-            (np.abs(r - g) > 20) & (r > g) & (r > b)
-        )
-        
-        return np.sum(skin_mask)
-    
-    def _calculate_saturation(self, img_array: np.array) -> float:
-        """Calculate average saturation of image"""
-        r, g, b = img_array[:,:,0], img_array[:,:,1], img_array[:,:,2]
-        max_val = np.maximum.reduce([r, g, b])
-        min_val = np.minimum.reduce([r, g, b])
-        saturation = np.where(max_val == 0, 0, (max_val - min_val) / max_val)
-        return np.mean(saturation)
-
-# Initialize detector
-nsfw_detector = SimpleNSFWDetector()
-
-# ─── RATE LIMITING ───
-def check_rate_limit(chat_id: int) -> bool:
-    """Check if chat has exceeded rate limit"""
-    current_hour = int(time.time()) // 3600
-    chat_key = f"{chat_id}_{current_hour}"
-    
-    if chat_key not in RATE_LIMIT:
-        RATE_LIMIT[chat_key] = 0
-    
-    if RATE_LIMIT[chat_key] >= MAX_SCANS_PER_HOUR:
-        return False
-    
-    RATE_LIMIT[chat_key] += 1
-    return True
 
 # ─── HELPERS ───
+from pyrogram.enums import ChatMemberStatus
+
 async def is_chat_admin(c: Gojo, chat_id: int, user_id: int) -> bool:
-    """Check if user is owner or admin with 'can_promote_members' rights."""
+    """Return True if user is owner or admin with 'add new admins' rights."""
     try:
         member = await c.get_chat_member(chat_id, user_id)
+
+        # Group Owner always allowed
         if member.status == ChatMemberStatus.OWNER:
             return True
+
+        # Admin with 'can_promote_members' (add new admins permission)
         if member.status == ChatMemberStatus.ADMINISTRATOR and getattr(member.privileges, "can_promote_members", False):
             return True
+
         return False
     except Exception:
         return False
+
+
+async def scan_nsfw(file_path: str):
+    """
+    Scan file via Sightengine.
+    Returns (is_nsfw: bool, raw_response: dict or None)
+    """
+    url = "https://api.sightengine.com/1.0/check.json"
+    payload = {
+        "models": "nudity",
+        "api_user": SIGHTENGINE_API_USER,
+        "api_secret": SIGHTENGINE_API_SECRET,
+    }
+
+    try:
+        if HAS_HTTPX:
+            async with httpx.AsyncClient(timeout=20) as client:
+                with open(file_path, "rb") as fh:
+                    files = {"media": ("file", fh, "application/octet-stream")}
+                    resp = await client.post(url, data=payload, files=files)
+                resp.raise_for_status()
+                j = resp.json()
+        else:
+            loop = asyncio.get_event_loop()
+            def _sync_post():
+                with open(file_path, "rb") as fh:
+                    return requests.post(url, data=payload, files={"media": fh}, timeout=20)
+            resp = await loop.run_in_executor(None, _sync_post)
+            j = resp.json()
+    except Exception as e:
+        print("Anti-NSFW: scan error:", e)
+        traceback.print_exc()
+        return False, None
+
+    # parse nudity info (Sightengine returns a 'nudity' dict)
+    nudity = j.get("nudity", {}) or {}
+    try:
+        raw = float(nudity.get("raw", 0))
+        partial = float(nudity.get("partial", 0))
+        safe = float(nudity.get("safe", 1))
+        sexual_activity = float(nudity.get("sexual_activity", 0))
+        sexual_display = float(nudity.get("sexual_display", 0))
+        suggestive = float(nudity.get("suggestive", 0)) if nudity.get("suggestive") is not None else 0.0
+    except Exception:
+        raw = partial = sexual_activity = sexual_display = suggestive = 0.0
+        safe = 1.0
+
+    # heuristic thresholds (tweakable)
+    if raw >= 0.6 or partial >= 0.6 or sexual_activity >= 0.5 or sexual_display >= 0.5 or safe <= 0.3:
+        return True, j
+    return False, j
 
 def _content_type_label(m: Message) -> str:
     if m.photo: return "📸 Photo"
@@ -229,16 +167,21 @@ def _content_type_label(m: Message) -> str:
     return "📦 Media"
 
 def _user_markdown_link(user) -> str:
+    # returns [Name](tg://user?id=ID)
     name = user.first_name or "User"
+    # include last name if exists
     if getattr(user, "last_name", None):
         name = f"{name} {user.last_name}"
+    # escape brackets not necessary for simple names; if you need markdownv2 escaping, adapt.
     return f"[{name}](tg://user?id={user.id})"
 
-# ─── COMMANDS ───
+
+# ─── /antinsfw with inline buttons (admin-only toggle) ───
 @Gojo.on_message(command(["antinsfw"]) & filters.group)
 async def toggle_antinsfw(c: Gojo, m: Message):
     chat_id_str = str(m.chat.id)
 
+    # show status if no arg
     if len(m.command) == 1:
         status = "✅ ENABLED" if ANTINSFW.get(chat_id_str, False) else "❌ DISABLED"
         kb = InlineKeyboardMarkup(
@@ -247,19 +190,19 @@ async def toggle_antinsfw(c: Gojo, m: Message):
                     InlineKeyboardButton("✅ Enable", callback_data=f"antinsfw:on:{chat_id_str}"),
                     InlineKeyboardButton("❌ Disable", callback_data=f"antinsfw:off:{chat_id_str}")
                 ],
-                [InlineKeyboardButton("⚙️ View Status", callback_data=f"antinsfw:status:{chat_id_str}")]
+                [
+                    InlineKeyboardButton("⚙️ View Settings", callback_data=f"antinsfw:status:{chat_id_str}")
+                ]
             ]
         )
-        await m.reply_text(
-            f"🚨 **Anti-NSFW System** 🚨\n\nCurrent status: **{status}**\n\n"
-            f"✅ **Local Detection:** No external APIs\n"
-            f"⚡ **Fast & Free:** No rate limits\n"
-            f"🔒 **Privacy:** All processing local",
+        return await m.reply_text(
+            f"🚨 **Anti-NSFW System** 🚨\n\nCurrent status: **{status}**\n\nUse the buttons below to change settings (admins only).",
             reply_markup=kb,
             parse_mode=PM.MARKDOWN
         )
-    else:
-        await m.reply_text("ℹ️ Use `/antinsfw` without arguments")
+
+    await m.reply_text("ℹ️ Use `/antinsfw` (without args) and press the buttons to toggle.")
+
 
 @Gojo.on_callback_query(filters.regex(r"^antinsfw:(on|off|status):(-?\d+)$"))
 async def antinsfw_callback(c: Gojo, q: CallbackQuery):
@@ -267,62 +210,104 @@ async def antinsfw_callback(c: Gojo, q: CallbackQuery):
     chat_id = int(chat_id_str)
     user_id = q.from_user.id
 
+    # require admin
     if action != "status" and not await is_chat_admin(c, chat_id, user_id):
-        return await q.answer("Admins with 'add admin' rights only.", show_alert=True)
+        return await q.answer("Only group admins with add admin permission and Owner of the group can change Anti-NSFW.", show_alert=True)
 
     if action == "on":
         ANTINSFW[chat_id_str] = True
         save_data()
         await q.message.edit_text(
-            "🚨 Anti-NSFW is now **ENABLED ✅**\n\n"
-            "✅ Using local detection\n"
-            "⚡ No external API limits\n"
-            "🔒 All processing done locally",
+            "🚨 Anti-NSFW is now **ENABLED ✅**\n\nDetected NSFW media will be removed automatically.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Disable", callback_data=f"antinsfw:off:{chat_id_str}")]]),
             parse_mode=PM.MARKDOWN
         )
-        await q.answer("Enabled")
+        await q.answer("Anti-NSFW enabled.")
     elif action == "off":
         ANTINSFW[chat_id_str] = False
         save_data()
-        await q.message.edit_text("⚠️ Anti-NSFW is now **DISABLED ❌**", parse_mode=PM.MARKDOWN)
-        await q.answer("Disabled")
-    else:
+        await q.message.edit_text(
+            "⚠️ Anti-NSFW is now **DISABLED ❌**\n\nThe bot will not scan media until enabled again.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Enable", callback_data=f"antinsfw:on:{chat_id_str}")]]),
+            parse_mode=PM.MARKDOWN
+        )
+        await q.answer("Anti-NSFW disabled.")
+    else:  # status
         status = "✅ ENABLED" if ANTINSFW.get(chat_id_str, False) else "❌ DISABLED"
-        scans_this_hour = RATE_LIMIT.get(f"{chat_id}_{int(time.time()) // 3600}", 0)
-        await q.answer(f"Status: {status}\nScans this hour: {scans_this_hour}", show_alert=True)
+        await q.answer(f"Anti-NSFW status: {status}", show_alert=True)
 
-# ─── FREE USERS ───
+
+# ─── /free (reply) - exempt a user (admin only), shows inline remove/status ───
 @Gojo.on_message(command(["free"]) & filters.group)
 async def free_user(c: Gojo, m: Message):
     chat_id_str = str(m.chat.id)
     if not m.reply_to_message or not m.reply_to_message.from_user:
-        return await m.reply_text("⚠️ Reply to a user's message to /free them.")
+        return await m.reply_text("⚠️ Reply to a user's message to /free them from scans.")
 
     if not await is_chat_admin(c, m.chat.id, m.from_user.id):
-        return await m.reply_text("❌ Admins only.")
+        return await m.reply_text("❌ Only group admins with add admin permission and Owner of the group can free users.")
 
     target = m.reply_to_message.from_user
     target_id_str = str(target.id)
     FREE_USERS.setdefault(chat_id_str, [])
 
+    kb = InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("🛑 Remove Free", callback_data=f"free:unfree:{chat_id_str}:{target_id_str}")],
+            [InlineKeyboardButton("ℹ️ Check Status", callback_data=f"free:status:{chat_id_str}:{target_id_str}")]
+        ]
+    )
+
     if target_id_str not in FREE_USERS[chat_id_str]:
         FREE_USERS[chat_id_str].append(target_id_str)
         save_data()
         await m.reply_text(
-            f"✅ {_user_markdown_link(target)} has been *freed* from Anti-NSFW scans.",
+            f"✅ {_user_markdown_link(target)} has been *freed* from Anti-NSFW scans by {_user_markdown_link(m.from_user)}.",
+            reply_markup=kb,
             parse_mode=PM.MARKDOWN
         )
     else:
-        await m.reply_text(f"⚡ {_user_markdown_link(target)} is already free.", parse_mode=PM.MARKDOWN)
+        await m.reply_text(
+            f"⚡ {_user_markdown_link(target)} is already free.",
+            reply_markup=kb,
+            parse_mode=PM.MARKDOWN
+        )
 
+@Gojo.on_callback_query(filters.regex(r"^free:(unfree|status):(-?\d+):(\d+)$"))
+async def free_buttons(c: Gojo, q: CallbackQuery):
+    parts = q.data.split(":")
+    action, chat_id_str, target_id_str = parts[1], parts[2], parts[3]
+    chat_id = int(chat_id_str)
+    user_id = q.from_user.id
+
+    # only admins
+    if not await is_chat_admin(c, chat_id, user_id):
+        return await q.answer("Only group admins with add admin permission and Owner of the group can use this.", show_alert=True)
+
+    if action == "unfree":
+        if target_id_str in FREE_USERS.get(chat_id_str, []):
+            FREE_USERS[chat_id_str].remove(target_id_str)
+            save_data()
+            await q.message.edit_text("🛑 User removed from free list.", parse_mode=PM.MARKDOWN)
+            await q.answer("User unfreed.")
+        else:
+            await q.answer("User is not free.", show_alert=True)
+    else:  # status
+        if target_id_str in FREE_USERS.get(chat_id_str, []):
+            await q.answer("✅ User is free from scans.", show_alert=True)
+        else:
+            await q.answer("⚠️ User is NOT free from scans.", show_alert=True)
+
+
+# ─── /unfree (reply) - admin only ───
 @Gojo.on_message(command(["unfree"]) & filters.group)
-async def unfree_user(c: Gojo, m: Message):
+async def unfree_user_cmd(c: Gojo, m: Message):
     chat_id_str = str(m.chat.id)
     if not m.reply_to_message or not m.reply_to_message.from_user:
         return await m.reply_text("⚠️ Reply to a user's message to /unfree them.")
 
     if not await is_chat_admin(c, m.chat.id, m.from_user.id):
-        return await m.reply_text("🚫 Admins only.")
+        return await m.reply_text("🚫 Only group admins with add admin permission and Owner of the group can unfree users.")
 
     target = m.reply_to_message.from_user
     target_id_str = str(target.id)
@@ -330,56 +315,116 @@ async def unfree_user(c: Gojo, m: Message):
     if target_id_str in FREE_USERS.get(chat_id_str, []):
         FREE_USERS[chat_id_str].remove(target_id_str)
         save_data()
-        await m.reply_text(f"✨ {_user_markdown_link(target)} removed from Free List.", parse_mode=PM.MARKDOWN)
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Done", callback_data="unfree_done"), InlineKeyboardButton("❌ Close", callback_data="unfree_close")]])
+        await m.reply_text(f"✨ {_user_markdown_link(target)} has been removed from Free List.", reply_markup=kb, parse_mode=PM.MARKDOWN)
     else:
-        await m.reply_text("⚠️ User not in Free List.")
+        await m.reply_text("⚠️ That user is not on the Free List.")
 
-# ─── MAIN SCANNER ───
+
+@Gojo.on_callback_query(filters.regex(r"^unfree_"))
+async def unfree_buttons(c: Gojo, q: CallbackQuery):
+    if q.data == "unfree_done":
+        await q.answer("✅ Done.", show_alert=True)
+    elif q.data == "unfree_close":
+        try:
+            await q.message.delete()
+        except Exception:
+            pass
+        await q.answer()
+
+
+# ─── MAIN SCANNER: scans common media types in groups ───
 @Gojo.on_message(filters.group & (filters.photo | filters.video | filters.animation | filters.document | filters.sticker))
 async def nsfw_scanner(c: Gojo, m: Message):
     chat_id_str = str(m.chat.id)
 
-    # Skip if not enabled or should be skipped
+    # only active when enabled
     if not ANTINSFW.get(chat_id_str, False):
         raise ContinuePropagation
+
+    # ignore bots / system messages
     if not m.from_user or m.from_user.is_bot:
         raise ContinuePropagation
+
+    # check free list
     if str(m.from_user.id) in FREE_USERS.get(chat_id_str, []):
-        raise ContinuePropagation
-    
-    # Skip videos and large files for heuristic detection
-    if m.video or (m.document and m.document.file_size and m.document.file_size > 10 * 1024 * 1024):
         raise ContinuePropagation
 
     file_path = None
     try:
+        # download media to temp file
         file_path = await m.download()
         if not file_path:
             raise ContinuePropagation
 
-        # Use local NSFW detection
-        is_nsfw, confidence = await nsfw_detector.detect_nsfw(file_path)
+        is_nsfw, raw_resp = await scan_nsfw(file_path)
+
+        # cleanup (best-effort)
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception:
+            pass
 
         if is_nsfw:
+            user = m.from_user
+            content_type = _content_type_label(m)
+
+            # compute NSFW % from response
+            nsfw_score = 0.0
+            try:
+                nudity = (raw_resp or {}).get("nudity", {}) or {}
+                nsfw_score = max(
+                    float(nudity.get("sexual_activity", 0) or 0),
+                    float(nudity.get("sexual_display", 0) or 0),
+                    float(nudity.get("suggestive", 0) or 0),
+                    float(nudity.get("raw", 0) or 0),
+                    float(nudity.get("partial", 0) or 0)
+                ) * 100.0
+            except Exception:
+                nsfw_score = 0.0
+
+            # try delete
             try:
                 await m.delete()
-            except Exception:
-                pass
+            except Exception as e:
+                print("Anti-NSFW: couldn't delete message:", e)
 
-            await c.send_message(
-                m.chat.id,
-                f"🚨 **Anti-NSFW Alert!** 🚨\n\n"
-                f"👤 {_user_markdown_link(m.from_user)}\n"
-                f"📛 Type: {_content_type_label(m)}\n"
-                f"⚠️ NSFW content detected & removed.\n"
-                f"🔍 Confidence: {confidence:.2f}",
-                parse_mode=PM.MARKDOWN
-            )
-            
+            # nice alert message (clickable name + id)
+            try:
+                alert_msg = (
+                    f"🚨 **Anti-NSFW Alert!** 🚨\n\n"
+                    f"👤 User: {_user_markdown_link(user)}\n"
+                    f"🆔 ID: `{user.id}`\n"
+                    f"📛 Type: **{content_type}**\n"
+                    f"📊 Detected NSFW Probability: **{nsfw_score:.2f}%**\n\n"
+                    f"⚠️ NSFW content was detected and removed automatically."
+                )
+
+                # moderation buttons for admins
+                kb = InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton("👮 Warn", callback_data=f"mod:warn:{chat_id_str}:{user.id}"),
+                            InlineKeyboardButton("🔨 Ban", callback_data=f"mod:ban:{chat_id_str}:{user.id}")
+                        ],
+                        [InlineKeyboardButton("❌ Dismiss", callback_data=f"mod:dismiss:{chat_id_str}:{user.id}")]
+                    ]
+                )
+
+                await c.send_message(
+                    m.chat.id,
+                    alert_msg,
+                    parse_mode=PM.MARKDOWN,
+                    reply_markup=kb
+                )
+            except Exception as e:
+                print("Anti-NSFW: couldn't send alert:", e)
+
     except ContinuePropagation:
         raise ContinuePropagation
     except Exception as e:
-        print(f"Anti-NSFW error: {e}")
+        print("Anti-NSFW: unexpected error in scanner:", e)
         traceback.print_exc()
     finally:
         try:
@@ -387,29 +432,58 @@ async def nsfw_scanner(c: Gojo, m: Message):
                 os.remove(file_path)
         except Exception:
             pass
-    
+
     raise ContinuePropagation
+
+
+# ─── Simple moderation callback handlers (warn/ban/dismiss) ───
+@Gojo.on_callback_query(filters.regex(r"^mod:(warn|ban|dismiss):(-?\d+):(\d+)$"))
+async def mod_buttons(c: Gojo, q: CallbackQuery):
+    action, chat_id_str, target_id_str = q.data.split(":")[1:]
+    chat_id = int(chat_id_str)
+    user_id = q.from_user.id
+
+    # restrict to admins
+    if not await is_chat_admin(c, chat_id, user_id):
+        return await q.answer("Only admins with add admin permission and Owner of the group can use moderation actions.", show_alert=True)
+
+    if action == "dismiss":
+        try:
+            await q.message.delete()
+        except Exception:
+            pass
+        return await q.answer("Dismissed.", show_alert=False)
+
+    if action == "warn":
+        # just send a group message warning (customize as needed)
+        try:
+            await c.send_message(chat_id, f"⚠️ [User](tg://user?id={int(q.data.split(':')[-1])}) — you were warned for posting NSFW content.", parse_mode=PM.MARKDOWN)
+        except Exception:
+            pass
+        return await q.answer("Warn sent.", show_alert=False)
+
+    if action == "ban":
+        target_id = int(target_id_str)
+        try:
+            # try to ban (kick) user (bot needs ban permissions)
+            await c.ban_chat_member(chat_id, target_id)
+            await q.answer("User banned.", show_alert=True)
+            try:
+                await q.message.edit_text("🔨 User has been banned by admin.", parse_mode=PM.MARKDOWN)
+            except Exception:
+                pass
+        except Exception as e:
+            print("Anti-NSFW: failed to ban:", e)
+            return await q.answer("Failed to ban (check bot perms).", show_alert=True)
+
 
 # ─── PLUGIN INFO ───
 __PLUGIN__ = "anti_nsfw"
 _DISABLE_CMDS_ = ["antinsfw", "free", "unfree"]
 __HELP__ = """
-**Anti-NSFW (Local Detection)**
-• /antinsfw → Enable/disable scanner (admin only)
-• /free (reply) → Free user from scans (admin only)
-• /unfree (reply) → Remove user from free list (admin only)
+**Anti-NSFW**
+• /antinsfw → Open inline buttons to enable/disable scanner (admin only)
+• /free (reply) → Free a user from scans (admin only)
+• /unfree (reply) → Remove user from free list (admin only)"""
 
-✅ **Features:**
-- Local processing (no external APIs)
-- No rate limits
-- Privacy focused
-- Fast detection
-"""
 
-# Initialize the detector when plugin loads
-async def initialize_detector():
-    await nsfw_detector.initialize()
-    print("✅ NSFW Detector initialized")
-
-# Run initialization
-asyncio.create_task(initialize_detector())
