@@ -5,6 +5,9 @@ import tempfile
 import traceback
 import time
 from typing import Dict, List, Tuple
+import numpy as np
+from PIL import Image
+import io
 
 from pyrogram import filters, ContinuePropagation
 from pyrogram.enums import ParseMode as PM, ChatMemberStatus
@@ -14,57 +17,180 @@ from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
 # ─── CONFIG ───
-# Multiple free NSFW detection APIs as fallbacks
-HF_API_URLS = [
-    "https://api-inference.huggingface.co/models/erfanzar/NSFW-Detection",
-    "https://api-inference.huggingface.co/models/michellejieli/NSFW_text_classifier",
-    "https://api-inference.huggingface.co/models/valhalla/distilbert-multilingual-nli-stsb-quora-ranking"
-]
-
-HF_API_KEY = os.getenv("HF_API_KEY", "")  # optional free token
-HEADERS = {"Authorization": f"Bearer {HF_API_KEY}"} if HF_API_KEY else {}
-
 DATA_FILE = os.path.join(os.getcwd(), "antinsfw.json")
+MODEL_PATH = os.path.join(os.getcwd(), "nsfw_model")
 
-# Rate limiting to avoid hitting free API limits
+# Rate limiting
+MAX_SCANS_PER_HOUR = 100  # Local model can handle more
 RATE_LIMIT = {}
-MAX_SCANS_PER_HOUR = 50  # Conservative limit for free API
 
-# ─── UTIL: load/save JSON ───
-def _normalize_loaded(d):
-    ant = {}
-    free = {}
-    for k, v in (d.get("antinsfw") or {}).items():
-        ant[str(k)] = bool(v)
-    for k, v in (d.get("free_users") or {}).items():
-        free[str(k)] = [str(uid) for uid in (v or [])]
-    return {"antinsfw": ant, "free_users": free}
-
+# ─── LOAD/SAVE DATA ───
 def load_data():
     if not os.path.exists(DATA_FILE):
         return {"antinsfw": {}, "free_users": {}}
     try:
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return _normalize_loaded(data)
+        # Normalize data
+        ant = {str(k): bool(v) for k, v in data.get("antinsfw", {}).items()}
+        free = {str(k): [str(uid) for uid in v] for k, v in data.get("free_users", {}).items()}
+        return {"antinsfw": ant, "free_users": free}
     except Exception:
         return {"antinsfw": {}, "free_users": {}}
 
 def save_data():
-    tmp_fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(DATA_FILE) or ".")
     try:
-        with os.fdopen(tmp_fd, "w", encoding="utf-8") as tmpf:
-            json.dump({"antinsfw": ANTINSFW, "free_users": FREE_USERS}, tmpf, indent=2, ensure_ascii=False)
-        os.replace(tmp_path, DATA_FILE)
-    except Exception:
-        try:
-            os.remove(tmp_path)
-        except Exception:
-            pass
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump({"antinsfw": ANTINSFW, "free_users": FREE_USERS}, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"Error saving data: {e}")
 
+# Load initial data
 _data = load_data()
 ANTINSFW = _data.get("antinsfw", {})
 FREE_USERS = _data.get("free_users", {})
+
+# ─── SIMPLE NSFW DETECTION (No external API) ───
+class SimpleNSFWDetector:
+    def __init__(self):
+        self.initialized = False
+        self.model = None
+        self.labels = ['drawings', 'hentai', 'neutral', 'porn', 'sexy']
+        
+    async def initialize(self):
+        """Initialize the detector - will use simple heuristics if TensorFlow fails"""
+        try:
+            # Try to import TensorFlow
+            import tensorflow as tf
+            from tensorflow.keras.models import load_model
+            from tensorflow.keras.preprocessing import image
+            
+            # Check if model exists
+            if os.path.exists(MODEL_PATH):
+                self.model = load_model(MODEL_PATH)
+                print("✅ Loaded TensorFlow NSFW model")
+            else:
+                print("⚠️ No local model found, using heuristic detection")
+            
+            self.initialized = True
+            return True
+            
+        except ImportError:
+            print("⚠️ TensorFlow not available, using heuristic detection")
+            self.initialized = True
+            return True
+        except Exception as e:
+            print(f"⚠️ Model loading failed: {e}, using heuristic detection")
+            self.initialized = True
+            return True
+    
+    async def detect_nsfw(self, image_path: str) -> Tuple[bool, float]:
+        """Detect NSFW content using multiple methods"""
+        if not self.initialized:
+            await self.initialize()
+        
+        try:
+            # Method 1: Try TensorFlow model if available
+            if self.model:
+                return await self._detect_with_model(image_path)
+            
+            # Method 2: Simple heuristic detection (no dependencies)
+            return await self._detect_heuristic(image_path)
+            
+        except Exception as e:
+            print(f"NSFW detection error: {e}")
+            return False, 0.0
+    
+    async def _detect_with_model(self, image_path: str) -> Tuple[bool, float]:
+        """Use TensorFlow model for detection"""
+        try:
+            from tensorflow.keras.preprocessing import image as tf_image
+            import tensorflow as tf
+            
+            # Load and preprocess image
+            img = tf_image.load_img(image_path, target_size=(299, 299))
+            img_array = tf_image.img_to_array(img)
+            img_array = tf.expand_dims(img_array, axis=0)
+            img_array = tf.keras.applications.inception_v3.preprocess_input(img_array)
+            
+            # Predict
+            predictions = self.model.predict(img_array)
+            confidence = float(np.max(predictions))
+            predicted_class = self.labels[np.argmax(predictions)]
+            
+            # Consider porn, hentai, sexy as NSFW
+            is_nsfw = predicted_class in ['porn', 'hentai', 'sexy'] and confidence > 0.6
+            
+            return is_nsfw, confidence
+            
+        except Exception as e:
+            print(f"Model detection failed: {e}")
+            # Fallback to heuristic
+            return await self._detect_heuristic(image_path)
+    
+    async def _detect_heuristic(self, image_path: str) -> Tuple[bool, float]:
+        """Simple heuristic-based NSFW detection"""
+        try:
+            with Image.open(image_path) as img:
+                # Convert to RGB if necessary
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # Get image data
+                img_array = np.array(img)
+                
+                # Simple heuristics (can be expanded)
+                nsfw_score = 0.0
+                
+                # 1. Check for skin tone pixels
+                skin_pixels = self._detect_skin_tone(img_array)
+                skin_ratio = skin_pixels / (img_array.shape[0] * img_array.shape[1])
+                
+                if skin_ratio > 0.3:  # More than 30% skin tones
+                    nsfw_score += 0.4
+                
+                # 2. Check image brightness (dark images often indicate NSFW)
+                brightness = np.mean(img_array) / 255.0
+                if brightness < 0.4:  # Dark image
+                    nsfw_score += 0.3
+                
+                # 3. Check color saturation
+                saturation = self._calculate_saturation(img_array)
+                if saturation > 0.6:  # Highly saturated
+                    nsfw_score += 0.3
+                
+                # Cap score at 1.0
+                nsfw_score = min(nsfw_score, 1.0)
+                
+                return nsfw_score > 0.6, nsfw_score
+                
+        except Exception as e:
+            print(f"Heuristic detection failed: {e}")
+            return False, 0.0
+    
+    def _detect_skin_tone(self, img_array: np.array) -> int:
+        """Detect skin tone pixels using simple color ranges"""
+        # Simple skin tone detection in RGB
+        r, g, b = img_array[:,:,0], img_array[:,:,1], img_array[:,:,2]
+        
+        # Skin tone conditions (can be adjusted)
+        skin_mask = (
+            (r > 120) & (g > 80) & (b > 60) & 
+            (np.abs(r - g) > 20) & (r > g) & (r > b)
+        )
+        
+        return np.sum(skin_mask)
+    
+    def _calculate_saturation(self, img_array: np.array) -> float:
+        """Calculate average saturation of image"""
+        r, g, b = img_array[:,:,0], img_array[:,:,1], img_array[:,:,2]
+        max_val = np.maximum.reduce([r, g, b])
+        min_val = np.minimum.reduce([r, g, b])
+        saturation = np.where(max_val == 0, 0, (max_val - min_val) / max_val)
+        return np.mean(saturation)
+
+# Initialize detector
+nsfw_detector = SimpleNSFWDetector()
 
 # ─── RATE LIMITING ───
 def check_rate_limit(chat_id: int) -> bool:
@@ -94,58 +220,6 @@ async def is_chat_admin(c: Gojo, chat_id: int, user_id: int) -> bool:
     except Exception:
         return False
 
-async def scan_nsfw(file_path: str) -> Tuple[bool, dict]:
-    """
-    Scan file using free Hugging Face NSFW model with fallbacks.
-    Returns (is_nsfw: bool, raw_response: dict or None).
-    """
-    import httpx
-    
-    # Check file size to avoid large files on free API
-    file_size = os.path.getsize(file_path)
-    if file_size > 5 * 1024 * 1024:  # 5MB limit
-        return False, {"error": "File too large for free API"}
-    
-    for api_url in HF_API_URLS:
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                with open(file_path, "rb") as f:
-                    data = f.read()
-                
-                headers = HEADERS if "huggingface.co" in api_url else {}
-                resp = await client.post(api_url, headers=headers, data=data)
-                
-                if resp.status_code == 429:  # Rate limited
-                    continue
-                
-                if resp.status_code != 200:
-                    continue
-                
-                result = resp.json()
-                
-                # Handle different response formats
-                if isinstance(result, list):
-                    # Standard Hugging Face format
-                    nsfw_score = 0
-                    for item in result:
-                        if "nsfw" in item.get("label", "").lower():
-                            nsfw_score = max(nsfw_score, item.get("score", 0))
-                    return nsfw_score >= 0.6, result
-                
-                elif isinstance(result, dict):
-                    # Alternative format detection
-                    if "NSFW" in result:
-                        return result["NSFW"] >= 0.6, result
-                    if "nsfw_score" in result:
-                        return result["nsfw_score"] >= 0.6, result
-                
-                return False, result
-                
-        except (httpx.RequestError, httpx.TimeoutException, json.JSONDecodeError):
-            continue  # Try next API
-    
-    return False, {"error": "All APIs failed or rate limited"}
-
 def _content_type_label(m: Message) -> str:
     if m.photo: return "📸 Photo"
     if m.video: return "🎥 Video"
@@ -173,16 +247,19 @@ async def toggle_antinsfw(c: Gojo, m: Message):
                     InlineKeyboardButton("✅ Enable", callback_data=f"antinsfw:on:{chat_id_str}"),
                     InlineKeyboardButton("❌ Disable", callback_data=f"antinsfw:off:{chat_id_str}")
                 ],
-                [InlineKeyboardButton("⚙️ View Settings", callback_data=f"antinsfw:status:{chat_id_str}")]
+                [InlineKeyboardButton("⚙️ View Status", callback_data=f"antinsfw:status:{chat_id_str}")]
             ]
         )
-        return await m.reply_text(
+        await m.reply_text(
             f"🚨 **Anti-NSFW System** 🚨\n\nCurrent status: **{status}**\n\n"
-            f"⚠️ **Free API Limits:**\n• Max {MAX_SCANS_PER_HOUR} scans/hour\n• Files under 5MB only",
+            f"✅ **Local Detection:** No external APIs\n"
+            f"⚡ **Fast & Free:** No rate limits\n"
+            f"🔒 **Privacy:** All processing local",
             reply_markup=kb,
             parse_mode=PM.MARKDOWN
         )
-    await m.reply_text("ℹ️ Use `/antinsfw` without args and press the buttons.")
+    else:
+        await m.reply_text("ℹ️ Use `/antinsfw` without arguments")
 
 @Gojo.on_callback_query(filters.regex(r"^antinsfw:(on|off|status):(-?\d+)$"))
 async def antinsfw_callback(c: Gojo, q: CallbackQuery):
@@ -198,21 +275,21 @@ async def antinsfw_callback(c: Gojo, q: CallbackQuery):
         save_data()
         await q.message.edit_text(
             "🚨 Anti-NSFW is now **ENABLED ✅**\n\n"
-            "⚠️ Using free API with limitations:\n"
-            f"• Max {MAX_SCANS_PER_HOUR} scans/hour\n"
-            "• Files under 5MB only",
+            "✅ Using local detection\n"
+            "⚡ No external API limits\n"
+            "🔒 All processing done locally",
             parse_mode=PM.MARKDOWN
         )
-        await q.answer("Enabled.")
+        await q.answer("Enabled")
     elif action == "off":
         ANTINSFW[chat_id_str] = False
         save_data()
         await q.message.edit_text("⚠️ Anti-NSFW is now **DISABLED ❌**", parse_mode=PM.MARKDOWN)
-        await q.answer("Disabled.")
+        await q.answer("Disabled")
     else:
         status = "✅ ENABLED" if ANTINSFW.get(chat_id_str, False) else "❌ DISABLED"
         scans_this_hour = RATE_LIMIT.get(f"{chat_id}_{int(time.time()) // 3600}", 0)
-        await q.answer(f"Anti-NSFW: {status}\nScans this hour: {scans_this_hour}/{MAX_SCANS_PER_HOUR}", show_alert=True)
+        await q.answer(f"Status: {status}\nScans this hour: {scans_this_hour}", show_alert=True)
 
 # ─── FREE USERS ───
 @Gojo.on_message(command(["free"]) & filters.group)
@@ -262,6 +339,7 @@ async def unfree_user(c: Gojo, m: Message):
 async def nsfw_scanner(c: Gojo, m: Message):
     chat_id_str = str(m.chat.id)
 
+    # Skip if not enabled or should be skipped
     if not ANTINSFW.get(chat_id_str, False):
         raise ContinuePropagation
     if not m.from_user or m.from_user.is_bot:
@@ -269,9 +347,8 @@ async def nsfw_scanner(c: Gojo, m: Message):
     if str(m.from_user.id) in FREE_USERS.get(chat_id_str, []):
         raise ContinuePropagation
     
-    # Check rate limit
-    if not check_rate_limit(m.chat.id):
-        print(f"Rate limit exceeded for chat {m.chat.id}")
+    # Skip videos and large files for heuristic detection
+    if m.video or (m.document and m.document.file_size and m.document.file_size > 10 * 1024 * 1024):
         raise ContinuePropagation
 
     file_path = None
@@ -280,13 +357,8 @@ async def nsfw_scanner(c: Gojo, m: Message):
         if not file_path:
             raise ContinuePropagation
 
-        is_nsfw, raw_resp = await scan_nsfw(file_path)
-
-        try:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-        except Exception:
-            pass
+        # Use local NSFW detection
+        is_nsfw, confidence = await nsfw_detector.detect_nsfw(file_path)
 
         if is_nsfw:
             try:
@@ -296,17 +368,18 @@ async def nsfw_scanner(c: Gojo, m: Message):
 
             await c.send_message(
                 m.chat.id,
-                f"🚨 **Anti-NSFW Alert!** 🚨\n\n👤 {_user_markdown_link(m.from_user)}\n📛 Type: {_content_type_label(m)}\n⚠️ NSFW content detected & removed.",
+                f"🚨 **Anti-NSFW Alert!** 🚨\n\n"
+                f"👤 {_user_markdown_link(m.from_user)}\n"
+                f"📛 Type: {_content_type_label(m)}\n"
+                f"⚠️ NSFW content detected & removed.\n"
+                f"🔍 Confidence: {confidence:.2f}",
                 parse_mode=PM.MARKDOWN
             )
-        elif "error" in raw_resp:
-            # Log API errors but don't alert users
-            print(f"NSFW scan error for chat {m.chat.id}: {raw_resp['error']}")
             
     except ContinuePropagation:
         raise ContinuePropagation
     except Exception as e:
-        print("Anti-NSFW error:", e)
+        print(f"Anti-NSFW error: {e}")
         traceback.print_exc()
     finally:
         try:
@@ -314,19 +387,29 @@ async def nsfw_scanner(c: Gojo, m: Message):
                 os.remove(file_path)
         except Exception:
             pass
+    
     raise ContinuePropagation
 
 # ─── PLUGIN INFO ───
 __PLUGIN__ = "anti_nsfw"
 _DISABLE_CMDS_ = ["antinsfw", "free", "unfree"]
 __HELP__ = """
-**Anti-NSFW (Free API Version)**
+**Anti-NSFW (Local Detection)**
 • /antinsfw → Enable/disable scanner (admin only)
 • /free (reply) → Free user from scans (admin only)
 • /unfree (reply) → Remove user from free list (admin only)
 
-⚠️ **Free Version Limits:**
-- Max 50 scans per hour
-- Files under 5MB only
-- Multiple API fallbacks for reliability
+✅ **Features:**
+- Local processing (no external APIs)
+- No rate limits
+- Privacy focused
+- Fast detection
 """
+
+# Initialize the detector when plugin loads
+async def initialize_detector():
+    await nsfw_detector.initialize()
+    print("✅ NSFW Detector initialized")
+
+# Run initialization
+asyncio.create_task(initialize_detector())
