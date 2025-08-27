@@ -60,17 +60,18 @@ async def love_calc(c: Gojo, m: Message):
     await processing.edit(result_text)
 
 
-__PLUGIN__ = "love"
+__PLUGIN__ = "ʟᴏᴠᴇ"
 
 _DISABLE_CMDS_ = ["love"]
 
 __alt_name__ = []
 
 __HELP__ = """
-**Love Calculator**
+**ʟᴏᴠᴇ ᴄᴀʟᴄᴜʟᴀᴛᴏʀ**
 • /love <name1> <name2>
-Calculates love compatibility between two names.
+ᴄᴀʟᴄᴜʟᴀᴛᴇs ʟᴏᴠᴇ ᴄᴏᴍᴘᴀᴛɪʙɪʟɪᴛʏ ʙᴇᴛᴡᴇᴇɴ ᴛᴡᴏ ɴᴀᴍᴇs.
 
-Example:
+ᴇxᴀᴍᴘʟᴇ:
 `/love Naruto Hinata`
 """
+
