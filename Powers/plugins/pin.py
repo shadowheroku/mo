@@ -225,20 +225,21 @@ async def perma_pin(_, m: Message):
     return
 
 
-__PLUGIN__ = "pins"
+__PLUGIN__ = "ᴘɪɴ"
 
 __alt_name__ = ["pin", "unpin"]
 
 __HELP__ = """
-**Pin**
+**ᴘɪɴ**
 
-Here you find find all help related to groups pins and how to manage them via me.
+ʜᴇʀᴇ ʏᴏᴜ ʀᴇᴄᴇɪᴠᴇ ᴀʟʟ ʜᴇʟᴘ ʀᴇʟᴀᴛᴇᴅ ᴛᴏ ɢʀᴏᴜᴘ ᴘɪɴs ᴀɴᴅ ʜᴏᴡ ᴛᴏ ᴍᴀɴᴀɢᴇ ᴛʜᴇᴍ ᴠɪᴀ ᴍᴇ.
 
-**Admin Cmds:**
-• /pin: Silently pins the message replied to - add `loud`, `notify` or `alert` to give notificaton to users.
-• /unpin: Unpins the last pinned message.
-• /pinned: Gives the current pinned message of the chat.
-• /unpinall: Unpins all the pinned message in the current chat.
-• /antichannelpin `<on/off/yes/no>`: Toggle antichannelpin status. All the messages from linked channel will be unpinned if enabled!
-• /cleanlinked `<on/off/yes/no>`: Toggle cleanlinked status. All the messages from linked channel will be deleted if enabled!
-• /permapin `<text>`: Pin a custom messages via bot. This message can contain markdown, and can be used in replies to the media include additional buttons and text."""
+**ᴀᴅᴍɪɴ ᴄᴍᴅs:**
+• /pin: sɪʟᴇɴᴛʟʏ ᴘɪɴs ᴛʜᴇ ᴍᴇssᴀɢᴇ ʀᴇᴘʟɪᴇᴅ ᴛᴏ - ᴀᴅᴅ `ʟᴏᴜᴅ`, `ɴᴏᴛɪꜰʏ` ᴏʀ `ᴀʟᴇʀᴛ` ᴛᴏ ɢɪᴠᴇ ɴᴏᴛɪꜰɪᴄᴀᴛɪᴏɴ ᴛᴏ ᴜsᴇʀs.
+• /unpin: ᴜɴᴘɪɴs ᴛʜᴇ ʟᴀsᴛ ᴘɪɴɴᴇᴅ ᴍᴇssᴀɢᴇ.
+• /pinned: ɢɪᴠᴇs ᴛʜᴇ ᴄᴜʀʀᴇɴᴛ ᴘɪɴɴᴇᴅ ᴍᴇssᴀɢᴇ ᴏꜰ ᴛʜᴇ ᴄʜᴀᴛ.
+• /unpinall: ᴜɴᴘɪɴs ᴀʟʟ ᴘɪɴɴᴇᴅ ᴍᴇssᴀɢᴇs ɪɴ ᴛʜᴇ ᴄᴜʀʀᴇɴᴛ ᴄʜᴀᴛ.
+• /antichannelpin `<on/off/yes/no>`: ᴛᴏɢɢʟᴇ ᴀɴᴛɪᴄʜᴀɴɴᴇʟᴘɪɴ sᴛᴀᴛᴜs. ᴀʟʟ ᴍᴇssᴀɢᴇs ғʀᴏᴍ ʟɪɴᴋᴇᴅ ᴄʜᴀɴɴᴇʟ ᴡɪʟʟ ʙᴇ ᴜɴᴘɪɴɴᴇᴅ ɪꜰ ᴇɴᴀʙʟᴇᴅ!
+• /cleanlinked `<on/off/yes/no>`: ᴛᴏɢɢʟᴇ ᴄʟᴇᴀɴʟɪɴᴋᴇᴅ sᴛᴀᴛᴜs. ᴀʟʟ ᴍᴇssᴀɢᴇs ғʀᴏᴍ ʟɪɴᴋᴇᴅ ᴄʜᴀɴɴᴇʟ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ ɪꜰ ᴇɴᴀʙʟᴇᴅ!
+• /permapin `<text>`: ᴘɪɴ ᴀ ᴄᴜsᴛᴏᴍ ᴍᴇssᴀɢᴇ ᴠɪᴀ ʙᴏᴛ. ᴛʜɪs ᴍᴇssᴀɢᴇ ᴄᴀɴ ᴄᴏɴᴛᴀɪɴ ᴍᴀʀᴋᴅᴏᴡɴ, ᴀɴᴅ ᴄᴀɴ ʙᴇ ᴜsᴇᴅ ɪɴ ʀᴇᴘʟɪᴇs ᴛᴏ ᴍᴇᴅɪᴀ ɪɴᴄʟᴜᴅɪɴɢ ᴀᴅᴅɪᴛɪᴏɴᴀʟ ʙᴜᴛᴛᴏɴs ᴀɴᴅ ᴛᴇxᴛ.
+"""
