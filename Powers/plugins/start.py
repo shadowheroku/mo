@@ -238,13 +238,55 @@ I'm here to help you manage your group(s)!
 
 **Available Modules:**
 Choose a module from below to get detailed help."""
+            await m.reply_photo(photo=str(choice(StartPic)), caption=msg, reply_markup=keyboard)
         else:
-            keyboard = InlineKeyboardMarkup(
-                [[InlineKeyboardButton("Help", url=f"t.me/{c.me.username}?start=start_help")]]
-            )
-            msg = "Contact me in PM to get the list of possible commands."
+            # In groups, direct users to the paginated help menu in PM
+            modules = sorted(list(HELP_COMMANDS.keys()))
+            buttons = [
+                InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}")
+                for x in modules
+            ]
+            keyboard = paginate_buttons(buttons, page=1)
+            
+            # Send the help menu to the user's PM first
+            try:
+                msg = f"""
+Hey **[{m.from_user.first_name}](http://t.me/{m.from_user.username})**! I am {c.me.first_name}✨.
+I'm here to help you manage your group(s)!
 
-        await m.reply_photo(photo=str(choice(StartPic)), caption=msg, reply_markup=keyboard)
+**Available Modules:**
+Choose a module from below to get detailed help."""
+                
+                await c.send_photo(
+                    m.from_user.id,
+                    photo=str(choice(StartPic)),
+                    caption=msg,
+                    reply_markup=keyboard
+                )
+                
+                # Then reply in the group with a confirmation
+                await m.reply_text(
+                    f"I've sent you the help menu in private, {m.from_user.mention}!",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton("Open Help Menu", url=f"t.me/{c.me.username}?start=start_help")]]
+                    )
+                )
+            except UserIsBlocked:
+                # If user has blocked the bot, provide a direct link
+                await m.reply_text(
+                    "You need to start me in PM first to use this command.",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton("Start Me", url=f"t.me/{c.me.username}?start=start_help")]]
+                    )
+                )
+            except Exception as e:
+                LOGGER.error(f"Error sending help menu to user: {e}")
+                await m.reply_text(
+                    "I couldn't send you the help menu. Please start me in PM first.",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton("Start Me", url=f"t.me/{c.me.username}?start=start_help")]]
+                    )
+                )
 
 
 # ─── Pagination Handler ───
@@ -295,8 +337,6 @@ async def get_module_info(c: Gojo, q: CallbackQuery):
     await q.answer()
 
 
-# ─── Staffs ───
-# ─── Staffs ───
 # ─── Staffs ───
 @Gojo.on_callback_query(filters.regex("^give_bot_staffs$"))
 async def give_bot_staffs(c: Gojo, q: CallbackQuery):
