@@ -22,11 +22,7 @@ from Powers.utils.extract_user import extract_user
 from Powers.utils.parser import mention_html
 
 
-from pyrogram.enums import ChatType
-from pyrogram.types import Message
-from Powers.bot_class import Gojo
-from Powers.utils.custom_filters import command
-from Powers.utils.helpers import mention_html
+
 import traceback
 import logging
 
