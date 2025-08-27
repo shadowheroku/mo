@@ -43,13 +43,14 @@ async def speedtest_handler(client, message: Message):
         await msg.edit_text(f"❌ Error running speedtest:\n`{e}`")
 
 
-__PLUGIN__ = "Speedtest"
+__PLUGIN__ = "sᴘᴇᴇᴅᴛᴇsᴛ"
+
 __HELP__ = """
-📡 **Speedtest (speedtest-cli)**
+📡 **sᴘᴇᴇᴅᴛᴇsᴛ**
 
-`/speedtest` — Runs an internet speed test and shows download, upload, ping, ISP, and server info.
+`/speedtest` — ʀᴜɴs ᴀɴ ɪɴᴛᴇʀɴᴇᴛ sᴘᴇᴇᴅ ᴛᴇsᴛ ᴀɴᴅ sʜᴏᴡs ᴅᴏᴡɴʟᴏᴀᴅ, ᴜᴘʟᴏᴀᴅ, ᴘɪɴɢ, ɪsᴘ, ᴀɴᴅ sᴇʀᴠᴇʀ ɪɴғᴏ.
 
-⚠️ Requires `speedtest-cli`:
+⚠️ ʀᴇǫᴜɪʀᴇs `speedtest-cli`:
 ```bash
 pip install speedtest-cli
-"""
+
