@@ -193,13 +193,14 @@ __PLUGIN__ = "formatting"
 __alt_name__ = ["formatting", "markdownhelp", "markdown"]
 __buttons__ = [
     [
-        ("Markdown Formatting", "formatting.md_formatting"),
-        ("Fillings", "formatting.fillings"),
+        ("ᴍᴀʀᴋᴅᴏᴡɴ ғᴏʀᴍᴀᴛᴛɪɴɢ", "formatting.md_formatting"),
+        ("ғɪʟʟɪɴɢs", "formatting.fillings"),
     ],
-    [("Random Content", "formatting.random_content")],
+    [("ʀᴀɴᴅᴏᴍ ᴄᴏɴᴛᴇɴᴛ", "formatting.random_content")],
 ]
 
 __HELP__ = """
-**Formatting**
+**ғᴏʀᴍᴀᴛᴛɪɴɢ**
 
-Gojo supports a large number of formatting options to make your messages more expressive. Take a look by clicking the buttons below!"""
+ᴍᴏɴɪᴄ sᴜᴘᴘᴏʀᴛs ᴀ ʟᴀʀɢᴇ ɴᴜᴍʙᴇʀ ᴏғ ғᴏʀᴍᴀᴛᴛɪɴɢ ᴏᴘᴛɪᴏɴs ᴛᴏ ᴍᴀᴋᴇ ʏᴏᴜʀ ᴍᴇssᴀɢᴇs ᴍᴏʀᴇ ᴇxᴘʀᴇssɪᴠᴇ. ᴛᴀᴋᴇ ᴀ ʟᴏᴏᴋ ʙʏ ᴄʟɪᴄᴋɪɴɢ ᴛʜᴇ ʙᴜᴛᴛᴏɴs ʙᴇʟᴏᴡ!
+"""
