@@ -174,16 +174,17 @@ async def gban_list(_, m: Message):
     return
 
 
-__PLUGIN__ = "global"
+__PLUGIN__ = "ɢʟᴏʙᴀʟ"
 
 __alt_name__ = ["antispam", "global"]
 
 __HELP__ = """
-**Global**
+**ɢʟᴏʙᴀʟ**
 
-**Sudo commands:**
-• /gban [reply to user | user id | username]: Add the user in the global ban watchlist.
-• /ungban [reply to user | user id | username]: Remove the user from the global ban watchlist.
-• /numgbans : Give number of users who are banned globally.
-• /gbanlist : Give list of globally banned users.
+**sᴜᴅᴏ ᴄᴏᴍᴍᴀɴᴅs:**
+• /gban [ʀᴇᴘʟʏ ᴛᴏ ᴜsᴇʀ | ᴜsᴇʀ ɪᴅ | ᴜsᴇʀɴᴀᴍᴇ]: ᴀᴅᴅ ᴛʜᴇ ᴜsᴇʀ ɪɴ ᴛʜᴇ ɢʟᴏʙᴀʟ ʙᴀɴ ᴡᴀᴛᴄʜʟɪsᴛ.
+• /ungban [ʀᴇᴘʟʏ ᴛᴏ ᴜsᴇʀ | ᴜsᴇʀ ɪᴅ | ᴜsᴇʀɴᴀᴍᴇ]: ʀᴇᴍᴏᴠᴇ ᴛʜᴇ ᴜsᴇʀ ꜰʀᴏᴍ ᴛʜᴇ ɢʟᴏʙᴀʟ ʙᴀɴ ᴡᴀᴛᴄʜʟɪsᴛ.
+• /numgbans : ɢɪᴠᴇ ɴᴜᴍʙᴇʀ ᴏꜰ ᴜsᴇʀs ᴡʜᴏ ᴀʀᴇ ʙᴀɴɴᴇᴅ ɢʟᴏʙᴀʟʟʏ.
+• /gbanlist : ɢɪᴠᴇ ʟɪsᴛ ᴏꜰ ɢʟᴏʙᴀʟʟʏ ʙᴀɴɴᴇᴅ ᴜsᴇʀs.
 """
+
