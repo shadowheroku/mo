@@ -142,20 +142,20 @@ async def enablealll(_, q: CallbackQuery):
     return
 
 
-__PLUGIN__ = "disable able"
+__PLUGIN__ = "ᴅɪsᴀʙʟᴇ"
 
 __alt_name__ = ["disable commands", "disable"]
 
 __HELP__ = """
-**Disable commands**
+**ᴅɪsᴀʙʟᴇ ᴄᴏᴍᴍᴀɴᴅs**
 
-**Admin commands:**
-• /disable [command]: To disable the given command.
-• /disabledel [on | off]: Will delete the command which is disabled.
-• /enable [command]: To enable the given command.
-• /disableable : Give all disableable commands.
-• /disabled : Give all disabled commands.
+**ᴀᴅᴍɪɴ ᴄᴏᴍᴍᴀɴᴅs:**
+• /disable [command]: ᴛᴏ ᴅɪsᴀʙʟᴇ ᴛʜᴇ ɢɪᴠᴇɴ ᴄᴏᴍᴍᴀɴᴅ.
+• /disabledel [on | off]: ᴡɪʟʟ ᴅᴇʟᴇᴛᴇ ᴛʜᴇ ᴄᴏᴍᴍᴀɴᴅ ᴡʜɪᴄʜ ɪs ᴅɪsᴀʙʟᴇᴅ.
+• /enable [command]: ᴛᴏ ᴇɴᴀʙʟᴇ ᴛʜᴇ ɢɪᴠᴇɴ ᴄᴏᴍᴍᴀɴᴅ.
+• /disableable : ɢɪᴠᴇ ᴀʟʟ ᴅɪsᴀʙʟᴇᴀʙʟᴇ ᴄᴏᴍᴍᴀɴᴅs.
+• /disabled : ɢɪᴠᴇ ᴀʟʟ ᴅɪsᴀʙʟᴇᴅ ᴄᴏᴍᴍᴀɴᴅs.
 
-**Owner command:**
-• /enableall : Enable all the disabled commands.
+**ᴏᴡɴᴇʀ ᴄᴏᴍᴍᴀɴᴅ:**
+• /enableall : ᴇɴᴀʙʟᴇ ᴀʟʟ ᴛʜᴇ ᴅɪsᴀʙʟᴇᴅ ᴄᴏᴍᴍᴀɴᴅs.
 """
