@@ -91,7 +91,7 @@ async def send_loading_animation(m: Message):
     and finally show a 'Done' checkmark.
     """
     # Step 1: Send fire emoji
-    fire_msg = await m.reply_text("🔥", quote=True)
+    fire_msg = await m.reply_text("⚡", quote=True)
     await asyncio.sleep(1.5)
     await fire_msg.delete()
 
@@ -106,6 +106,7 @@ async def send_loading_animation(m: Message):
 
     # Step 4: Final confirmation
     await loading_msg.edit_text("✅ ᴍᴏɴɪᴄ sᴛᴀʀᴛᴇᴅ !")
+    await asyncio.sleep(1)
     await loading_msg.delete()
 
 
