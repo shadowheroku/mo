@@ -127,14 +127,16 @@ async def karma_vote(c, m):
 
 
 # ===== METADATA =====
-__PLUGIN__ = "Per-Chat Karma System (+/- Voting)"
-__HELP__ = """
-💫 **Per-Chat Karma System**
+__PLUGIN__ = "ᴋᴀʀᴍᴀ"
 
-• Reply with `+` to give karma
-• Reply with `-` to remove karma
-• /karma → Check user's karma
-• /topkarma → Show top 10 users in this chat
-• Anti-self-voting & cooldown prevents spam
-• Karma is tracked separately for each group
+__HELP__ = """
+💫 **ᴘᴇʀ-ᴄʜᴀᴛ ᴋᴀʀᴍᴀ sʏsᴛᴇᴍ**
+
+• ʀᴇᴘʟʏ ᴡɪᴛʜ `+` ᴛᴏ ɢɪᴠᴇ ᴋᴀʀᴍᴀ
+• ʀᴇᴘʟʏ ᴡɪᴛʜ `-` ᴛᴏ ʀᴇᴍᴏᴠᴇ ᴋᴀʀᴍᴀ
+• /karma → ᴄʜᴇᴄᴋ ᴜsᴇʀ's ᴋᴀʀᴍᴀ
+• /topkarma → sʜᴏᴡ ᴛᴏᴘ 10 ᴜsᴇʀs ɪɴ ᴛʜɪs ᴄʜᴀᴛ
+• ᴀɴᴛɪ-sᴇʟꜰ-ᴠᴏᴛɪɴɢ & ᴄᴏᴏʟᴅᴏᴡɴ ᴘʀᴇᴠᴇɴᴛs sᴘᴀᴍ
+• ᴋᴀʀᴍᴀ ɪs ᴛʀᴀᴄᴋᴇᴅ sᴇᴘᴀʀᴀᴛᴇʟʏ ғᴏʀ ᴇᴀᴄʜ ɢʀᴏᴜᴘ
 """
+
