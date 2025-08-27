@@ -153,32 +153,61 @@ async def zombie_clean(c: Gojo, m: Message):
         )
 
 
+LOGGER = logging.getLogger(__name__)
+
+
 @Gojo.on_message(command("admincache"))
 async def reload_admins(_, m: Message):
     global TEMP_ADMIN_CACHE_BLOCK
+
+    # ─── GROUP CHECK ───
     if m.chat.type not in [ChatType.SUPERGROUP, ChatType.GROUP]:
-        return await m.reply_text(
-            "This command is made to be used in groups only!",
-        )
+        return await m.reply_text("⚠️ This command can only be used inside <b>groups</b>.")
+
     SUPPORT_STAFF = get_support_staff()
+
+    # ─── RATE LIMIT: ONCE IN 10 MIN ───
     if (
-            (m.chat.id in set(TEMP_ADMIN_CACHE_BLOCK.keys()))
-            and (m.from_user.id not in SUPPORT_STAFF)
-            and TEMP_ADMIN_CACHE_BLOCK[m.chat.id] == "manualblock"
+        (m.chat.id in set(TEMP_ADMIN_CACHE_BLOCK.keys()))
+        and (m.from_user.id not in SUPPORT_STAFF)
+        and TEMP_ADMIN_CACHE_BLOCK[m.chat.id] == "manualblock"
     ):
-        await m.reply_text("Can only reload admin cache once per 10 mins!")
-        return
+        return await m.reply_text(
+            "⏳ <b>Cooldown active:</b> You can only reload admin cache once every <b>10 minutes</b>."
+        )
+
+    status = await m.reply_text("🔄 Reloading admin cache...")
+
     try:
         await admin_cache_reload(m, "admincache")
         TEMP_ADMIN_CACHE_BLOCK[m.chat.id] = "manualblock"
-        await m.reply_text(text="Reloaded all admins in this chat!")
+
+        await status.edit_text("✅ <b>Admin cache refreshed successfully!</b>\nNow using updated admin list.")
+
+    except ChatAdminRequired:
+        await status.edit_text("🚫 I need <b>admin privileges</b> to reload the admin cache.")
+    except FloodWait as e:
+        await status.edit_text(f"⏳ FloodWait triggered. Retrying in {e.value} seconds...")
+        await sleep(e.value)
+        try:
+            await admin_cache_reload(m, "admincache")
+            TEMP_ADMIN_CACHE_BLOCK[m.chat.id] = "manualblock"
+            await status.edit_text("✅ <b>Admin cache refreshed after waiting!</b>")
+        except Exception as ex:
+            await status.edit_text(
+                f"⚠️ Retried but failed:\n<code>{ex}</code>"
+            )
+            LOGGER.error(f"[AdminCache-FloodWait] {ex}\n{traceback.format_exc()}")
     except RPCError as ef:
-        await m.reply_text(
-            text=f"Some error occured, report it using `/bug` \n <b>Error:</b> <code>{ef}</code>"
+        await status.edit_text(
+            f"⚠️ <b>RPC Error:</b>\n<code>{ef}</code>\n👉 Report this via <code>/bug</code>."
         )
-        LOGGER.error(ef)
-        LOGGER.error(format_exc())
-    return
+        LOGGER.error(f"[AdminCache-RPCError] {ef}\n{traceback.format_exc()}")
+    except Exception as e:
+        await status.edit_text(
+            f"⚠️ <b>Unexpected Error:</b>\n<code>{e}</code>"
+        )
+        LOGGER.error(f"[AdminCache-UnknownError] {e}\n{traceback.format_exc()}")
 
 
 @Gojo.on_message(filters.regex(r"^(?i)@admin(s)?") & filters.group)
