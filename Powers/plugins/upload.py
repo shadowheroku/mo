@@ -64,12 +64,14 @@ async def upload_media_to_catbox(c: Gojo, m: Message):
         if "media_path" in locals() and os.path.exists(media_path):
             os.remove(media_path)
 
-__PLUGIN__ = "catbox_upload"
-__HELP__ = """
-**📤 Catbox Uploader**
-`/tgm` — Reply to a media file to upload to Catbox.
+__PLUGIN__ = "ᴛɢᴍ"
 
-**✅ Supported formats:** JPG, PNG, GIF, MP4, WEBM, MOV  
-📦 **Max size:** 200MB  
-🔄 **Includes share button for easy link sharing!**
+__HELP__ = """
+**📤 ᴜᴘʟᴏᴀᴅᴇʀ**
+`/tgm` — ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇᴅɪᴀ ғɪʟᴇ ᴛᴏ ᴜᴘʟᴏᴀᴅ ᴛᴏ ᴄᴀᴛʙᴏx.
+
+**✅ sᴜᴘᴘᴏʀᴛᴇᴅ ғᴏʀᴍᴀᴛs:** JPG, PNG, GIF, MP4, WEBM, MOV  
+📦 **ᴍᴀx sɪᴢᴇ:** 200MB  
+🔄 **ɪɴᴄʟᴜᴅᴇs sʜᴀʀᴇ ʙᴜᴛᴛᴏɴ ғᴏʀ ᴇᴀsʏ ʟɪɴᴋ sʜᴀʀɪɴɢ!**
 """
+
