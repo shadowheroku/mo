@@ -105,7 +105,7 @@ async def send_loading_animation(m: Message):
             await asyncio.sleep(0.8)
 
     # Step 4: Final confirmation
-    await loading_msg.edit_text("✅ ᴍᴏɴɪᴄ sᴛᴀʀᴛᴇᴅ !")
+    await loading_msg.edit_text(" ᴍᴏɴɪᴄ sᴛᴀʀᴛᴇᴅ !")
     await asyncio.sleep(1)
     await loading_msg.delete()
 
