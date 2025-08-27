@@ -329,14 +329,15 @@ async def download_instareels(c: Gojo, m: Message):
         return
 
 
-__PLUGIN__ = "web support"
+__PLUGIN__ = "Wᴇʙ"
 
 __HELP__ = """
-**Available commands**
-• /rmbg (/removebg, /removebackground) : Reply to image file or sticker of which you want to remove background
-• /song (/yta) <songname or youtube link> : Download audio only from provided youtube url
-• /vsong (/ytv) <songname or youtube link> : Download video from provided youtube url
-• /ig (/instagram , /insta) <reel's url> : Download reel from it's url
+**ᴀᴠᴀɪʟᴀʙʟᴇ ᴄᴏᴍᴍᴀɴᴅs**
+• /rmbg (/removebg, /removebackground) : ʀᴇᴘʟʏ ᴛᴏ ɪᴍᴀɢᴇ ꜰɪʟᴇ ᴏʀ sᴛɪᴄᴋᴇʀ ᴏꜰ ᴡʜɪᴄʜ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ʀᴇᴍᴏᴠᴇ ʙᴀᴄᴋɢʀᴏᴜɴᴅ
+• /song (/yta) <songname or youtube link> : ᴅᴏᴡɴʟᴏᴀᴅ ᴀᴜᴅɪᴏ ᴏɴʟʏ ꜰʀᴏᴍ ᴘʀᴏᴠɪᴅᴇᴅ ʏᴏᴜᴛᴜʙᴇ ᴜʀʟ
+• /vsong (/ytv) <songname or youtube link> : ᴅᴏᴡɴʟᴏᴀᴅ ᴠɪᴅᴇᴏ ꜰʀᴏᴍ ᴘʀᴏᴠɪᴅᴇᴅ ʏᴏᴜᴛᴜʙᴇ ᴜʀʟ
+• /ig (/instagram , /insta) <reel's url> : ᴅᴏᴡɴʟᴏᴀᴅ ʀᴇᴇʟ ꜰʀᴏᴍ ɪᴛ's ᴜʀʟ
 
-**Bot will not download any song or video having duration greater than 10 minutes (to reduce the load on bot's server)**
+**ʙᴏᴛ ᴡɪʟʟ ɴᴏᴛ ᴅᴏᴡɴʟᴏᴀᴅ ᴀɴʏ sᴏɴɢ ᴏʀ ᴠɪᴅᴇᴏ ʜᴀᴠɪɴɢ ᴅᴜʀᴀᴛɪᴏɴ ɢʀᴇᴀᴛᴇʀ ᴛʜᴀɴ 10 ᴍɪɴᴜᴛᴇs (ᴛᴏ ʀᴇᴅᴜᴄᴇ ᴛʜᴇ ʟᴏᴀᴅ ᴏɴ ʙᴏᴛ's sᴇʀᴠᴇʀ)**
 """
+    
