@@ -104,28 +104,53 @@ async def adminlist_show(_, m: Message):
 
 @Gojo.on_message(command("zombies") & admin_filter)
 async def zombie_clean(c: Gojo, m: Message):
-    zombie = 0
-    wait = await m.reply_text("Searching ... and banning ...")
-    failed = 0
-    async for member in c.get_chat_members(m.chat.id):
-        if member.user.is_deleted:
-            zombie += 1
-            try:
-                await c.ban_chat_member(m.chat.id, member.user.id)
-            except UserAdminInvalid:
-                failed += 1
-            except FloodWait as e:
-                await sleep(e.value)
+    status = await m.reply_text("🔍 Scanning for deleted accounts...")
+    zombies, banned, failed = 0, 0, 0
+
+    try:
+        async for member in c.get_chat_members(m.chat.id):
+            if member.user.is_deleted:
+                zombies += 1
                 try:
                     await c.ban_chat_member(m.chat.id, member.user.id)
-                except Exception:
-                    pass
-    if zombie == 0:
-        return await wait.edit_text("Group is clean!")
-    await wait.delete()
-    txt = f"<b>{zombie}</b> Zombies found and {zombie - failed} has been banned!\n{failed} zombies' are immune to me",
-    await m.reply_animation("https://graph.org/file/02a1dcf7788186ffb36cb.mp4", caption=txt)
-    return
+                    banned += 1
+                except UserAdminInvalid:
+                    failed += 1
+                except ChatAdminRequired:
+                    failed += 1
+                except FloodWait as e:
+                    await sleep(e.value)
+                    try:
+                        await c.ban_chat_member(m.chat.id, member.user.id)
+                        banned += 1
+                    except Exception:
+                        failed += 1
+                except RPCError:
+                    failed += 1
+
+        if zombies == 0:
+            return await status.edit_text("✅ Group is already clean! No deleted accounts found.")
+
+        await status.delete()
+
+        caption = (
+            f"🧹 <b>Zombies Cleanup Complete</b>\n\n"
+            f"👥 <b>Total Zombies Found:</b> <code>{zombies}</code>\n"
+            f"✅ <b>Banned Successfully:</b> <code>{banned}</code>\n"
+            f"⚠️ <b>Failed / Immune:</b> <code>{failed}</code>"
+        )
+
+        await m.reply_animation(
+            "https://graph.org/file/02a1dcf7788186ffb36cb.mp4",
+            caption=caption,
+        )
+
+    except ChatAdminRequired:
+        await status.edit_text("🚫 I need <b>Ban Users</b> permission to clean zombies.")
+    except Exception as e:
+        await status.edit_text(
+            f"⚠️ An unexpected error occurred:\n<code>{e}</code>"
+        )
 
 
 @Gojo.on_message(command("admincache"))
