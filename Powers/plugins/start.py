@@ -92,7 +92,7 @@ async def send_loading_animation(m: Message):
     loading_msgs = []
     for i in range(1, 4):
         loading_text = "ʟᴏᴀᴅɪɴɢ" + ("." * i)
-        loading_msg = await m.reply_text(loading_text, quote=True)
+        loading_msg = await m.edit_text(loading_text, quote=True)
         loading_msgs.append(loading_msg)
         await asyncio.sleep(0.8)  # Wait between each loading message
     
