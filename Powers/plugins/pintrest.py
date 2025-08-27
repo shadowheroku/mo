@@ -103,13 +103,15 @@ async def pinterest_downloader(c, m):
                     pass
 
 # Metadata
-__PLUGIN__ = "Pinterest Video Downloader"
+__PLUGIN__ = "Pinterest"
+
 __HELP__ = """
-🎥 Download videos from Pinterest:
+🎥 ᴅᴏᴡɴʟᴏᴀᴅ ᴠɪᴅᴇᴏs ғʀᴏᴍ ᴘɪɴᴛᴇʀᴇsᴛ:
 
-• Send any Pinterest video link
-• Uses only `_pinterest_sess` for login
-• Works with private videos (if your account has access)
+• sᴇɴᴅ ᴀɴʏ ᴘɪɴᴛᴇʀᴇsᴛ ᴠɪᴅᴇᴏ ʟɪɴᴋ
+• ᴜsᴇs ᴏɴʟʏ `_pinterest_sess` ғᴏʀ ʟᴏɢɪɴ
+• ᴡᴏʀᴋs ᴡɪᴛʜ ᴘʀɪᴠᴀᴛᴇ ᴠɪᴅᴇᴏs (ɪꜰ ʏᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛ ʜᴀs ᴀᴄᴄᴇss)
 
-⚠️ Only video posts are supported, not images.
+⚠️ ᴏɴʟʏ ᴠɪᴅᴇᴏ ᴘᴏsᴛs ᴀʀᴇ sᴜᴘᴘᴏʀᴛᴇᴅ, ɴᴏᴛ ɪᴍᴀɢᴇs.
 """
+
