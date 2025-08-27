@@ -197,15 +197,16 @@ async def accept_decline_request(c: Gojo, q: CallbackQuery):
             LOGGER.error(format_exc())
 
 
-__PLUGIN__ = "auto join"
+__PLUGIN__ = "ᴀᴜᴛᴏ ᴊᴏɪɴ"
 __alt_name__ = ["join_request"]
 
 __HELP__ = """
-**Auto Join Requests**
+**ᴀᴜᴛᴏ ᴊᴏɪɴ ʀᴇǫᴜᴇsᴛs**
 
-**Admin Commands:**
-• `/joinreq [on | off]` → Enable/disable auto-join.
+**ᴀᴅᴍɪɴ ᴄᴏᴍᴍᴀɴᴅs:**
+• `/joinreq [on | off]` → ᴇɴᴀʙʟᴇ/ᴅɪsᴀʙʟᴇ ᴀᴜᴛᴏ-ᴊᴏɪɴ.
 • `/joinreqmode [auto | manual]`
-   • `auto` → Approves all requests automatically.
-   • `manual` → Notifies admins with Accept/Decline buttons.
+   • `auto` → ᴀᴘᴘʀᴏᴠᴇs ᴀʟʟ ʀᴇǫᴜᴇsᴛs ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ.
+   • `manual` → ɴᴏᴛɪꜰɪᴇs ᴀᴅᴍɪɴs ᴡɪᴛʜ ᴀᴄᴄᴇᴘᴛ/ᴅᴇᴄʟɪɴᴇ ʙᴜᴛᴛᴏɴs.
 """
+
