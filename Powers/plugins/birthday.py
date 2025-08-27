@@ -233,15 +233,15 @@ async def switch_on_off(c: Gojo, q: CallbackQuery):
     return
 
 
-__PLUGIN__ = "birthday"
+__PLUGIN__ = "ʙɪʀᴛʜᴅᴀʏ"
 
 __HELP__ = """
-• /remember [reply to user] [DOB] : To registers user date of birth in my database. If not replied to user then the DOB givien will be treated as yours
-• /nextbdays (/nbdays,/brithdays,/bdays) : Return upcoming birthdays of 10 users
-• /removebday (/rmbday) : To remove birthday from database (One can only remove their data from database not of others)
-• /settingbday (/sbday) : To configure the settings for wishing and all for the chat
-• /getbday (/gbday,/mybirthday,/mybday) [reply to user] : If replied to user get the replied user's birthday else returns your birthday
+• /remember [reply to user] [ᴅᴏʙ] : ᴛᴏ ʀᴇɢɪsᴛᴇʀs ᴜsᴇʀ ᴅᴀᴛᴇ ᴏғ ʙɪʀᴛʜ ɪɴ ᴍʏ ᴅᴀᴛᴀʙᴀsᴇ. ɪғ ɴᴏᴛ ʀᴇᴘʟɪᴇᴅ ᴛᴏ ᴜsᴇʀ ᴛʜᴇɴ ᴛʜᴇ ᴅᴏʙ ɢɪᴠɪᴇɴ ᴡɪʟʟ ʙᴇ ᴛʀᴇᴀᴛᴇᴅ ᴀs ʏᴏᴜʀs  
+• /nextbdays (/nbdays,/brithdays,/bdays) : ʀᴇᴛᴜʀɴ ᴜᴘᴄᴏᴍɪɴɢ ʙɪʀᴛʜᴅᴀʏs ᴏғ 10 ᴜsᴇʀs  
+• /removebday (/rmbday) : ᴛᴏ ʀᴇᴍᴏᴠᴇ ʙɪʀᴛʜᴅᴀʏ ғʀᴏᴍ ᴅᴀᴛᴀʙᴀsᴇ (ᴏɴᴇ ᴄᴀɴ ᴏɴʟʏ ʀᴇᴍᴏᴠᴇ ᴛʜᴇɪʀ ᴅᴀᴛᴀ ғʀᴏᴍ ᴅᴀᴛᴀʙᴀsᴇ ɴᴏᴛ ᴏғ ᴏᴛʜᴇʀs)  
+• /settingbday (/sbday) : ᴛᴏ ᴄᴏɴғɪɢᴜʀᴇ ᴛʜᴇ sᴇᴛᴛɪɴɢs ғᴏʀ ᴡɪsʜɪɴɢ ᴀɴᴅ ᴀʟʟ ғᴏʀ ᴛʜᴇ ᴄʜᴀᴛ  
+• /getbday (/gbday,/mybirthday,/mybday) [reply to user] : ɪғ ʀᴇᴘʟɪᴇᴅ ᴛᴏ ᴜsᴇʀ ɢᴇᴛ ᴛʜᴇ ʀᴇᴘʟɪᴇᴅ ᴜsᴇʀ's ʙɪʀᴛʜᴅᴀʏ ᴇʟsᴇ ʀᴇᴛᴜʀɴs ʏᴏᴜʀ ʙɪʀᴛʜᴅᴀʏ  
 
-DOB should be in format of dd/mm/yyyy
-Year is optional it is not necessary to pass it
+ᴅᴏʙ sʜᴏᴜʟᴅ ʙᴇ ɪɴ ғᴏʀᴍᴀᴛ ᴏғ ᴅᴅ/ᴍᴍ/yyyy  
+ʏᴇᴀʀ ɪs ᴏᴘᴛɪᴏɴᴀʟ ɪᴛ ɪs ɴᴏᴛ ɴᴇᴄᴇssᴀʀʏ ᴛᴏ ᴘᴀss ɪᴛ  
 """
