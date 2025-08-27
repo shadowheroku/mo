@@ -266,7 +266,7 @@ async def get_image_search(_, m: Message):
         await ab.edit("Error occurred while sending images. Please try again.")
 
 
-__PLUGIN__ = "search"
+__PLUGIN__ = "sᴇᴀʀᴄʜ"
 
 __alt_name__ = [
     "google",
@@ -275,14 +275,15 @@ __alt_name__ = [
 ]
 
 __HELP__ = """
-**Search**
+**sᴇᴀʀᴄʜ**
 
-**Available commands:**
-• /google `<query>` : Search the google for the given query.
-• /anime `<query>`  : Search myanimelist for the given query.
-• /stack `<query>`  : Search stackoverflow for the given query.
-• /images (/imgs) `<query>` : Get the images regarding to your query
+**ᴀᴠᴀɪʟᴀʙʟᴇ ᴄᴏᴍᴍᴀɴᴅs:**
+• /google `<query>` : sᴇᴀʀᴄʜ ᴛʜᴇ ɢᴏᴏɢʟᴇ ғᴏʀ ᴛʜᴇ ɢɪᴠᴇɴ ǫᴜᴇʀʏ.
+• /anime `<query>`  : sᴇᴀʀᴄʜ ᴍʏᴀɴɪᴍᴇʟɪsᴛ ғᴏʀ ᴛʜᴇ ɢɪᴠᴇɴ ǫᴜᴇʀʏ.
+• /stack `<query>`  : sᴇᴀʀᴄʜ sᴛᴀᴄᴋᴏᴠᴇʀꜰʟᴏᴡ ғᴏʀ ᴛʜᴇ ɢɪᴠᴇɴ ǫᴜᴇʀʏ.
+• /images (/imgs) `<query>` : ɢᴇᴛ ᴛʜᴇ ɪᴍᴀɢᴇs ʀᴇʟᴀᴛɪɴɢ ᴛᴏ ʏᴏᴜʀ ǫᴜᴇʀʏ
 
-**Example:**
-`/google pyrogram`: return top 5 reuslts.
+**ᴇxᴀᴍᴘʟᴇ:**
+`/google pyrogram`: ʀᴇᴛᴜʀɴ ᴛᴏᴘ 5 ʀᴇsᴜʟᴛs.
 """
+
