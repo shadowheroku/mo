@@ -82,12 +82,10 @@ async def instagram_downloader(c, m):
 
 # Metadata
 __PLUGIN__ = "Instagram Downloader"
+
 __HELP__ = """
-📸 Download posts/reels/videos from Instagram:
+📸 ᴅᴏᴡɴʟᴏᴀᴅ ʀᴇᴇʟs/ᴠɪᴅᴇᴏs ғʀᴏᴍ ɪɴsᴛᴀɢʀᴀᴍ:
 
-• Send any Instagram post/reel/tv link
-• Uses only `sessionid` for login
-• Works with private posts (if your account has access)
-
-⚠️ Both videos and images are supported.
+• sᴇɴᴅ ᴀɴʏ ɪɴsᴛᴀɢʀᴀᴍ ʀᴇᴇʟ ʟɪɴᴋ
 """
+
