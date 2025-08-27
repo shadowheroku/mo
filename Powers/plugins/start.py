@@ -99,13 +99,14 @@ async def send_loading_animation(m: Message):
     loading_msg = await m.reply_text("ʟᴏᴀᴅɪɴɢ", quote=True)
 
     # Step 3: Edit the bot's own message
-    for _ in range(3):  # Repeat 3 cycles
+    for _ in range(1):  # Repeat 3 cycles
         for dots in range(1, 4):  # 1 to 3 dots
             await loading_msg.edit_text(f"ʟᴏᴀᴅɪɴɢ{'.' * dots}")
             await asyncio.sleep(0.8)
 
     # Step 4: Final confirmation
     await loading_msg.edit_text("✅ ᴍᴏɴɪᴄ sᴛᴀʀᴛᴇᴅ !")
+    await loading_msg.delete()
 
 
 
