@@ -47,14 +47,14 @@ def paginate_buttons(buttons: list, page: int = 1, per_page: int = 9):
     # navigation row
     nav = []
     if page > 1:
-        nav.append(InlineKeyboardButton("◀️ Prev", callback_data=f"help_page_{page-1}"))
+        nav.append(InlineKeyboardButton("◀ Pʀᴇᴠ", callback_data=f"help_page_{page-1}"))
     if page < total_pages:
-        nav.append(InlineKeyboardButton("Next ▶️", callback_data=f"help_page_{page+1}"))
+        nav.append(InlineKeyboardButton("Nᴇxᴛ ▶", callback_data=f"help_page_{page+1}"))
     if nav:
         rows.append(nav)
     
     # Add back button
-    rows.append([InlineKeyboardButton("« Back to Start", callback_data="start_back")])
+    rows.append([InlineKeyboardButton("« Bᴀᴄᴋ ᴛᴏ Sᴛᴀʀᴛ", callback_data="start_back")])
 
     return InlineKeyboardMarkup(rows)
 
@@ -99,11 +99,11 @@ async def start(c: Gojo, m: Message):
                 ]
                 keyboard = paginate_buttons(buttons, page=1)
                 msg = f"""
-Hey **[{m.from_user.first_name}](http://t.me/{m.from_user.username})**! I am {c.me.first_name}✨.
-I'm here to help you manage your group(s)!
+Hᴇʏ **[{m.from_user.first_name}](http://t.me/{m.from_user.username})**! I ᴀᴍ {c.me.first_name}✨.
+I'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
 
-**Available Modules:**
-Choose a module from below to get detailed help."""
+Aᴠᴀɪʟᴀʙʟᴇ Mᴏᴅᴜʟᴇs:
+Cʜᴏᴏsᴇ ᴀ ᴍᴏᴅᴜʟᴇ ғʀᴏᴍ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴅᴇᴛᴀɪʟᴇᴅ ʜᴇʟᴘ."""
                 await m.reply_photo(photo=str(choice(StartPic)), caption=msg, reply_markup=keyboard)
                 return
 
@@ -143,11 +143,11 @@ Choose a module from below to get detailed help."""
 
         try:
             cpt = f"""
-Hey [{m.from_user.first_name}](http://t.me/{m.from_user.username})! I am {c.me.first_name} ✨.
-I'm here to help you manage your group(s)!
-Hit /help to find out more about how to use me in my full potential!
+Hᴇʏ [{q.from_user.first_name}](http://t.me/{q.from_user.username})! I ᴀᴍ {c.me.first_name} ✨.
+I'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
+Hɪᴛ /help ᴛᴏ ғɪɴᴅ ᴏᴜᴛ ᴍᴏʀᴇ ᴀʙᴏᴜᴛ ʜᴏᴡ ᴛᴏ ᴜsᴇ ᴍᴇ ɪɴ ᴍʏ ғᴜʟʟ ᴘᴏᴛᴇɴᴛɪᴀʟ!
 
-Join my [News Channel](https://t.me/ShadowBotsHQ) to get information on all the latest updates."""
+Jᴏɪɴ ᴍʏ [Nᴇᴡs Cʜᴀɴɴᴇʟ](http://t.me/shadowbotshq) ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ᴏɴ ᴀʟʟ ᴛʜᴇ ʟᴀᴛᴇsᴛ ᴜᴘᴅᴀᴛᴇs."""
             await m.reply_photo(
                 photo=str(choice(StartPic)),
                 caption=cpt,
@@ -158,7 +158,7 @@ Join my [News Channel](https://t.me/ShadowBotsHQ) to get information on all the 
             LOGGER.warning(f"Bot blocked by {m.from_user.id}")
     else:
         kb = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("Connect me to pm", url=f"https://{c.me.username}.t.me/")]]
+            [[InlineKeyboardButton("Cᴏɴɴᴇᴄᴛ ᴍᴇ ᴛᴏ ᴘᴍ", url=f"https://{c.me.username}.t.me/")]]
         )
         await m.reply_photo(
             photo=str(choice(StartPic)),
@@ -173,11 +173,11 @@ Join my [News Channel](https://t.me/ShadowBotsHQ) to get information on all the 
 async def start_back(c: Gojo, q: CallbackQuery):
     try:
         cpt = f"""
-Hey [{q.from_user.first_name}](http://t.me/{q.from_user.username})! I am {c.me.first_name} ✨.
-I'm here to help you manage your group(s)!
-Hit /help to find out more about how to use me in my full potential!
+Hᴇʏ [{q.from_user.first_name}](http://t.me/{q.from_user.username})! I ᴀᴍ {c.me.first_name} ✨.
+I'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
+Hɪᴛ /help ᴛᴏ ғɪɴᴅ ᴏᴜᴛ ᴍᴏʀᴇ ᴀʙᴏᴜᴛ ʜᴏᴡ ᴛᴏ ᴜsᴇ ᴍᴇ ɪɴ ᴍʏ ғᴜʟʟ ᴘᴏᴛᴇɴᴛɪᴀʟ!
 
-Join my [News Channel](http://t.me/shadowbotshq) to get information on all the latest updates."""
+Jᴏɪɴ ᴍʏ [Nᴇᴡs Cʜᴀɴɴᴇʟ](http://t.me/shadowbotshq) ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ᴏɴ ᴀʟʟ ᴛʜᴇ ʟᴀᴛᴇsᴛ ᴜᴘᴅᴀᴛᴇs."""
         await q.edit_message_caption(caption=cpt, reply_markup=(await gen_start_kb(q.message)))
     except MessageNotModified:
         pass
@@ -195,11 +195,11 @@ async def commands_menu(c: Gojo, q: CallbackQuery):
     keyboard = paginate_buttons(buttons, page=1)
     
     msg = f"""
-Hey **[{q.from_user.first_name}](http://t.me/{q.from_user.username})**! I am {c.me.first_name}✨.
-I'm here to help you manage your group(s)!
+Hᴇʏ **[{m.from_user.first_name}](http://t.me/{m.from_user.username})**! I ᴀᴍ {c.me.first_name}✨.
+I'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
 
-**Available Modules:**
-Choose a module from below to get detailed help."""
+Aᴠᴀɪʟᴀʙʟᴇ Mᴏᴅᴜʟᴇs:
+Cʜᴏᴏsᴇ ᴀ ᴍᴏᴅᴜʟᴇ ғʀᴏᴍ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴅᴇᴛᴀɪʟᴇᴅ ʜᴇʟᴘ."""
 
     try:
         await q.edit_message_caption(caption=msg, reply_markup=keyboard)
@@ -237,7 +237,7 @@ async def help_menu(c: Gojo, m: Message):
                 photo=str(choice(StartPic)),
                 caption=f"Press the button below to get help for <i>{help_option}</i>",
                 reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("Help", url=f"t.me/{c.me.username}?start={help_option}")]]
+                    [[InlineKeyboardButton("Hᴇʟᴘ", url=f"t.me/{c.me.username}?start={help_option}")]]
                 ),
             )
     else:
@@ -249,11 +249,11 @@ async def help_menu(c: Gojo, m: Message):
             ]
             keyboard = paginate_buttons(buttons, page=1)
             msg = f"""
-Hey **[{m.from_user.first_name}](http://t.me/{m.from_user.username})**! I am {c.me.first_name}✨.
-I'm here to help you manage your group(s)!
+Hᴇʏ **[{m.from_user.first_name}](http://t.me/{m.from_user.username})**! I ᴀᴍ {c.me.first_name}✨.
+I'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
 
-**Available Modules:**
-Choose a module from below to get detailed help."""
+Aᴠᴀɪʟᴀʙʟᴇ Mᴏᴅᴜʟᴇs:
+Cʜᴏᴏsᴇ ᴀ ᴍᴏᴅᴜʟᴇ ғʀᴏᴍ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴅᴇᴛᴀɪʟᴇᴅ ʜᴇʟᴘ."""
             await m.reply_photo(photo=str(choice(StartPic)), caption=msg, reply_markup=keyboard)
         else:
             # In groups, redirect to the paginated help menu
@@ -261,7 +261,7 @@ Choose a module from below to get detailed help."""
                 photo=str(choice(StartPic)),
                 caption="I'll send you the help menu in private!",
                 reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("Open Help Menu", url=f"https://t.me/{c.me.username}?start=help")]]
+                    [[InlineKeyboardButton("Oᴘᴇɴ Hᴇʟᴘ Mᴇɴᴜ", url=f"https://t.me/{c.me.username}?start=help")]]
                 )
             )
 
@@ -286,11 +286,11 @@ async def give_curr_info(c: Gojo, q: CallbackQuery):
     delta_ping = time() - start
     await x.delete()
     txt = f"""
-🏓 Ping : {delta_ping * 1000:.3f} ms
-📈 Uptime : {up}
-🤖 Bot's version: {VERSION}
-🐍 Python's version: {PYTHON_VERSION}
-🔥 Pyrogram's version : {PYROGRAM_VERSION}
+🏓 Pɪɴɢ : {delta_ping * 1000:.3f} ms
+📈 Uᴘᴛɪᴍᴇ : {up}
+🤖 Bᴏᴛ's ᴠᴇʀsɪᴏɴ: {VERSION}
+🐍 Pʏᴛʜᴏɴ's ᴠᴇʀsɪᴏɴ: {PYTHON_VERSION}
+🔥 Pʏʀᴏɢʀᴀᴍ's ᴠᴇʀsɪᴏɴ : {PYROGRAM_VERSION}
     """
     await q.answer(txt, show_alert=True)
 
@@ -323,14 +323,14 @@ async def give_bot_staffs(c: Gojo, q: CallbackQuery):
     try:
         owner = await c.get_users(OWNER_ID)
         owner_name = owner.first_name or "The Creator"
-        reply = f"<b>👑 Supreme Commander:</b> {(await mention_html(owner_name, OWNER_ID))} (<code>{OWNER_ID}</code>)\n"
+        reply = f"<b>👑 Sᴜᴘʀᴇᴍᴇ Cᴏᴍᴍᴀɴᴅᴇʀ:</b> {(await mention_html(owner_name, OWNER_ID))} (<code>{OWNER_ID}</code>)\n"
     except RPCError as e:
         LOGGER.error(f"Error getting owner info: {e}")
-        reply = f"<b>👑 Supreme Commander:</b> <code>{OWNER_ID}</code>\n"
+        reply = f"<b>👑 Sᴜᴘʀᴇᴍᴇ Cᴏᴍᴍᴀɴᴅᴇʀ:</b> <code>{OWNER_ID}</code>\n"
     
     # Developers information (excluding owner)
     true_dev = get_support_staff("dev")
-    reply += "\n<b>⚡️ Code Wizards:</b>\n"
+    reply += "\n<b>⚡️ Cᴏᴅᴇ Wɪᴢᴀʀᴅs:</b>\n"
     if not true_dev:
         reply += "No mystical coders found\n"
     else:
@@ -356,9 +356,9 @@ async def give_bot_staffs(c: Gojo, q: CallbackQuery):
     
     # Sudo users information (excluding owner and developers)
     true_sudo = get_support_staff("sudo")
-    reply += "\n<b>🐲 Dragon Riders:</b>\n"
+    reply += "\n<b>🐲 Dʀᴀɢᴏɴ Rɪᴅᴇʀs:</b>\n"
     if not true_sudo:
-        reply += "No dragon masters available\n"
+        reply += "Nᴏ ᴅʀᴀɢᴏɴ ᴍᴀsᴛᴇʀs ᴀᴠᴀɪʟᴀʙʟᴇ\n"
     else:
         sudo_count = 0
         for each_user in true_sudo:
@@ -378,11 +378,11 @@ async def give_bot_staffs(c: Gojo, q: CallbackQuery):
                 sudo_count += 1
         
         if sudo_count == 0:
-            reply += "No dragon masters available\n"
+            reply += "Nᴏ ᴅʀᴀɢᴏɴ ᴍᴀsᴛᴇʀs ᴀᴠᴀɪʟᴀʙʟᴇ\n"
     
     # Whitelisted users information (excluding owner, developers, and sudo users)
     wl = get_support_staff("whitelist")
-    reply += "\n<b>🦊 Shadow Agents:</b>\n"
+    reply += "\n<b>🦊 Sʜᴀᴅᴏᴡ Aɢᴇɴᴛs:</b>\n"
     if not wl:
         reply += "No covert operatives deployed\n"
     else:
@@ -409,11 +409,11 @@ async def give_bot_staffs(c: Gojo, q: CallbackQuery):
             reply += "No covert operatives deployed\n"
 
     # Add some flavor text
-    reply += "\n\n<i>These are the chosen ones who wield the bot's power across the digital realm!</i> ✨"
+    reply += "\n\n<i>Tʜᴇsᴇ ᴀʀᴇ ᴛʜᴇ ᴄʜᴏsᴇɴ ᴏɴᴇs ᴡʜᴏ ᴡɪᴇʟᴅ ᴛʜᴇ ʙᴏᴛ's ᴘᴏᴡᴇʀ ᴀᴄʀᴏss ᴛʜᴇ ᴅɪɢɪᴛᴀʟ ʀᴇᴀʟᴍ!</i> ✨"
 
     await q.edit_message_caption(
         caption=reply,
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back to Start", "start_back")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Bᴀᴄᴋ ᴛᴏ Sᴛᴀʀᴛ", "start_back")]])
     )
     await q.answer()
 
