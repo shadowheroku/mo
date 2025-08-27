@@ -173,7 +173,7 @@ Jᴏɪɴ ᴍʏ [Nᴇᴡs Cʜᴀɴɴᴇʟ](http://t.me/shadowbotshq) ᴛᴏ ɢᴇ
 async def start_back(c: Gojo, q: CallbackQuery):
     try:
         cpt = f"""
-Hᴇʏ [{m.from_user.first_name}](http://t.me/{m.from_user.username})! I ᴀᴍ {c.me.first_name} ✨.
+Hᴇʏ [{q.from_user.first_name}](http://t.me/{q.from_user.username})! I ᴀᴍ {c.me.first_name} ✨.
 I'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
 Hɪᴛ /help ᴛᴏ ғɪɴᴅ ᴏᴜᴛ ᴍᴏʀᴇ ᴀʙᴏᴜᴛ ʜᴏᴡ ᴛᴏ ᴜsᴇ ᴍᴇ ɪɴ ᴍʏ ғᴜʟʟ ᴘᴏᴛᴇɴᴛɪᴀʟ!
 
