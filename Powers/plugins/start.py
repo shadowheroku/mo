@@ -87,22 +87,25 @@ from pyrogram.types import Message
 
 async def send_loading_animation(m: Message):
     """
-    Display a fire emoji, then a loading animation on the same message,
+    Display a fire emoji, then a loading animation in a new bot message,
     and finally show a 'Done' checkmark.
     """
-    # Step 1: Send fire emoji and wait
-    fire_msg = await m.reply_text("⚡", quote=True)
+    # Step 1: Send fire emoji
+    fire_msg = await m.reply_text("🔥", quote=True)
     await asyncio.sleep(1.5)
     await fire_msg.delete()
 
-    # Step 2: Loading animation (edit same message)
+    # Step 2: Send a new message for loading animation
+    loading_msg = await m.reply_text("ʟᴏᴀᴅɪɴɢ", quote=True)
+
+    # Step 3: Edit the bot's own message
     for _ in range(3):  # Repeat 3 cycles
         for dots in range(1, 4):  # 1 to 3 dots
-            await m.edit_text(f"ʟᴏᴀᴅɪɴɢ{'.' * dots}")
+            await loading_msg.edit_text(f"ʟᴏᴀᴅɪɴɢ{'.' * dots}")
             await asyncio.sleep(0.8)
 
-    # Step 3: Final confirmation
-    await m.edit_text("✅ Done!")
+    # Step 4: Final confirmation
+    await loading_msg.edit_text("✅ ᴍᴏɴɪᴄ sᴛᴀʀᴛᴇᴅ !")
 
 
 
