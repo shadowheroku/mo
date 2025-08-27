@@ -22,60 +22,88 @@ from Powers.utils.extract_user import extract_user
 from Powers.utils.parser import mention_html
 
 
+from pyrogram.enums import ChatType
+from pyrogram.types import Message
+from Powers.bot_class import Gojo
+from Powers.utils.custom_filters import command
+from Powers.utils.helpers import mention_html
+import traceback
+import logging
+
+LOGGER = logging.getLogger(__name__)
+
 @Gojo.on_message(command("adminlist"))
 async def adminlist_show(_, m: Message):
     global ADMIN_CACHE
+
+    # ─── CHECK GROUP TYPE ───
     if m.chat.type not in [ChatType.SUPERGROUP, ChatType.GROUP]:
         return await m.reply_text(
-            text="This command is made to be used in groups only!",
+            "⚠️ This command can only be used inside a <b>group chat</b>!",
         )
+
     try:
+        # ─── LOAD ADMINS FROM CACHE ───
         try:
             admin_list = ADMIN_CACHE[m.chat.id]
-            note = "<i>Note:</i> These are cached values!"
+            note = "⚡ <i>Showing cached results</i>"
         except KeyError:
             admin_list = await admin_cache_reload(m, "adminlist")
-            note = "<i>Note:</i> These are up-to-date values!"
-        adminstr = f"Admins in <b>{m.chat.title}</b>:" + "\n\n"
-        bot_admins = [i for i in admin_list if (i[1].lower()).endswith("bot")]
-        user_admins = [i for i in admin_list if not (i[1].lower()).endswith("bot")]
-        # format is like: (user_id, username/name,anonyamous or not)
-        mention_users = [
-            (
-                admin[1]
-                if admin[1].startswith("@")
-                else (await mention_html(admin[1], admin[0]))
-            )
-            for admin in user_admins
-            if not admin[2]  # if non-anonyamous admin
-        ]
-        mention_users.sort(key=lambda x: x[1])
-        mention_bots = [
-            (
-                admin[1]
-                if admin[1].startswith("@")
-                else (await mention_html(admin[1], admin[0]))
-            )
-            for admin in bot_admins
-        ]
-        mention_bots.sort(key=lambda x: x[1])
-        adminstr += "<b>User Admins:</b>\n"
-        adminstr += "\n".join(f"- {i}" for i in mention_users)
-        adminstr += "\n\n<b>Bots:</b>\n"
-        adminstr += "\n".join(f"- {i}" for i in mention_bots)
-        await m.reply_text(adminstr + "\n\n" + note)
+            note = "🔄 <i>Fetched fresh data</i>"
 
-    except Exception as ef:
-        if str(ef) == str(m.chat.id):
-            await m.reply_text(text="Use /admincache to reload admins!")
-        else:
-            ef = f"{str(ef)}{admin_list}\n"
-            await m.reply_text(
-                text=f"Some error occured, report it using `/bug` \n <b>Error:</b> <code>{ef}</code>"
+        if not admin_list:
+            return await m.reply_text(
+                "❌ Couldn’t fetch admin list. Try <code>/admincache</code> to reload."
             )
-        LOGGER.error(ef)
-        LOGGER.error(format_exc())
-    return
+
+        # ─── SPLIT ADMINS ───
+        bot_admins = [i for i in admin_list if i[1].lower().endswith("bot")]
+        user_admins = [i for i in admin_list if not i[1].lower().endswith("bot")]
+
+        # ─── FORMAT USER ADMINS ───
+        mention_users = []
+        for admin in user_admins:
+            if not admin[2]:  # Non-anonymous admin
+                if admin[1].startswith("@"):
+                    mention_users.append(admin[1])
+                else:
+                    mention_users.append(await mention_html(admin[1], admin[0]))
+
+        # ─── FORMAT BOT ADMINS ───
+        mention_bots = []
+        for admin in bot_admins:
+            if admin[1].startswith("@"):
+                mention_bots.append(admin[1])
+            else:
+                mention_bots.append(await mention_html(admin[1], admin[0]))
+
+        # ─── SORT RESULTS ───
+        mention_users.sort(key=lambda x: x.lower())
+        mention_bots.sort(key=lambda x: x.lower())
+
+        # ─── FINAL MESSAGE ───
+        adminstr = f"👮‍♂️ <b>Admins in {m.chat.title}</b>\n\n"
+        adminstr += "👤 <b>User Admins:</b>\n"
+        adminstr += "\n".join(f"• {i}" for i in mention_users) if mention_users else "• None"
+        adminstr += "\n\n🤖 <b>Bot Admins:</b>\n"
+        adminstr += "\n".join(f"• {i}" for i in mention_bots) if mention_bots else "• None"
+        adminstr += f"\n\n{note}"
+
+        await m.reply_text(adminstr, disable_web_page_preview=True)
+
+    # ─── ERROR HANDLING ───
+    except PermissionError:
+        await m.reply_text("🚫 I don’t have enough permissions to fetch admins.")
+    except TimeoutError:
+        await m.reply_text("⏳ Timed out while fetching admins. Please try again.")
+    except Exception as ef:
+        LOGGER.error(f"[AdminListError] {ef}\n{traceback.format_exc()}")
+        await m.reply_text(
+            "⚠️ An unexpected error occurred while fetching admins.\n"
+            f"<b>Error:</b> <code>{ef}</code>\n"
+            "👉 Try using <code>/admincache</code> to refresh."
+        )
+
 
 
 @Gojo.on_message(command("zombies") & admin_filter)
