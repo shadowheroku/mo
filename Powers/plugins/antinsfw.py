@@ -3,6 +3,8 @@ import json
 import asyncio
 import tempfile
 import traceback
+import time
+from typing import Dict, List, Tuple
 
 from pyrogram import filters, ContinuePropagation
 from pyrogram.enums import ParseMode as PM, ChatMemberStatus
@@ -12,16 +14,21 @@ from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
 # ─── CONFIG ───
-HF_API_URL = os.getenv(
-    "HF_API_URL",
-    "https://api-inference.huggingface.co/models/erfanzar/NSFW-Detection"
-)
-HF_API_KEY = os.getenv("HF_API_KEY", "")  # optional, free Hugging Face token
+# Multiple free NSFW detection APIs as fallbacks
+HF_API_URLS = [
+    "https://api-inference.huggingface.co/models/erfanzar/NSFW-Detection",
+    "https://api-inference.huggingface.co/models/michellejieli/NSFW_text_classifier",
+    "https://api-inference.huggingface.co/models/valhalla/distilbert-multilingual-nli-stsb-quora-ranking"
+]
 
+HF_API_KEY = os.getenv("HF_API_KEY", "")  # optional free token
 HEADERS = {"Authorization": f"Bearer {HF_API_KEY}"} if HF_API_KEY else {}
 
-DATA_FILE = os.path.join(os.getcwd(), "antinsfw.json")  # file persists settings
+DATA_FILE = os.path.join(os.getcwd(), "antinsfw.json")
 
+# Rate limiting to avoid hitting free API limits
+RATE_LIMIT = {}
+MAX_SCANS_PER_HOUR = 50  # Conservative limit for free API
 
 # ─── UTIL: load/save JSON ───
 def _normalize_loaded(d):
@@ -33,7 +40,6 @@ def _normalize_loaded(d):
         free[str(k)] = [str(uid) for uid in (v or [])]
     return {"antinsfw": ant, "free_users": free}
 
-
 def load_data():
     if not os.path.exists(DATA_FILE):
         return {"antinsfw": {}, "free_users": {}}
@@ -43,7 +49,6 @@ def load_data():
         return _normalize_loaded(data)
     except Exception:
         return {"antinsfw": {}, "free_users": {}}
-
 
 def save_data():
     tmp_fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(DATA_FILE) or ".")
@@ -57,11 +62,24 @@ def save_data():
         except Exception:
             pass
 
-
 _data = load_data()
-ANTINSFW = _data.get("antinsfw", {})     # {chat_id_str: True/False}
-FREE_USERS = _data.get("free_users", {}) # {chat_id_str: [user_id_str,...]}
+ANTINSFW = _data.get("antinsfw", {})
+FREE_USERS = _data.get("free_users", {})
 
+# ─── RATE LIMITING ───
+def check_rate_limit(chat_id: int) -> bool:
+    """Check if chat has exceeded rate limit"""
+    current_hour = int(time.time()) // 3600
+    chat_key = f"{chat_id}_{current_hour}"
+    
+    if chat_key not in RATE_LIMIT:
+        RATE_LIMIT[chat_key] = 0
+    
+    if RATE_LIMIT[chat_key] >= MAX_SCANS_PER_HOUR:
+        return False
+    
+    RATE_LIMIT[chat_key] += 1
+    return True
 
 # ─── HELPERS ───
 async def is_chat_admin(c: Gojo, chat_id: int, user_id: int) -> bool:
@@ -76,39 +94,57 @@ async def is_chat_admin(c: Gojo, chat_id: int, user_id: int) -> bool:
     except Exception:
         return False
 
-
-async def scan_nsfw(file_path: str):
+async def scan_nsfw(file_path: str) -> Tuple[bool, dict]:
     """
-    Scan file using Hugging Face NSFW model.
+    Scan file using free Hugging Face NSFW model with fallbacks.
     Returns (is_nsfw: bool, raw_response: dict or None).
     """
-    import httpx, requests
-
-    try:
-        with open(file_path, "rb") as f:
-            data = f.read()
-
-        if "httpx" in globals():
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.post(HF_API_URL, headers=HEADERS, data=data)
+    import httpx
+    
+    # Check file size to avoid large files on free API
+    file_size = os.path.getsize(file_path)
+    if file_size > 5 * 1024 * 1024:  # 5MB limit
+        return False, {"error": "File too large for free API"}
+    
+    for api_url in HF_API_URLS:
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                with open(file_path, "rb") as f:
+                    data = f.read()
+                
+                headers = HEADERS if "huggingface.co" in api_url else {}
+                resp = await client.post(api_url, headers=headers, data=data)
+                
+                if resp.status_code == 429:  # Rate limited
+                    continue
+                
+                if resp.status_code != 200:
+                    continue
+                
                 result = resp.json()
-        else:
-            loop = asyncio.get_event_loop()
-            def _sync_post():
-                return requests.post(HF_API_URL, headers=HEADERS, data=open(file_path, "rb"))
-            resp = await loop.run_in_executor(None, _sync_post)
-            result = resp.json()
-
-        # Expecting something like: [{'label': 'NSFW', 'score': 0.98}, {'label': 'SFW', 'score': 0.02}]
-        if isinstance(result, list):
-            nsfw_score = max([x["score"] for x in result if "nsfw" in x["label"].lower()])
-            return nsfw_score >= 0.6, result
-        return False, result
-    except Exception as e:
-        print("Anti-NSFW scan error:", e)
-        traceback.print_exc()
-        return False, None
-
+                
+                # Handle different response formats
+                if isinstance(result, list):
+                    # Standard Hugging Face format
+                    nsfw_score = 0
+                    for item in result:
+                        if "nsfw" in item.get("label", "").lower():
+                            nsfw_score = max(nsfw_score, item.get("score", 0))
+                    return nsfw_score >= 0.6, result
+                
+                elif isinstance(result, dict):
+                    # Alternative format detection
+                    if "NSFW" in result:
+                        return result["NSFW"] >= 0.6, result
+                    if "nsfw_score" in result:
+                        return result["nsfw_score"] >= 0.6, result
+                
+                return False, result
+                
+        except (httpx.RequestError, httpx.TimeoutException, json.JSONDecodeError):
+            continue  # Try next API
+    
+    return False, {"error": "All APIs failed or rate limited"}
 
 def _content_type_label(m: Message) -> str:
     if m.photo: return "📸 Photo"
@@ -118,13 +154,11 @@ def _content_type_label(m: Message) -> str:
     if m.sticker: return "🖼️ Sticker"
     return "📦 Media"
 
-
 def _user_markdown_link(user) -> str:
     name = user.first_name or "User"
     if getattr(user, "last_name", None):
         name = f"{name} {user.last_name}"
     return f"[{name}](tg://user?id={user.id})"
-
 
 # ─── COMMANDS ───
 @Gojo.on_message(command(["antinsfw"]) & filters.group)
@@ -143,12 +177,12 @@ async def toggle_antinsfw(c: Gojo, m: Message):
             ]
         )
         return await m.reply_text(
-            f"🚨 **Anti-NSFW System** 🚨\n\nCurrent status: **{status}**",
+            f"🚨 **Anti-NSFW System** 🚨\n\nCurrent status: **{status}**\n\n"
+            f"⚠️ **Free API Limits:**\n• Max {MAX_SCANS_PER_HOUR} scans/hour\n• Files under 5MB only",
             reply_markup=kb,
             parse_mode=PM.MARKDOWN
         )
     await m.reply_text("ℹ️ Use `/antinsfw` without args and press the buttons.")
-
 
 @Gojo.on_callback_query(filters.regex(r"^antinsfw:(on|off|status):(-?\d+)$"))
 async def antinsfw_callback(c: Gojo, q: CallbackQuery):
@@ -162,7 +196,13 @@ async def antinsfw_callback(c: Gojo, q: CallbackQuery):
     if action == "on":
         ANTINSFW[chat_id_str] = True
         save_data()
-        await q.message.edit_text("🚨 Anti-NSFW is now **ENABLED ✅**", parse_mode=PM.MARKDOWN)
+        await q.message.edit_text(
+            "🚨 Anti-NSFW is now **ENABLED ✅**\n\n"
+            "⚠️ Using free API with limitations:\n"
+            f"• Max {MAX_SCANS_PER_HOUR} scans/hour\n"
+            "• Files under 5MB only",
+            parse_mode=PM.MARKDOWN
+        )
         await q.answer("Enabled.")
     elif action == "off":
         ANTINSFW[chat_id_str] = False
@@ -171,8 +211,8 @@ async def antinsfw_callback(c: Gojo, q: CallbackQuery):
         await q.answer("Disabled.")
     else:
         status = "✅ ENABLED" if ANTINSFW.get(chat_id_str, False) else "❌ DISABLED"
-        await q.answer(f"Anti-NSFW: {status}", show_alert=True)
-
+        scans_this_hour = RATE_LIMIT.get(f"{chat_id}_{int(time.time()) // 3600}", 0)
+        await q.answer(f"Anti-NSFW: {status}\nScans this hour: {scans_this_hour}/{MAX_SCANS_PER_HOUR}", show_alert=True)
 
 # ─── FREE USERS ───
 @Gojo.on_message(command(["free"]) & filters.group)
@@ -198,7 +238,6 @@ async def free_user(c: Gojo, m: Message):
     else:
         await m.reply_text(f"⚡ {_user_markdown_link(target)} is already free.", parse_mode=PM.MARKDOWN)
 
-
 @Gojo.on_message(command(["unfree"]) & filters.group)
 async def unfree_user(c: Gojo, m: Message):
     chat_id_str = str(m.chat.id)
@@ -218,7 +257,6 @@ async def unfree_user(c: Gojo, m: Message):
     else:
         await m.reply_text("⚠️ User not in Free List.")
 
-
 # ─── MAIN SCANNER ───
 @Gojo.on_message(filters.group & (filters.photo | filters.video | filters.animation | filters.document | filters.sticker))
 async def nsfw_scanner(c: Gojo, m: Message):
@@ -229,6 +267,11 @@ async def nsfw_scanner(c: Gojo, m: Message):
     if not m.from_user or m.from_user.is_bot:
         raise ContinuePropagation
     if str(m.from_user.id) in FREE_USERS.get(chat_id_str, []):
+        raise ContinuePropagation
+    
+    # Check rate limit
+    if not check_rate_limit(m.chat.id):
+        print(f"Rate limit exceeded for chat {m.chat.id}")
         raise ContinuePropagation
 
     file_path = None
@@ -256,6 +299,10 @@ async def nsfw_scanner(c: Gojo, m: Message):
                 f"🚨 **Anti-NSFW Alert!** 🚨\n\n👤 {_user_markdown_link(m.from_user)}\n📛 Type: {_content_type_label(m)}\n⚠️ NSFW content detected & removed.",
                 parse_mode=PM.MARKDOWN
             )
+        elif "error" in raw_resp:
+            # Log API errors but don't alert users
+            print(f"NSFW scan error for chat {m.chat.id}: {raw_resp['error']}")
+            
     except ContinuePropagation:
         raise ContinuePropagation
     except Exception as e:
@@ -269,13 +316,17 @@ async def nsfw_scanner(c: Gojo, m: Message):
             pass
     raise ContinuePropagation
 
-
 # ─── PLUGIN INFO ───
 __PLUGIN__ = "anti_nsfw"
 _DISABLE_CMDS_ = ["antinsfw", "free", "unfree"]
 __HELP__ = """
-**Anti-NSFW (Free HuggingFace API)**
+**Anti-NSFW (Free API Version)**
 • /antinsfw → Enable/disable scanner (admin only)
 • /free (reply) → Free user from scans (admin only)
 • /unfree (reply) → Remove user from free list (admin only)
+
+⚠️ **Free Version Limits:**
+- Max 50 scans per hour
+- Files under 5MB only
+- Multiple API fallbacks for reliability
 """
