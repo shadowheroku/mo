@@ -520,7 +520,8 @@ async def get_invitelink(c: Gojo, m: Message):
                 "✨ <b>Invite Link Generated!</b> ✨\n\n"
                 f"👥 <b>Chat:</b> {m.chat.title}\n"
                 f"🆔 <b>Chat ID:</b> <code>{m.chat.id}</code>\n"
-                f"🔗 <b>Invite Link:</b> <a href='{link}'>Click Here</a>"
+                f"🔗 <b>Invite Link:</b> <code>{link}</code>\n\n"
+                "📌 Copy the link above and share!"
             ),
             disable_web_page_preview=True,
         )
@@ -540,6 +541,7 @@ async def get_invitelink(c: Gojo, m: Message):
         )
         LOGGER.error(e)
         LOGGER.error(format_exc())
+
 
 
 @Gojo.on_message(command("setgtitle") & admin_filter)
