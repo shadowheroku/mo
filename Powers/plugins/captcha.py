@@ -250,9 +250,10 @@ async def on_chat_members_updatess(c: Gojo, m: Message):
             continue
 
 
-__PLUGIN__ = "captcha"
+__PLUGIN__ = "ᴄᴀᴘᴛᴄʜᴀ"
 
 __HELP__ = """
-• /captcha [on|yes|enable|off|no|disable] : To enable or disable captcha verification
-• /captchamode [qr|image] : To change captcha mode
+• /captcha [ᴏɴ|ʏᴇs|ᴇɴᴀʙʟᴇ|ᴏꜰꜰ|ɴᴏ|ᴅɪꜱᴀʙʟᴇ] : ᴛᴏ ᴇɴᴀʙʟᴇ ᴏʀ ᴅɪꜱᴀʙʟᴇ ᴄᴀᴘᴛᴄʜᴀ ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ  
+• /captchamode [ǫʀ|ɪᴍᴀɢᴇ] : ᴛᴏ ᴄʜᴀɴɢᴇ ᴄᴀᴘᴛᴄʜᴀ ᴍᴏᴅᴇ
 """
+
