@@ -50,7 +50,5 @@ __HELP__ = """
 
 `/speedtest` — ʀᴜɴs ᴀɴ ɪɴᴛᴇʀɴᴇᴛ sᴘᴇᴇᴅ ᴛᴇsᴛ ᴀɴᴅ sʜᴏᴡs ᴅᴏᴡɴʟᴏᴀᴅ, ᴜᴘʟᴏᴀᴅ, ᴘɪɴɢ, ɪsᴘ, ᴀɴᴅ sᴇʀᴠᴇʀ ɪɴғᴏ.
 
-⚠️ ʀᴇǫᴜɪʀᴇs `speedtest-cli`:
-```bash
-pip install speedtest-cli
 
+"""
