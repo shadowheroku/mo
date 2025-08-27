@@ -108,9 +108,11 @@ async def couple_cmd(c: Gojo, m: Message):
     )
     await m.reply_text(message)
 
-__PLUGIN__ = "waifu_couple"
+__PLUGIN__ = "ᴡᴀɪꜰᴜ & ᴄᴏᴜᴘʟᴇ"
+
 __HELP__ = """
-**💖 Waifu & Couple Commands 💖**
-• `/waifu` - Get today's waifu (fixed for the day)
-• `/couple` or `/pair` - Get today's couple (fixed for the day)
+**💖 ᴡᴀɪꜰᴜ & ᴄᴏᴜᴘʟᴇ ᴄᴏᴍᴍᴀɴᴅꜱ 💖**
+• `/waifu` - ɢᴇᴛ ᴛᴏᴅᴀʏ'ꜱ ᴡᴀɪꜰᴜ (ꜰɪxᴇᴅ ꜰᴏʀ ᴛʜᴇ ᴅᴀʏ)
+• `/couple` ᴏʀ `/pair` - ɢᴇᴛ ᴛᴏᴅᴀʏ'ꜱ ᴄᴏᴜᴘʟᴇ (ꜰɪxᴇᴅ ꜰᴏʀ ᴛʜᴇ ᴅᴀʏ)
 """
+
