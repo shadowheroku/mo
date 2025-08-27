@@ -3,7 +3,7 @@ from secrets import choice
 from traceback import format_exc
 
 from pyrogram.errors import RPCError
-from pyrogram.types import CallbackQuery, Message
+from pyrogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 from Powers import HELP_COMMANDS, LOGGER, OWNER_ID, SUPPORT_CHANNEL
 from Powers.bot_class import Gojo
@@ -38,21 +38,11 @@ async def gen_start_kb(q: Message or CallbackQuery):
     return ikb(
         [
             [
-                ("📚 Cᴏᴍᴍᴀɴᴅs & Hᴇʟᴘ", "commands"),
-          
-                (
-                    "Sᴜᴘᴘᴏʀᴛ⚡️",
-                    f"https://{SUPPORT_CHANNEL}.t.me",
-                    "url",
-                ),
-        ]
-            
-          [
-                (
-                    "➕ Aᴅᴅ ᴍᴇ ᴛᴏ ᴀ ᴄʜᴀᴛ!",
-                    f"https://t.me/{Config.BOT_USERNAME}?startgroup=new",
-                    "url",
-                )
+                ("📚 ᴄᴏᴍᴍᴀɴᴅs & ʜᴇʟᴘ", "commands"),
+                ("sᴜᴘᴘᴏʀᴛ ⚡️", f"https://{SUPPORT_CHANNEL}.t.me", "url"),
+            ],
+            [
+                ("➕ ᴀᴅᴅ ᴍᴇ ᴛᴏ ᴀ ᴄʜᴀᴛ", f"https://t.me/{Config.BOT_USERNAME}?startgroup=new", "url"),
             ],
         ]
     )
@@ -66,14 +56,13 @@ async def get_private_note(c: Gojo, m: Message, help_option: str):
 
         all_notes = notes_db.get_all_notes(chat_id)
         chat_title = Chats.get_chat_info(chat_id)["chat_name"]
-        rply = f"Notes in {chat_title}:\n\n"
         note_list = [
             f"- [{note[0]}](https://t.me/{c.me.username}?start=note_{chat_id}_{note[1]})"
             for note in all_notes
         ]
-        rply = f"Available notes in {chat_title}\n"
+        rply = f"ᴀᴠᴀɪʟᴀʙʟᴇ ɴᴏᴛᴇs ɪɴ {chat_title}\n"
         rply += "\n".join(note_list)
-        rply += "\n\nYou can retrieve these notes by tapping on the notename."
+        rply += "\n\nyᴏᴜ ᴄᴀɴ ʀᴇᴛʀɪᴇᴠᴇ ᴛʜᴇsᴇ ɴᴏᴛᴇs ʙʏ ᴛᴀᴘᴘɪɴɢ ᴏɴ ᴛʜᴇ ɴᴏᴛᴇɴᴀᴍᴇ."
         await m.reply_text(rply, disable_web_page_preview=True, quote=True)
         return
 
@@ -83,13 +72,13 @@ async def get_private_note(c: Gojo, m: Message, help_option: str):
     note_hash = help_option.split("_")[2]
     getnotes = notes_db.get_note_by_hash(note_hash)
     if not getnotes:
-        await m.reply_text("Note does not exist", quote=True)
+        await m.reply_text("ɴᴏᴛᴇ ᴅᴏᴇs ɴᴏᴛ ᴇxɪsᴛ", quote=True)
         return
 
     msgtype = getnotes["msgtype"]
     if not msgtype:
         await m.reply_text(
-            "<b>Error:</b> Cannot find a type for this note!!",
+            "<b>ᴇʀʀᴏʀ:</b> ᴄᴀɴɴᴏᴛ ғɪɴᴅ ᴀ ᴛʏᴘᴇ ғᴏʀ ᴛʜɪs ɴᴏᴛᴇ!!",
             quote=True,
         )
         return
@@ -114,12 +103,11 @@ async def get_private_note(c: Gojo, m: Message, help_option: str):
     text = await escape_mentions_using_curly_brackets(m, note_reply, parse_words)
 
     if msgtype == Types.TEXT:
-
         teks, button = await parse_button(text)
         button = await build_keyboard(button)
         button = ikb(button) if button else None
         if not teks:
-            teks = "Here is your note"
+            teks = "ʜᴇʀᴇ ɪs ʏᴏᴜʀ ɴᴏᴛᴇ"
         if button:
             try:
                 await m.reply_text(
@@ -131,7 +119,7 @@ async def get_private_note(c: Gojo, m: Message, help_option: str):
                 return
             except RPCError as ef:
                 await m.reply_text(
-                    "An error has occured! Cannot parse note.",
+                    "ᴀɴ ᴇʀʀᴏʀ ʜᴀs ᴏᴄᴄᴜʀᴇᴅ! ᴄᴀɴɴᴏᴛ ᴘᴀʀsᴇ ɴᴏᴛᴇ.",
                     quote=True,
                 )
                 LOGGER.error(ef)
@@ -189,7 +177,7 @@ async def get_private_rules(_, m: Message, help_option: str):
     chat_title = Chats.get_chat_info(chat_id)["chat_name"]
     if not rules:
         await m.reply_text(
-            "The Admins of that group have not setup any rules, that dosen't mean you break the decorum of the chat!",
+            "ᴛʜᴇ ᴀᴅᴍɪɴs ᴏғ ᴛʜᴀᴛ ɢʀᴏᴜᴘ ʜᴀᴠᴇ ɴᴏᴛ sᴇᴛᴜᴘ ᴀɴʏ ʀᴜʟᴇs, ᴛʜᴀᴛ ᴅᴏsᴇɴ'ᴛ ᴍᴇᴀɴ ʏᴏᴜ ʙʀᴇᴀᴋ ᴛʜᴇ ᴅᴇᴄᴏʀᴜᴍ ᴏғ ᴛʜᴇ ᴄʜᴀᴛ!",
             quote=True,
         )
         return ""
@@ -198,9 +186,7 @@ async def get_private_rules(_, m: Message, help_option: str):
     button = ikb(button) if button else None
     textt = teks
     await m.reply_text(
-        f"""The rules for <b>{escape(chat_title)} are</b>:\n
-{textt}
-""",
+        f"ᴛʜᴇ ʀᴜʟᴇs ғᴏʀ <b>{escape(chat_title)} ᴀʀᴇ</b>:\n\n{textt}",
         quote=True,
         disable_web_page_preview=True,
         reply_markup=button
@@ -231,23 +217,22 @@ async def get_help_msg(c: Gojo, m: Message or CallbackQuery, help_option: str):
             if help_option in HELP_COMMANDS[i]["alt_cmds"]
         )
         help_kb = ikb(ou, True, "commands")
-        help_msg = f"**{(help_option_value)}:**"
+        help_msg = f"**{help_option_value}:**"
 
     else:
         mes = m.message if isinstance(m, CallbackQuery) else m
         help_msg = f"""
-Hey **[{mes.from_user.first_name}](http://t.me/{mes.from_user.username})**!I am {c.me.first_name}✨.
-I'm here to help you manage your groups!
-Commands available:
-× /start: Start the bot
-× /help: Give's you this message."""
+ʜᴇʏ **[{mes.from_user.first_name}](http://t.me/{mes.from_user.username})**! ɪ ᴀᴍ {c.me.first_name} ✨.
+ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘs!
+
+ᴄᴏᴍᴍᴀɴᴅs ᴀᴠᴀɪʟᴀʙʟᴇ:
+× /start: sᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ
+× /help: ɢɪᴠᴇ's ʏᴏᴜ ᴛʜɪs ᴍᴇssᴀɢᴇ."""
         ou = await gen_cmds_kb(m)
         help_kb = ikb(ou, True)
 
     return help_msg, help_kb
 
-# ─── Split Long Help Messages ───
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 async def get_divided_msg(module: str, back_to_do: str = "start"):
     """
@@ -258,13 +243,13 @@ async def get_divided_msg(module: str, back_to_do: str = "start"):
         help_msg = HELP_COMMANDS[module]["help_msg"]
         help_kb = HELP_COMMANDS[module].get("buttons", [])
     except KeyError:
-        return "Help message not found.", InlineKeyboardMarkup(
-            [[InlineKeyboardButton("« Back", callback_data=back_to_do)]]
+        return "ʜᴇʟᴘ ᴍᴇssᴀɢᴇ ɴᴏᴛ ғᴏᴜɴᴅ.", InlineKeyboardMarkup(
+            [[InlineKeyboardButton("« ʙᴀᴄᴋ", callback_data=back_to_do)]]
         )
 
     # Telegram's max caption length is 1024 characters
     if len(help_msg) > 1024:
-        caption = help_msg[:1000] + "...\n\n[Message trimmed]"
+        caption = help_msg[:1000] + "...\n\n[ᴍᴇssᴀɢᴇ ᴛʀɪᴍᴍᴇᴅ]"
     else:
         caption = help_msg
 
@@ -273,7 +258,7 @@ async def get_divided_msg(module: str, back_to_do: str = "start"):
         keyboard = ikb(help_kb, True, todo="commands")
     else:
         keyboard = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("« Back", callback_data=back_to_do)]]
+            [[InlineKeyboardButton("« ʙᴀᴄᴋ", callback_data=back_to_do)]]
         )
 
     return caption, keyboard
