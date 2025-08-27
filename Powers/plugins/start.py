@@ -90,6 +90,23 @@ async def start(c: Gojo, m: Message):
                 await get_private_rules(c, m, help_option)
                 return
 
+            # Handle help pagination in private chat
+            if help_option == "help":
+                modules = sorted(list(HELP_COMMANDS.keys()))
+                buttons = [
+                    InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}")
+                    for x in modules
+                ]
+                keyboard = paginate_buttons(buttons, page=1)
+                msg = f"""
+Hey **[{m.from_user.first_name}](http://t.me/{m.from_user.username})**! I am {c.me.first_name}✨.
+I'm here to help you manage your group(s)!
+
+**Available Modules:**
+Choose a module from below to get detailed help."""
+                await m.reply_photo(photo=str(choice(StartPic)), caption=msg, reply_markup=keyboard)
+                return
+
             help_msg, help_kb = await get_help_msg(c, m, help_option)
             if help_msg:
                 await m.reply_photo(
