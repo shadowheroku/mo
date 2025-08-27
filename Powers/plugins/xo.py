@@ -156,11 +156,12 @@ async def xo_play(c: Gojo, q: CallbackQuery):
     )
 
 
-__PLUGIN__ = "xo"
+__PLUGIN__ = "ᴛɪᴄ-ᴛᴀᴄ-ᴛᴏᴇ"
 _DISABLE_CMDS_ = ["xo"]
 
 __HELP__ = """
-🎮 Tic-Tac-Toe
-• /xo → Play with Bot  
-• Reply /xo → Challenge another player  
+🎮 ᴛɪᴄ-ᴛᴀᴄ-ᴛᴏᴇ
+• /xo → ᴘʟᴀʏ ᴡɪᴛʜ ʙᴏᴛ  
+• ʀᴇᴘʟʏ /xo → ᴄʜᴀʟʟᴇɴɢᴇ ᴀɴᴏᴛʜᴇʀ ᴘʟᴀʏᴇʀ  
 """
+
