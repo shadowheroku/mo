@@ -705,36 +705,37 @@ async def forward_type_broadcast(c: Gojo, m: Message):
     return
 
 
-__PLUGIN__ = "devs"
+__PLUGIN__ = "ᴅᴇᴠ"
 
 __HELP__ = """
-**DEV and SUDOERS commands**
+**ᴅᴇᴠ ᴀɴᴅ ꜱᴜᴅᴏᴇʀꜱ ᴄᴏᴍᴍᴀɴᴅꜱ**
 
-**Owner's commands:**
-• /restart : Restart the bot
-• /update : To update the bot with the main stream repo
+**ᴏᴡɴᴇʀ'ꜱ ᴄᴏᴍᴍᴀɴᴅꜱ:**
+• /restart : ʀᴇꜱᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ
+• /update : ᴛᴏ ᴜᴘᴅᴀᴛᴇ ᴛʜᴇ ʙᴏᴛ ᴡɪᴛʜ ᴛʜᴇ ᴍᴀɪɴ ꜱᴛʀᴇᴀᴍ ʀᴇᴘᴏ
 
-**Dev's commands:**
-• /addsupport [dev | sudo | whitelist] : Reply to message or give me user id or username
-• /logs : Return the logs of bot.
-• /neofetch : Fetch neo.
-• /eval : Evaluate the given python code.
-• /exec : Execute the given code.
-• /minfo [module name]: Give info about module
-• /chatlist : Return the list of chats present in database
-• /uptime : Return the uptime of the bot.
-• /leavechat : Bot will leave the provided chat.
-• /chatbroadcast : Broadcast the messge to chats.
-• /forward (/fwd) [tag] : Forward message to peers according to tag. Default to all
-    Available tags:
-     `-u` : For users
-     `-c` : For chats
-     `-all` : For all
+**ᴅᴇᴠ'ꜱ ᴄᴏᴍᴍᴀɴᴅꜱ:**
+• /addsupport [dev | sudo | whitelist] : ʀᴇᴘʟʏ ᴛᴏ ᴍᴇꜱꜱᴀɢᴇ ᴏʀ ɢɪᴠᴇ ᴍᴇ ᴜꜱᴇʀ ɪᴅ ᴏʀ ᴜꜱᴇʀɴᴀᴍᴇ  
+• /logs : ʀᴇᴛᴜʀɴ ᴛʜᴇ ʟᴏɢꜱ ᴏꜰ ʙᴏᴛ.  
+• /neofetch : ꜰᴇᴛᴄʜ ɴᴇᴏ.  
+• /eval : ᴇᴠᴀʟᴜᴀᴛᴇ ᴛʜᴇ ɢɪᴠᴇɴ ᴘʏᴛʜᴏɴ ᴄᴏᴅᴇ.  
+• /exec : ᴇxᴇᴄᴜᴛᴇ ᴛʜᴇ ɢɪᴠᴇɴ ᴄᴏᴅᴇ.  
+• /minfo [module name]: ɢɪᴠᴇ ɪɴꜰᴏ ᴀʙᴏᴜᴛ ᴍᴏᴅᴜʟᴇ  
+• /chatlist : ʀᴇᴛᴜʀɴ ᴛʜᴇ ʟɪꜱᴛ ᴏꜰ ᴄʜᴀᴛꜱ ᴘʀᴇꜱᴇɴᴛ ɪɴ ᴅᴀᴛᴀʙᴀꜱᴇ  
+• /uptime : ʀᴇᴛᴜʀɴ ᴛʜᴇ ᴜᴘᴛɪᴍᴇ ᴏꜰ ᴛʜᴇ ʙᴏᴛ.  
+• /leavechat : ʙᴏᴛ ᴡɪʟʟ ʟᴇᴀᴠᴇ ᴛʜᴇ ᴘʀᴏᴠɪᴅᴇᴅ ᴄʜᴀᴛ.  
+• /chatbroadcast : ʙʀᴏᴀᴅᴄᴀꜱᴛ ᴛʜᴇ ᴍᴇꜱꜱɢᴇ ᴛᴏ ᴄʜᴀᴛꜱ.  
+• /forward (/fwd) [tag] : ꜰᴏʀᴡᴀʀᴅ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴘᴇᴇʀꜱ ᴀᴄᴄᴏʀᴅɪɴɢ ᴛᴏ ᴛᴀɢ. ᴅᴇꜰᴀᴜʟᴛ ᴛᴏ ᴀʟʟ  
+    ᴀᴠᴀɪʟᴀʙʟᴇ ᴛᴀɢꜱ:  
+     `-u` : ꜰᴏʀ ᴜꜱᴇʀꜱ  
+     `-c` : ꜰᴏʀ ᴄʜᴀᴛꜱ  
+     `-all` : ꜰᴏʀ ᴀʟʟ  
 
-**Sudoer's command:**
-• /ping : return the ping of the bot.
-• /cleandb : Delete useless junks from database (Automatically start cleaning it at 3:00:00 AM)
+**ꜱᴜᴅᴏᴇʀ'ꜱ ᴄᴏᴍᴍᴀɴᴅ:**
+• /ping : ʀᴇᴛᴜʀɴ ᴛʜᴇ ᴘɪɴɢ ᴏꜰ ᴛʜᴇ ʙᴏᴛ.  
+• /cleandb : ᴅᴇʟᴇᴛᴇ ᴜꜱᴇʟᴇꜱꜱ ᴊᴜɴᴋꜱ ꜰʀᴏᴍ ᴅᴀᴛᴀʙᴀꜱᴇ (ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ ꜱᴛᴀʀᴛ ᴄʟᴇᴀɴɪɴɢ ɪᴛ ᴀᴛ 3:00:00 ᴀᴍ)  
 
-**Example:**
+**ᴇxᴀᴍᴘʟᴇ:**
 /ping
 """
+
