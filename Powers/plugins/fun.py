@@ -184,7 +184,7 @@ async def weebify(_, m: Message):
     return
 
 
-__PLUGIN__ = "fun"
+__PLUGIN__ = "ғᴜɴ"
 
 _DISABLE_CMDS_ = [
     "weebify",
@@ -203,17 +203,19 @@ _DISABLE_CMDS_ = [
 ]
 
 __HELP__ = """
-**Fun**
+**ғᴜɴ**
 
-• /runs: reply a random string from an array of replies.
-• /slap: slap a user, or get slapped if not a reply.
-• /insult: to insult a user, or get insulted if not a reply
-• /shrug : get shrug XD.
-• /decide : Randomly answers yes/no/maybe
-• /toss : Tosses A coin
-• /yes : check urself :V
-• /no : check urself :V
-• /bluetext : check urself :V
-• /roll : Roll a dice.
-• /react : Random Reaction
-• /shout `<keyword>`: write anything you want to give loud shout."""
+• /runs: ʀᴇᴘʟʏ ᴀ ʀᴀɴᴅᴏᴍ sᴛʀɪɴɢ ғʀᴏᴍ ᴀɴ ᴀʀʀᴀʏ ᴏғ ʀᴇᴘʟɪᴇs.
+• /slap: sʟᴀᴘ ᴀ ᴜsᴇʀ, ᴏʀ ɢᴇᴛ sʟᴀᴘᴘᴇᴅ ɪғ ɴᴏᴛ ᴀ ʀᴇᴘʟʏ.
+• /insult: ᴛᴏ ɪɴsᴜʟᴛ ᴀ ᴜsᴇʀ, ᴏʀ ɢᴇᴛ ɪɴsᴜʟᴛᴇᴅ ɪғ ɴᴏᴛ ᴀ ʀᴇᴘʟʏ.
+• /shrug: ɢᴇᴛ sʜʀᴜɢ XD.
+• /decide: ʀᴀɴᴅᴏᴍʟʏ ᴀɴsᴡᴇʀs ʏᴇs/ɴᴏ/ᴍᴀʏʙᴇ.
+• /toss: ᴛᴏssᴇs ᴀ ᴄᴏɪɴ.
+• /yes: ᴄʜᴇᴄᴋ ᴜʀsᴇʟғ :V
+• /no: ᴄʜᴇᴄᴋ ᴜʀsᴇʟғ :V
+• /bluetext: ᴄʜᴇᴄᴋ ᴜʀsᴇʟғ :V
+• /roll: ʀᴏʟʟ ᴀ ᴅɪᴄᴇ.
+• /react: ʀᴀɴᴅᴏᴍ ʀᴇᴀᴄᴛɪᴏɴ.
+• /shout `<keyword>`: ᴡʀɪᴛᴇ ᴀɴʏᴛʜɪɴɢ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ɢɪᴠᴇ ʟᴏᴜᴅ sʜᴏᴜᴛ.
+"""
+
