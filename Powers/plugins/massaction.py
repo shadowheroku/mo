@@ -210,13 +210,14 @@ async def confirm_action(c: Gojo, cb: CallbackQuery):
 
 
 
-__PLUGIN__ = "MassActions"
+__PLUGIN__ = "ᴍᴀssᴀᴄᴛɪᴏɴs"
 _DISABLE_CMDS_ = ["deleteall", "banall", "unbanall", "muteall", "unmuteall", "kickall"]
 __alt_name__ = ["delall", "bannall", "unbannall", "mute_everyone", "unmute_everyone", "kick_everyone"]
-__HELP__ = """
-**Mass Group Management Commands (with confirmation)**
-• /deleteall — Delete all messages (**group owner only**)
-• /unbanall — Unban all banned members (**group owner only**)
-• /unmuteall — Unmute all muted members (**group owner only**)
 
+__HELP__ = """
+**ᴍᴀss ɢʀᴏᴜᴘ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ ᴄᴏᴍᴍᴀɴᴅs (ᴡɪᴛʜ ᴄᴏɴꜰɪʀᴍᴀᴛɪᴏɴ)**
+• /deleteall — ᴅᴇʟᴇᴛᴇ ᴀʟʟ ᴍᴇssᴀɢᴇs (**ɢʀᴏᴜᴘ ᴏᴡɴᴇʀ ᴏɴʟʏ**)
+• /unbanall — ᴜɴʙᴀɴ ᴀʟʟ ʙᴀɴɴᴇᴅ ᴍᴇᴍʙᴇʀs (**ɢʀᴏᴜᴘ ᴏᴡɴᴇʀ ᴏɴʟʏ**)
+• /unmuteall — ᴜɴᴍᴜᴛᴇ ᴀʟʟ ᴍᴜᴛᴇᴅ ᴍᴇᴍʙᴇʀs (**ɢʀᴏᴜᴘ ᴏᴡɴᴇʀ ᴏɴʟʏ**)
 """
+
