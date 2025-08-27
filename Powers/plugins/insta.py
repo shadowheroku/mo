@@ -7,7 +7,7 @@ from pyrogram import filters
 from Powers.bot_class import Gojo
 
 # ===== CONFIG =====
-SESSION_ID = "70808632711%3AaVps8t4cBpXZlG%3A21%3AAYe2L2nE2r6Sjc3mcrKRebDdj_2uGSXRb2KQICTN3Q"   # Replace with your Instagram sessionid
+SESSION_ID = "70808632711%3AWmmFOypFiSGCSB%3A10%3AAYemfSL6Gm7VmS9xPoWfonhPFrvkw5uxlD_15NiVpg"   # Replace with your Instagram sessionid
 COOKIES_FILE = "instagram_session.txt"
 
 # Write minimal Netscape cookie file
