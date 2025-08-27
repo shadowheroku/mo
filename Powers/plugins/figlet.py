@@ -28,12 +28,13 @@ async def figlet_cmd(c: Gojo, m: Message):
         quote=True
     )
 
-__PLUGIN__ = "figlet"
+__PLUGIN__ = "ꜰɪɢʟᴇᴛ"
 __HELP__ = """
-🎨 **Figlet Text Art**
+🎨 **ꜰɪɢʟᴇᴛ ᴛᴇxᴛ ᴀʀᴛ**
 
-`/figlet <text>` — Create cool ASCII art text.
+`/figlet <text>` — ᴄʀᴇᴀᴛᴇ ᴄᴏᴏʟ ᴀsᴄɪɪ ᴀʀᴛ ᴛᴇxᴛ.
 
-Example:
+**Example:**
 `/figlet Monic Bot`
 """
+
