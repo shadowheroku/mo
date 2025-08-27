@@ -38,40 +38,21 @@ async def gen_start_kb(q: Message or CallbackQuery):
     return ikb(
         [
             [
+                ("📚 Cᴏᴍᴍᴀɴᴅs & Hᴇʟᴘ", "commands"),
+          
                 (
-                    "➕ Add me to a chat!",
-                    f"https://t.me/{Config.BOT_USERNAME}?startgroup=new",
-                    "url",
-                ),
-                ("Bot Staffs 🚔", "give_bot_staffs"),
-            ],
-            [
-                ("📚 Commands & Help", "commands"),
-                ("Bot info 👾", "bot_curr_info"),
-            ],
-            [
-                (
-                    "🗃️ Source Code",
-                    "https://t.me/+Mn2HIM6pmWUyZTBl",
-                    "url",
-                ),
-                (
-                    "Owner ❤️",
-                    OWNER_ID,
-                    "user_id",
-                ),
-            ],
-            [
-                (
-                    "❗️ Essential",
-                    "https://t.me/+W9Qb1Iti7FQ3MDc1",
-                    "url",
-                ),
-                (
-                    "Powered by ⚡️",
+                    "Sᴜᴘᴘᴏʀᴛ⚡️",
                     f"https://{SUPPORT_CHANNEL}.t.me",
                     "url",
                 ),
+        ]
+            
+          [
+                (
+                    "➕ Aᴅᴅ ᴍᴇ ᴛᴏ ᴀ ᴄʜᴀᴛ!",
+                    f"https://t.me/{Config.BOT_USERNAME}?startgroup=new",
+                    "url",
+                )
             ],
         ]
     )
