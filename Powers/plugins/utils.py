@@ -514,24 +514,25 @@ async def botstaff(c: Gojo, m: Message):
     return
 
 
-__PLUGIN__ = "utils"
+__PLUGIN__ = "ᴜᴛɪʟs"
 _DISABLE_CMDS_ = ["paste", "wiki", "id", "gifid", "tr", "github", "git", "bug"]
 __alt_name__ = ["util", "misc", "tools"]
 
 __HELP__ = """
-**Utils**
+**ᴜᴛɪʟs**
 
-Some utils provided by bot to make your tasks easy!
+Sᴏᴍᴇ ᴜᴛɪʟs ᴘʀᴏᴠɪᴅᴇᴅ ʙʏ ʙᴏᴛ ᴛᴏ ᴍᴀᴋᴇ ʏᴏᴜʀ ᴛᴀsᴋs ᴇᴀsʏ!
 
-• /id: Get the current group id. If used by replying to a message, get that user's id.
-• /gifid: Reply to a gif to me to tell you its file ID.
-• /lyrics `<song name>`-`<artist name>` : Find your song and give the lyrics of the song
-• /wiki: `<query>`: wiki your query.
-• /tr `<language>`: Translates the text and then replies to you with the language you have specifed, works as a reply to message.
-• /git `<username>`: Search for the user using github api!
-• /weebify `<text>` or `<reply to message>`: To weebify the text.
-• /bug <reply to text message> : To report a bug
-• /botstaffs : Give the list of the bot staffs.
+• /id: ɢᴇᴛ ᴛʜᴇ ᴄᴜʀʀᴇɴᴛ ɢʀᴏᴜᴘ ɪᴅ. ɪꜰ ᴜsᴇᴅ ʙʏ ʀᴇᴘʟʏɪɴɢ ᴛᴏ ᴀ ᴍᴇssᴀɢᴇ, ɢᴇᴛ ᴛʜᴀᴛ ᴜsᴇʀ's ɪᴅ.
+• /gifid: ʀᴇᴘʟʏ ᴛᴏ ᴀ ɢɪꜰ ᴛᴏ ᴛᴇʟʟ ʏᴏᴜ ɪᴛs ꜰɪʟᴇ ɪᴅ.
+• /lyrics `<song name>`-`<artist name>` : ꜰɪɴᴅ ʏᴏᴜʀ sᴏɴɢ ᴀɴᴅ ɢɪᴠᴇ ᴛʜᴇ ʟʏʀɪᴄs ᴏꜰ ᴛʜᴇ sᴏɴɢ
+• /wiki: `<query>`: ᴡɪᴋɪ ʏᴏᴜʀ qᴜᴇʀʏ.
+• /tr `<language>`: ᴛʀᴀɴsʟᴀᴛᴇs ᴛʜᴇ ᴛᴇxᴛ ᴀɴᴅ ᴛʜᴇɴ ʀᴇᴘʟɪᴇs ᴡɪᴛʜ ᴛʜᴇ ʟᴀɴɢᴜᴀɢᴇ ʏᴏᴜ ʜᴀᴠᴇ sᴘᴇᴄɪꜰɪᴇᴅ, ᴡᴏʀᴋs ᴀs ᴀ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇssᴀɢᴇ.
+• /git `<username>`: sᴇᴀʀᴄʜ ꜰᴏʀ ᴛʜᴇ ᴜsᴇʀ ᴜsɪɴɢ ɢɪᴛʜᴜʙ ᴀᴘɪ!
+• /weebify `<text>` or `<reply to message>`: ᴛᴏ ᴡᴇᴇʙɪꜰʏ ᴛʜᴇ ᴛᴇxᴛ.
+• /bug <reply to text message> : ᴛᴏ ʀᴇᴘᴏʀᴛ ᴀ ʙᴜɢ
+• /botstaffs : ɢɪᴠᴇ ᴛʜᴇ ʟɪsᴛ ᴏꜰ ᴛʜᴇ ʙᴏᴛ sᴛᴀꜰꜰs.
 
-**Example:**
-`/git iamgojoof6eyes`: this fetches the information about a user from the database."""
+**ᴇxᴀᴍᴘʟᴇ:**
+`/git iamgojoof6eyes`: ᴛʜɪs ꜰᴇᴛᴄʜᴇs ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ ᴀʙᴏᴜᴛ ᴀ ᴜsᴇʀ ꜰʀᴏᴍ ᴛʜᴇ ᴅᴀᴛᴀʙᴀsᴇ.
+"""
