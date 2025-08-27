@@ -624,7 +624,7 @@ async def unmutebutton(c: Gojo, q: CallbackQuery):
     return
 
 
-__PLUGIN__ = "muting"
+__PLUGIN__ = "ᴍᴜᴛɪɴɢ"
 
 __alt_name__ = [
     "mute",
@@ -633,16 +633,18 @@ __alt_name__ = [
 ]
 
 __HELP__ = """
-**Muting**
+**ᴍᴜᴛɪɴɢ**
 
-**Admin only:**
-• /mute: Mute the user replied to or mentioned.
-• /smute: silences a user without notifying. Can also be used as a reply, muting the replied to user.
-• /dmute: Mute a user by reply, and delete their message.
-• /tmute <userhandle> x(m/h/d): mutes a user for x time. (via handle, or reply). m = minutes, h = hours, d = days.
-• /stmute <userhandle> x(m/h/d): mutes a user for x time without notifying. (via handle, or reply). m = minutes, h = hours, d = days.
-• /dtmute <userhandle> x(m/h/d): Mute the replied user, and delete the replied message. (via reply). m = minutes, h = hours, d = days.
-• /unmute: Unmutes the user mentioned or replied to.
+**ᴀᴅᴍɪɴ ᴏɴʟʏ:**
+• /mute: ᴍᴜᴛᴇ ᴛʜᴇ ᴜsᴇʀ ʀᴇᴘʟɪᴇᴅ ᴛᴏ ᴏʀ ᴍᴇɴᴛɪᴏɴᴇᴅ.
+• /smute: sɪʟᴇɴᴄᴇs ᴀ ᴜsᴇʀ ᴡɪᴛʜᴏᴜᴛ ɴᴏᴛɪꜰʏɪɴɢ. ᴄᴀɴ ᴀʟsᴏ ʙᴇ ᴜsᴇᴅ ᴀs ᴀ ʀᴇᴘʟʏ, ᴍᴜᴛɪɴɢ ᴛʜᴇ ʀᴇᴘʟɪᴇᴅ ᴛᴏ ᴜsᴇʀ.
+• /dmute: ᴍᴜᴛᴇ ᴀ ᴜsᴇʀ ʙʏ ʀᴇᴘʟʏ, ᴀɴᴅ ᴅᴇʟᴇᴛᴇ ᴛʜᴇɪʀ ᴍᴇssᴀɢᴇ.
+• /tmute <userhandle> x(m/h/d): ᴍᴜᴛᴇs ᴀ ᴜsᴇʀ ғᴏʀ x ᴛɪᴍᴇ. (ᴠɪᴀ ʜᴀɴᴅʟᴇ, ᴏʀ ʀᴇᴘʟʏ). m = ᴍɪɴᴜᴛᴇs, h = ʜᴏᴜʀs, d = ᴅᴀʏs.
+• /stmute <userhandle> x(m/h/d): ᴍᴜᴛᴇs ᴀ ᴜsᴇʀ ғᴏʀ x ᴛɪᴍᴇ ᴡɪᴛʜᴏᴜᴛ ɴᴏᴛɪꜰʏɪɴɢ. (ᴠɪᴀ ʜᴀɴᴅʟᴇ, ᴏʀ ʀᴇᴘʟʏ). m = ᴍɪɴᴜᴛᴇs, h = ʜᴏᴜʀs, d = ᴅᴀʏs.
+• /dtmute <userhandle> x(m/h/d): ᴍᴜᴛᴇ ᴛʜᴇ ʀᴇᴘʟɪᴇᴅ ᴜsᴇʀ, ᴀɴᴅ ᴅᴇʟᴇᴛᴇ ᴛʜᴇ ʀᴇᴘʟɪᴇᴅ ᴍᴇssᴀɢᴇ. (ᴠɪᴀ ʀᴇᴘʟʏ). m = ᴍɪɴᴜᴛᴇs, h = ʜᴏᴜʀs, d = ᴅᴀʏs.
+• /unmute: ᴜɴᴍᴜᴛᴇs ᴛʜᴇ ᴜsᴇʀ ᴍᴇɴᴛɪᴏɴᴇᴅ ᴏʀ ʀᴇᴘʟɪᴇᴅ ᴛᴏ.
 
-**Example:**
-`/mute @username`; this mutes a user."""
+**ᴇxᴀᴍᴘʟᴇ:**
+`/mute @username`; ᴛʜɪs ᴍᴜᴛᴇs ᴀ ᴜsᴇʀ.
+"""
+
