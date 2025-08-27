@@ -30,14 +30,15 @@ async def ball_cmd(c: Gojo, m: Message):
 async def football_cmd(c: Gojo, m: Message):
     await send_game(c, m, "⚽")
 
-__PLUGIN__ = "Games"
-__HELP__ = """
-🎮 **Play Mini Games with Emoji Dice!**
+__PLUGIN__ = "ɢᴀᴍᴇs"
 
-`/dice` - Dice 🎲  
-`/dart` - Dart 🎯  
-`/basket` - Basketball 🏀  
-`/ball` - Bowling 🎳  
-`/football` - Football ⚽  
-`/jackpot` - Slot Machine 🎰
+__HELP__ = """
+🎮 **ᴘʟᴀʏ ᴍɪɴɪ ɢᴀᴍᴇs ᴡɪᴛʜ ᴇᴍᴏᴊɪ ᴅɪᴄᴇ!**
+  
+`/dart` - ᴅᴀʀᴛ 🎯  
+`/basket` - ʙᴀsᴋᴇᴛʙᴀʟʟ 🏀  
+`/ball` - ʙᴏᴡʟɪɴɢ 🎳  
+`/football` - ғᴏᴏᴛʙᴀʟʟ ⚽  
+`/jackpot` - sʟᴏᴛ ᴍᴀᴄʜɪɴᴇ 🎰
 """
+
