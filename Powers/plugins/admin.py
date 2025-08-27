@@ -273,7 +273,7 @@ async def fullpromote_usr(c: Gojo, m: Message):
         await m.chat.promote_member(user_id=user_id, privileges=bot.privileges)
         title = ""
         if m.chat.type in [ChatType.SUPERGROUP, ChatType.GROUP]:
-            title = "Gojo"  # Default fullpromote title
+            title = "Lᴜɪᴛᴇɴᴀɴᴛ"  # Default fullpromote title
             if len(m.text.split()) == 3 and not m.reply_to_message:
                 title = " ".join(m.text.split()[2:16])  # trim title to 16 characters
             elif len(m.text.split()) >= 2 and m.reply_to_message:
@@ -376,7 +376,7 @@ async def promote_usr(c: Gojo, m: Message):
         )
         title = ""
         if m.chat.type in [ChatType.SUPERGROUP, ChatType.GROUP]:
-            title = "Itadori"  # Deafult title
+            title = "Oғғɪᴄᴇʀ"  # Deafult title
             if len(m.text.split()) >= 3 and not m.reply_to_message:
                 title = " ".join(m.text.split()[2:16])  # trim title to 16 characters
             elif len(m.text.split()) >= 2 and m.reply_to_message:
