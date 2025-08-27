@@ -2558,7 +2558,8 @@ async def style(c, m):
 
 
 __help__ = """
-❍ `/fonts or /font <text>` — Converts simple text into beautiful text by changing its font.
+❍ `/fonts or /font <text>` — ᴄᴏɴᴠᴇʀᴛs sɪᴍᴘʟᴇ ᴛᴇxᴛ ɪɴᴛᴏ ʙᴇᴀᴜᴛɪғᴜʟ ᴛᴇxᴛ ʙʏ ᴄʜᴀɴɢɪɴɢ ɪᴛs ғᴏɴᴛ.
 """
 
-__mod_name__ = "Fonts"
+__PLUGIN__ = "ғᴏɴᴛs"
+
