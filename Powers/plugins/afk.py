@@ -149,13 +149,14 @@ async def afk_notifier(c: Gojo, m: Message):
 
 
 # ─── PLUGIN INFO ───
-__PLUGIN__ = "afk"
-_DISABLE_CMDS_ = ["afk", "brb"]
+__plugin__ = "ᴀꜰᴋ"
+__disable_cmds__ = ["afk", "brb"]
 __alt_name__ = ["brb"]
 
-__HELP__ = """
-**AFK**
-• /afk (/brb) [reason | reply to a message]
+__help__ = """
+ᴀꜰᴋ
+• /ᴀꜰᴋ (/ʙʀʙ) [ʀᴇᴀꜱᴏɴ | ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇꜱꜱᴀɢᴇ]
 
-`reply to a message` can be any media or text
+`ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇꜱꜱᴀɢᴇ` ᴄᴀɴ ʙᴇ ᴀɴʏ ᴍᴇᴅɪᴀ ᴏʀ ᴛᴇxᴛ
 """
+
