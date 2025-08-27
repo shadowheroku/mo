@@ -1035,7 +1035,7 @@ async def kickme(c: Gojo, m: Message):
     return
 
 
-__PLUGIN__ = "bans"
+__PLUGIN__ = "ʙᴀɴs"
 
 _DISABLE_CMDS_ = ["kickme"]
 
@@ -1048,19 +1048,21 @@ __alt_name__ = [
 ]
 
 __HELP__ = """
-**Bans**
+**ʙᴀɴs**
 
-**Admin only:**
-• /kick: Kick the user replied or tagged.
-• /skick: Kick the user replied or tagged and delete your messsage.
-• /dkick: Kick the user replied and delete their message.
-• /ban: Bans the user replied to or tagged.
-• /sban: Bans the user replied or tagged and delete your messsage.
-• /dban: Bans the user replied and delete their message.
-• /tban <userhandle> x(m/h/d): Bans a user for x time. (via handle, or reply). m = minutes, h = hours, d = days.
-• /stban <userhandle> x(m/h/d): Silently bans a user for x time. (via handle, or reply). m = minutes, h = hours, d = days.
-• /dtban <userhandle> x(m/h/d): Silently bans a user for x time and delete the replied message. (via reply). m = minutes, h = hours, d = days.
-• /unban: Unbans the user replied to or tagged.
+**ᴀᴅᴍɪɴ ᴏɴʟʏ:**
+• /kick: ᴋɪᴄᴋ ᴛʜᴇ ᴜsᴇʀ ʀᴇᴘʟɪᴇᴅ ᴏʀ ᴛᴀɢɢᴇᴅ.
+• /skick: ᴋɪᴄᴋ ᴛʜᴇ ᴜsᴇʀ ʀᴇᴘʟɪᴇᴅ ᴏʀ ᴛᴀɢɢᴇᴅ ᴀɴᴅ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴍᴇssᴀɢᴇ.
+• /dkick: ᴋɪᴄᴋ ᴛʜᴇ ᴜsᴇʀ ʀᴇᴘʟɪᴇᴅ ᴀɴᴅ ᴅᴇʟᴇᴛᴇ ᴛʜᴇɪʀ ᴍᴇssᴀɢᴇ.
+• /ban: ʙᴀɴs ᴛʜᴇ ᴜsᴇʀ ʀᴇᴘʟɪᴇᴅ ᴛᴏ ᴏʀ ᴛᴀɢɢᴇᴅ.
+• /sban: ʙᴀɴs ᴛʜᴇ ᴜsᴇʀ ʀᴇᴘʟɪᴇᴅ ᴏʀ ᴛᴀɢɢᴇᴅ ᴀɴᴅ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴍᴇssᴀɢᴇ.
+• /dban: ʙᴀɴs ᴛʜᴇ ᴜsᴇʀ ʀᴇᴘʟɪᴇᴅ ᴀɴᴅ ᴅᴇʟᴇᴛᴇ ᴛʜᴇɪʀ ᴍᴇssᴀɢᴇ.
+• /tban <userhandle> x(m/h/d): ʙᴀɴs ᴀ ᴜsᴇʀ ғᴏʀ x ᴛɪᴍᴇ. (ᴠɪᴀ ʜᴀɴᴅʟᴇ, ᴏʀ ʀᴇᴘʟʏ). ᴍ = ᴍɪɴᴜᴛᴇs, ʜ = ʜᴏᴜʀs, ᴅ = ᴅᴀʏs.
+• /stban <userhandle> x(m/h/d): sɪʟᴇɴᴛʟʏ ʙᴀɴs ᴀ ᴜsᴇʀ ғᴏʀ x ᴛɪᴍᴇ. (ᴠɪᴀ ʜᴀɴᴅʟᴇ, ᴏʀ ʀᴇᴘʟʏ). ᴍ = ᴍɪɴᴜᴛᴇs, ʜ = ʜᴏᴜʀs, ᴅ = ᴅᴀʏs.
+• /dtban <userhandle> x(m/h/d): sɪʟᴇɴᴛʟʏ ʙᴀɴs ᴀ ᴜsᴇʀ ғᴏʀ x ᴛɪᴍᴇ ᴀɴᴅ ᴅᴇʟᴇᴛᴇ ᴛʜᴇ ʀᴇᴘʟɪᴇᴅ ᴍᴇssᴀɢᴇ. (ᴠɪᴀ ʀᴇᴘʟʏ). ᴍ = ᴍɪɴᴜᴛᴇs, ʜ = ʜᴏᴜʀs, ᴅ = ᴅᴀʏs.
+• /unban: ᴜɴʙᴀɴs ᴛʜᴇ ᴜsᴇʀ ʀᴇᴘʟɪᴇᴅ ᴛᴏ ᴏʀ ᴛᴀɢɢᴇᴅ.
 
-**Example:**
-`/ban @username`: this bans a user in the chat."""
+**ᴇxᴀᴍᴘʟᴇ:**
+`/ban @username`: ᴛʜɪs ʙᴀɴs ᴀ ᴜsᴇʀ ɪɴ ᴛʜᴇ ᴄʜᴀᴛ.
+"""
+
