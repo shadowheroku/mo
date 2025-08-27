@@ -98,13 +98,13 @@ async def list_blacklist_chats(_, m: Message):
     return
 
 
-__PLUGIN__ = "Chat blacklist"
+__PLUGIN__ = "ᴄʜᴀᴛ ʙʟᴀᴄᴋʟɪsᴛ"
 
 __HELP__ = """
-**Chat blacklist**
+**ᴄʜᴀᴛ ʙʟᴀᴄᴋʟɪsᴛ**
 
-**Dev commands:**
-• /blchat [space separated id or username of chats]: Add chats to black list if given or the current chat.
-• /rmblchat [space separated id or username of chats]: Remove chats from black list if given or the current chat.
-• /blchats: Give the list of blacklisted chats
+**ᴅᴇᴠ ᴄᴏᴍᴍᴀɴᴅs:**
+• /blchat [sᴘᴀᴄᴇ sᴇᴘᴀʀᴀᴛᴇᴅ ɪᴅ ᴏʀ ᴜsᴇʀɴᴀᴍᴇ ᴏғ ᴄʜᴀᴛs]: ᴀᴅᴅ ᴄʜᴀᴛs ᴛᴏ ʙʟᴀᴄᴋʟɪsᴛ ɪғ ɢɪᴠᴇɴ ᴏʀ ᴛʜᴇ ᴄᴜʀʀᴇɴᴛ ᴄʜᴀᴛ.
+• /rmblchat [sᴘᴀᴄᴇ sᴇᴘᴀʀᴀᴛᴇᴅ ɪᴅ ᴏʀ ᴜsᴇʀɴᴀᴍᴇ ᴏғ ᴄʜᴀᴛs]: ʀᴇᴍᴏᴠᴇ ᴄʜᴀᴛs ғʀᴏᴍ ʙʟᴀᴄᴋʟɪsᴛ ɪғ ɢɪᴠᴇɴ ᴏʀ ᴛʜᴇ ᴄᴜʀʀᴇɴᴛ ᴄʜᴀᴛ.
+• /blchats: ɢɪᴠᴇ ᴛʜᴇ ʟɪsᴛ ᴏғ ʙʟᴀᴄᴋʟɪsᴛᴇᴅ ᴄʜᴀᴛs
 """
