@@ -37,14 +37,6 @@ class Gojo(Client):
         """Start the bot."""
         await super().start()
 
-        await self.set_bot_commands(
-            [
-                BotCommand("start", "To check whether the bot is alive"),
-                BotCommand("help", "To get help menu"),
-                BotCommand("donate", "To buy me a coffee"),
-                BotCommand("bug", "To report bugs"),
-            ]
-        )
 
         meh = await self.get_me()
         LOGGER.info("Starting bot...")
