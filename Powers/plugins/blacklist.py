@@ -196,26 +196,28 @@ async def rm_allbl_callback(_, q: CallbackQuery):
     return
 
 
-__PLUGIN__ = "blacklist"
+__PLUGIN__ = "ʙʟᴀᴄᴋʟɪsᴛ"
 
 __alt_name__ = ["blacklists", "blaction"]
 
 __HELP__ = """
-**Blacklist**
+**ʙʟᴀᴄᴋʟɪsᴛ**
 
-**NOTE:** blacklists do not affect group admins.
-• /blacklist: View the current blacklisted words.
+**ɴᴏᴛᴇ:** ʙʟᴀᴄᴋʟɪsᴛs ᴅᴏ ɴᴏᴛ ᴀғғᴇᴄᴛ ɢʀᴏᴜᴘ ᴀᴅᴍɪɴs.  
+• /blacklist: ᴠɪᴇᴡ ᴛʜᴇ ᴄᴜʀʀᴇɴᴛ ʙʟᴀᴄᴋʟɪsᴛᴇᴅ ᴡᴏʀᴅs.  
 
-**Admin only:**
-• /addblacklist `<triggers>`: Add a trigger to the blacklist. Each line is considered one trigger, so using different lines will allow you to add multiple triggers.
-• /unblacklist `<triggers>`: Remove triggers from the blacklist. Same newline logic applies here, so you can remove multiple triggers at once.
-• /blaction `<action>`: This action will occur when user uses a blacklist word. Choose from - 'kick', 'ban', 'mute', 'warn'.
-Default is 'none', which will delete the users message on typing a blacklist word.
+**ᴀᴅᴍɪɴ ᴏɴʟʏ:**  
+• /addblacklist `<ᴛʀɪɢɢᴇʀs>`: ᴀᴅᴅ ᴀ ᴛʀɪɢɢᴇʀ ᴛᴏ ᴛʜᴇ ʙʟᴀᴄᴋʟɪsᴛ. ᴇᴀᴄʜ ʟɪɴᴇ ɪs ᴄᴏɴsɪᴅᴇʀᴇᴅ ᴏɴᴇ ᴛʀɪɢɢᴇʀ, sᴏ ᴜsɪɴɢ ᴅɪғғᴇʀᴇɴᴛ ʟɪɴᴇs ᴡɪʟʟ ᴀʟʟᴏᴡ ʏᴏᴜ ᴛᴏ ᴀᴅᴅ ᴍᴜʟᴛɪᴘʟᴇ ᴛʀɪɢɢᴇʀs.  
+• /unblacklist `<ᴛʀɪɢɢᴇʀs>`: ʀᴇᴍᴏᴠᴇ ᴛʀɪɢɢᴇʀs ғʀᴏᴍ ᴛʜᴇ ʙʟᴀᴄᴋʟɪsᴛ. sᴀᴍᴇ ɴᴇᴡʟɪɴᴇ ʟᴏɢɪᴄ ᴀᴘᴘʟɪᴇs ʜᴇʀᴇ, sᴏ ʏᴏᴜ ᴄᴀɴ ʀᴇᴍᴏᴠᴇ ᴍᴜʟᴛɪᴘʟᴇ ᴛʀɪɢɢᴇʀs ᴀᴛ ᴏɴᴄᴇ.  
+• /blaction `<ᴀᴄᴛɪᴏɴ>`: ᴛʜɪs ᴀᴄᴛɪᴏɴ ᴡɪʟʟ ᴏᴄᴄᴜʀ ᴡʜᴇɴ ᴜsᴇʀ ᴜsᴇs ᴀ ʙʟᴀᴄᴋʟɪsᴛ ᴡᴏʀᴅ. ᴄʜᴏᴏsᴇ ғʀᴏᴍ - 'ᴋɪᴄᴋ', 'ʙᴀɴ', 'ᴍᴜᴛᴇ', 'ᴡᴀʀɴ'.  
+ᴅᴇғᴀᴜʟᴛ ɪs 'ɴᴏɴᴇ', ᴡʜɪᴄʜ ᴡɪʟʟ ᴅᴇʟᴇᴛᴇ ᴛʜᴇ ᴜsᴇʀs ᴍᴇssᴀɢᴇ ᴏɴ ᴛʏᴘɪɴɢ ᴀ ʙʟᴀᴄᴋʟɪsᴛ ᴡᴏʀᴅ.  
 
-**Owner Only**
-• /rmallblacklist: Removes all the blacklists from the current chat.
+**ᴏᴡɴᴇʀ ᴏɴʟʏ**  
+• /rmallblacklist: ʀᴇᴍᴏᴠᴇs ᴀʟʟ ᴛʜᴇ ʙʟᴀᴄᴋʟɪsᴛs ғʀᴏᴍ ᴛʜᴇ ᴄᴜʀʀᴇɴᴛ ᴄʜᴀᴛ.  
 
-**Note:** Can only add or remove one blacklist at a time!
+**ɴᴏᴛᴇ:** ᴄᴀɴ ᴏɴʟʏ ᴀᴅᴅ ᴏʀ ʀᴇᴍᴏᴠᴇ ᴏɴᴇ ʙʟᴀᴄᴋʟɪsᴛ ᴀᴛ ᴀ ᴛɪᴍᴇ!  
 
-**Example:**
-`/addblacklist hello`: this adds the word 'hello' as blacklist in the chat."""
+**ᴇxᴀᴍᴘʟᴇ:**  
+`/addblacklist hello`: ᴛʜɪs ᴀᴅᴅs ᴛʜᴇ ᴡᴏʀᴅ 'hello' ᴀs ʙʟᴀᴄᴋʟɪsᴛ ɪɴ ᴛʜᴇ ᴄʜᴀᴛ.
+"""
+
