@@ -948,23 +948,25 @@ load_balance()
 load_daily()
 load_promotions()
 
-__PLUGIN__ = "mines"
+__PLUGIN__ = "ᴍɪɴᴇs ɢᴀᴍᴇ"
 _DISABLE_CMDS_ = ["mines"]
-__HELP__ = """
-🎮 Mines Game
-• /mines <amount> <mines> → Start a Mines game (min 100 coins)
-• /bet <amount> <heads/tails> → Coin flip betting game
-• /balance → Check your monic coins
-• /daily → Claim 100 coins daily
-• /mgive → Give coins to someone from your balance (reply to their message)
-• /mgift → Owner can gift coins to anyone
-• /take → Remove coins from a user (reply)
-• /top → Top collectors of monic coins
-• /mpromote → Promote yourself to Coin Master (costs 10 lakh coins, group admin only)
-• /mtitle <title> → Change your admin title (costs 1 lakh coins, requires promotion)
-• /mseason → Check current season information
 
-💡 You can withdraw anytime using the 💰 Withdraw button to collect your current winnings.
-💣 Hitting a bomb ends the game and reveals all cells.
-🌿 Seasons reset monthly - all balances are set to 1000 at the start of each new season
+__HELP__ = """
+🎮 ᴍɪɴᴇs ɢᴀᴍᴇ
+• /mines <amount> <mines> → sᴛᴀʀᴛ ᴀ ᴍɪɴᴇs ɢᴀᴍᴇ (ᴍɪɴ 100 ᴄᴏɪɴs)
+• /bet <amount> <heads/tails> → ᴄᴏɪɴ ᴘʟɪᴘ ʙᴇᴛᴛɪɴɢ ɢᴀᴍᴇ
+• /balance → ᴄʜᴇᴄᴋ ʏᴏᴜʀ ᴍᴏɴɪᴄ ᴄᴏɪɴs
+• /daily → ᴄʟᴀɪᴍ 100 ᴄᴏɪɴs ᴅᴀɪʟʏ
+• /mgive → ɢɪᴠᴇ ᴄᴏɪɴs ᴛᴏ sᴏᴍᴇᴏɴᴇ ғʀᴏᴍ ʏᴏᴜʀ ʙᴀʟᴀɴᴄᴇ (ʀᴇᴘʟʏ ᴛᴏ ᴛʜᴇɪʀ ᴍᴇssᴀɢᴇ)
+• /mgift → ᴏᴡɴᴇʀ ᴄᴀɴ ɢɪғᴛ ᴄᴏɪɴs ᴛᴏ ᴀɴʏᴏɴᴇ
+• /take → ʀᴇᴍᴏᴠᴇ ᴄᴏɪɴs ғʀᴏᴍ ᴀ ᴜsᴇʀ (ʀᴇᴘʟʏ)
+• /top → ᴛᴏᴘ ᴄᴏʟʟᴇᴄᴛᴏʀs ᴏꜰ ᴍᴏɴɪᴄ ᴄᴏɪɴs
+• /mpromote → ᴘʀᴏᴍᴏᴛᴇ ʏᴏᴜʀsᴇʟғ ᴛᴏ ᴄᴏɪɴ ᴍᴀsᴛᴇʀ (ᴄᴏsᴛs 10 ʟᴀᴋʜ ᴄᴏɪɴs, ɢʀᴏᴜᴘ ᴀᴅᴍɪɴ ᴏɴʟʏ)
+• /mtitle <title> → ᴄʜᴀɴɢᴇ ʏᴏᴜʀ ᴀᴅᴍɪɴ ᴛɪᴛʟᴇ (ᴄᴏsᴛs 1 ʟᴀᴋʜ ᴄᴏɪɴs, ʀᴇqᴜɪʀᴇs ᴘʀᴏᴍᴏᴛɪᴏɴ)
+• /mseason → ᴄʜᴇᴄᴋ ᴄᴜʀʀᴇɴᴛ sᴇᴀsᴏɴ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ
+
+💡 ʏᴏᴜ ᴄᴀɴ ᴡɪᴛʜᴅʀᴀᴡ ᴀɴʏᴛɪᴍᴇ ᴜsɪɴɢ ᴛʜᴇ 💰 ᴡɪᴛʜᴅʀᴀᴡ ʙᴜᴛᴛᴏɴ ᴛᴏ ᴄᴏʟʟᴇᴄᴛ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴡɪɴɴɪɴɢs.
+💣 ʜɪᴛᴛɪɴɢ ᴀ ʙᴏᴍʙ ᴇɴᴅs ᴛʜᴇ ɢᴀᴍᴇ ᴀɴᴅ ʀᴇᴠᴇᴀʟs ᴀʟʟ ᴄᴇʟʟs.
+🌿 sᴇᴀsᴏɴs ʀᴇsᴇᴛ ᴍᴏɴᴛʜʟʏ - ᴀʟʟ ʙᴀʟᴀɴᴄᴇs ᴀʀᴇ sᴇᴛ ᴛᴏ 1000 ᴀᴛ ᴛʜᴇ sᴛᴀʀᴛ ᴏꜰ ᴇᴀᴄʜ ɴᴇᴡ sᴇᴀsᴏɴ
 """
+
