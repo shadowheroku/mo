@@ -478,12 +478,13 @@ async def mod_buttons(c: Gojo, q: CallbackQuery):
 
 
 # ─── PLUGIN INFO ───
-__PLUGIN__ = "anti_nsfw"
-_DISABLE_CMDS_ = ["antinsfw", "free", "unfree"]
-__HELP__ = """
-**Anti-NSFW**
-• /antinsfw → Open inline buttons to enable/disable scanner (admin only)
-• /free (reply) → Free a user from scans (admin only)
-• /unfree (reply) → Remove user from free list (admin only)"""
+__plugin__ = "ᴀɴᴛɪ-ɴsғᴡ"
+_disable_cmds_ = ["antinsfw", "free", "unfree"]
+__help__ = """
+**ᴀɴᴛɪ-ɴsғᴡ**
+• /antinsfw → ᴏᴘᴇɴ ɪɴʟɪɴᴇ ʙᴜᴛᴛᴏɴs ᴛᴏ ᴇɴᴀʙʟᴇ/ᴅɪsᴀʙʟᴇ sᴄᴀɴɴᴇʀ (ᴀᴅᴍɪɴ ᴏɴʟʏ)
+• /free (reply) → ғʀᴇᴇ ᴀ ᴜsᴇʀ ғʀᴏᴍ sᴄᴀɴs (ᴀᴅᴍɪɴ ᴏɴʟʏ)
+• /unfree (reply) → ʀᴇᴍᴏᴠᴇ ᴜsᴇʀ ғʀᴏᴍ ғʀᴇᴇ ʟɪsᴛ (ᴀᴅᴍɪɴ ᴏɴʟʏ)"""
+
 
 
