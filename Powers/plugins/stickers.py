@@ -968,26 +968,27 @@ async def sticker_callbacks(c: Gojo, q: CallbackQuery):
     return
 
 
-__PLUGIN__ = "sticker"
+__PLUGIN__ = "sᴛɪᴄᴋᴇʀ"
 __alt_name__ = [
     "sticker",
     "kang"
 ]
+
 __HELP__ = """
-**User Commands:**
-• /kang (/steal) <emoji>: Reply to a sticker or any supported media
-• /stickerinfo (/stinfo) : Reply to any sticker to get it's info
-• /getsticker (/getst) : Get sticker as photo, gif or vice versa.
-• /stickerid (/stid) : Reply to any sticker to get it's id
-• /mypacks : Get all of your current sticker pack you have made via me.
-• /q(/ss) <reply to message> : Will quote the replied message
-• /q(/ss) r <reply to message> : Will quote the replied message and message it was replied to.
-• /mmf <your text>: Reply to a normal sticker or a photo or video file to memify it. If you want to right text at bottom use `;right your message`
-    ■ For e.g. 
-    ○ /mmfb <text>: To fill text with black colour
-    ○ /mmfw or /mmf <text>: To fill it with white colour
+**ᴜsᴇʀ ᴄᴏᴍᴍᴀɴᴅs:**
+• /kang (/steal) <emoji>: ʀᴇᴘʟʏ ᴛᴏ ᴀ sᴛɪᴄᴋᴇʀ ᴏʀ ᴀɴʏ sᴜᴘᴘᴏʀᴛᴇᴅ ᴍᴇᴅɪᴀ
+• /stickerinfo (/stinfo) : ʀᴇᴘʟʏ ᴛᴏ ᴀɴʏ sᴛɪᴄᴋᴇʀ ᴛᴏ ɢᴇᴛ ɪᴛ's ɪɴғᴏ
+• /getsticker (/getst) : ɢᴇᴛ sᴛɪᴄᴋᴇʀ ᴀs ᴘʜᴏᴛᴏ, ɢɪғ ᴏʀ ᴠɪᴄᴇ ᴠᴇʀsᴀ.
+• /stickerid (/stid) : ʀᴇᴘʟʏ ᴛᴏ ᴀɴʏ sᴛɪᴄᴋᴇʀ ᴛᴏ ɢᴇᴛ ɪᴛ's ɪᴅ
+• /mypacks : ɢᴇᴛ ᴀʟʟ ᴏꜰ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ sᴛɪᴄᴋᴇʀ ᴘᴀᴄᴋs ʏᴏᴜ ʜᴀᴠᴇ ᴍᴀᴅᴇ ᴠɪᴀ ᴍᴇ.
+• /q(/ss) <ʀᴇᴘʟʏ ᴛᴏ ᴍᴇssᴀɢᴇ> : ᴡɪʟʟ ǫᴜᴏᴛᴇ ᴛʜᴇ ʀᴇᴘʟɪᴇᴅ ᴍᴇssᴀɢᴇ
+• /q(/ss) r <ʀᴇᴘʟʏ ᴛᴏ ᴍᴇssᴀɢᴇ> : ᴡɪʟʟ ǫᴜᴏᴛᴇ ᴛʜᴇ ʀᴇᴘʟɪᴇᴅ ᴍᴇssᴀɢᴇ ᴀɴᴅ ᴛʜᴇ ᴍᴇssᴀɢᴇ ɪᴛ ᴡᴀs ʀᴇᴘʟɪᴇᴅ ᴛᴏ.
+• /mmf <ʏᴏᴜʀ ᴛᴇxᴛ>: ʀᴇᴘʟʏ ᴛᴏ ᴀ ɴᴏʀᴍᴀʟ sᴛɪᴄᴋᴇʀ ᴏʀ ᴀ ᴘʜᴏᴛᴏ ᴏʀ ᴠɪᴅᴇᴏ ғɪʟᴇ ᴛᴏ ᴍᴇᴍɪꜰʏ ɪᴛ. ɪꜰ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ʀɪɢʜᴛ ᴛᴇxᴛ ᴀᴛ ʙᴏᴛᴛᴏᴍ ᴜsᴇ `;right ʏᴏᴜʀ ᴍᴇssᴀɢᴇ`
+    ■ ғᴏʀ ᴇ.ɢ. 
+    ○ /mmfb <text>: ᴛᴏ ꜰɪʟʟ ᴛᴇxᴛ ᴡɪᴛʜ ʙʟᴀᴄᴋ ᴄᴏʟᴏᴜʀ
+    ○ /mmfw or /mmf <text>: ᴛᴏ ꜰɪʟʟ ɪᴛ ᴡɪᴛʜ ᴡʜɪᴛᴇ ᴄᴏʟᴏᴜʀ
 
-**Note**
-mmf and getsticker only support photo and normal stickers for now.
-
+**ɴᴏᴛᴇ**
+mmf ᴀɴᴅ getsticker ᴏɴʟʏ sᴜᴘᴘᴏʀᴛ ᴘʜᴏᴛᴏ ᴀɴᴅ ɴᴏʀᴍᴀʟ sᴛɪᴄᴋᴇʀs ғᴏʀ ɴᴏᴡ.
 """
+
