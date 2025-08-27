@@ -2557,7 +2557,7 @@ async def style(c, m):
         pass
 
 
-__help__ = """
+__HELP__ = """
 ❍ `/fonts or /font <text>` — ᴄᴏɴᴠᴇʀᴛs sɪᴍᴘʟᴇ ᴛᴇxᴛ ɪɴᴛᴏ ʙᴇᴀᴜᴛɪғᴜʟ ᴛᴇxᴛ ʙʏ ᴄʜᴀɴɢɪɴɢ ɪᴛs ғᴏɴᴛ.
 """
 
