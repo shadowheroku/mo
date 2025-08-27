@@ -41,12 +41,13 @@ async def qr_handler(client, message: Message):
             "⚠️ Please provide text after the command.\n\nExample:\n`/qr Hello World`"
         )
 
-__PLUGIN__ = "QrCode"
+__PLUGIN__ = "ǫʀ ᴄᴏᴅᴇ"
+
 __HELP__ = """
-⏳ **Reminder**
+⏳ **ʀᴇᴍɪɴᴅᴇʀ**
 
-`/qr <text/links>` — Creates qrcode of text or links.
+`/qr <text/links>` — ᴄʀᴇᴀᴛᴇs ǫʀ ᴄᴏᴅᴇ ᴏғ ᴛᴇxᴛ ᴏʀ ʟɪɴᴋs.
 
-Example:
+ᴇxᴀᴍᴘʟᴇ:
 `/qr t.me/MonicRobot`
 """
