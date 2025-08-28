@@ -125,8 +125,8 @@ async def start(c: Gojo, m: Message):
 
             # Handle help pagination in private chat
             if help_option == "help":
-                # Sort modules alphabetically by their name (the part after "plugins.")
-                modules = sorted(list(HELP_COMMANDS.keys()), key=lambda x: x.split(".")[-1])
+                # Use the original order of plugins as they are queued
+                modules = list(HELP_COMMANDS.keys())
                 buttons = [
                     InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}")
                     for x in modules
@@ -222,8 +222,8 @@ async def start_back(c: Gojo, q: CallbackQuery):
 # ─── Commands ───
 @Gojo.on_callback_query(filters.regex("^commands$"))
 async def commands_menu(c: Gojo, q: CallbackQuery):
-    # Sort modules alphabetically by their name (the part after "plugins.")
-    modules = sorted(list(HELP_COMMANDS.keys()), key=lambda x: x.split(".")[-1])
+    # Use the original order of plugins as they are queued
+    modules = list(HELP_COMMANDS.keys())
     buttons = [
         InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}")
         for x in modules
@@ -234,7 +234,7 @@ async def commands_menu(c: Gojo, q: CallbackQuery):
 ʜᴇʏ **[{q.from_user.first_name}](http://t.me/{q.from_user.username})**! ɪ ᴀᴍ {c.me.first_name}✨.
 ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
 
-ᴀᴠᴀɪʟᴀʙʟᴇ ᴍᴏᴅᴜʟᴇs:
+ᴀᴠᴀɪʟᴀʙʜᴇ ᴍᴏᴅᴜʟᴇs:
 ᴄʜᴏᴏsᴇ ᴀ ᴍᴏᴅᴜʟᴇ ғʀᴏᴍ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴅᴇᴛᴀɪʟᴇᴅ ʜᴇʟᴘ."""
 
     try:
@@ -249,10 +249,6 @@ async def commands_menu(c: Gojo, q: CallbackQuery):
 # ─── Help ───
 @Gojo.on_message(command("help"))
 async def help_menu(c: Gojo, m: Message):
-    if m.chat.type == ChatType.PRIVATE:
-        # Send loading animation for help command in private chat
-
-    await send_loading_animation(m)
     if len(m.text.split()) >= 2:
         textt = m.text.replace(" ", "_").replace("_", " ", 1)
         help_option = (textt.split(None)[1]).lower()
@@ -282,8 +278,8 @@ async def help_menu(c: Gojo, m: Message):
             )
     else:
         if m.chat.type == ChatType.PRIVATE:
-            # Sort modules alphabetically by their name (the part after "plugins.")
-            modules = sorted(list(HELP_COMMANDS.keys()), key=lambda x: x.split(".")[-1])
+            # Use the original order of plugins as they are queued
+            modules = list(HELP_COMMANDS.keys())
             buttons = [
                 InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}")
                 for x in modules
@@ -311,8 +307,8 @@ async def help_menu(c: Gojo, m: Message):
 @Gojo.on_callback_query(filters.regex(r"^help_page_[0-9]+$"))
 async def paginate_help(c: Gojo, q: CallbackQuery):
     page = int(q.data.split("_")[-1])
-    # Sort modules alphabetically by their name (the part after "plugins.")
-    modules = sorted(list(HELP_COMMANDS.keys()), key=lambda x: x.split(".")[-1])
+    # Use the original order of plugins as they are queued
+    modules = list(HELP_COMMANDS.keys())
     buttons = [InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}") for x in modules]
     keyboard = paginate_buttons(buttons, page=page)
     await q.edit_message_reply_markup(reply_markup=keyboard)
