@@ -67,7 +67,7 @@ async def tag_all_members(c: Gojo, m: Message):
             m.chat.id,
             tag_text,
             disable_web_page_preview=True,
-            reply_to_message_id=m.reply_to_message.message_id if m.reply_to_message else m.id
+            reply_to_message_id=m.reply_to_message.id if m.reply_to_message else m.id
         )
         
         # Send remaining batches as new messages with 1.5 second gap
@@ -105,7 +105,7 @@ __HELP__ = """
 • 𝗌𝗎𝗉𝗉𝗈𝗋𝗍𝗌 𝖺𝖽𝖽𝗂𝗇𝗀 𝖺 𝗆𝖾𝗌𝗌𝖺𝗀𝖾 𝖺𝖿𝗍𝖾𝗋 𝖼𝗈𝗆𝗆𝖺𝗇𝖽
 
 **𝗋𝖾𝗊𝗎𝗂𝗋𝖾𝗆𝖾𝗇𝗍𝗌:**
-- 𝗆𝗎𝗌𝗍 𝖻𝖾 𝗎𝗌𝖾𝖽 𝗂𝗇 𝗀𝗋𝗈𝗎𝗉𝗌/𝗌𝗎𝗉𝖾𝗋𝗀𝗋𝗈𝗎𝗉𝗌
+- 𝗆𝗎𝗌𝗍 𝖻𝖾 𝗎𝗌𝖾𝗍 𝗂𝗇 𝗀𝗋𝗈𝗎𝗉𝗌/𝗌𝗎𝗉𝖾𝗋𝗀𝗋𝗈𝗎𝗉𝗌
 - 𝗎𝗌𝖾𝗋 𝗆𝗎𝗌𝗍 𝖻𝖾 𝖺𝗇 𝖺𝖽𝗆𝗂𝗇
 - 𝗀𝗋𝗈𝗎𝗉 𝗆𝗎𝗌𝗍 𝗁𝖺𝗏𝖾 𝗆𝖾𝗆𝖻𝖾𝗋𝗌
 
