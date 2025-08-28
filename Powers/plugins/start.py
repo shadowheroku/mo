@@ -106,7 +106,7 @@ async def send_loading_animation(m: Message):
 @Gojo.on_message(command("start") & (filters.group | filters.private))
 async def start(c: Gojo, m: Message):
     if m.chat.type == ChatType.PRIVATE:
-        # Send loading animation only for private chats
+        # Send loading animation only for private chats in start command
         await send_loading_animation(m)
         
         if len(m.text.strip().split()) > 1:
@@ -121,7 +121,7 @@ async def start(c: Gojo, m: Message):
                 await get_private_rules(c, m, help_option)
                 return
 
-            # Handle help pagination in private chat
+            # Handle help pagination in private chat - NO LOADING ANIMATION FOR HELP
             if help_option == "help":
                 # Use the original order of plugins as they are queued
                 modules = list(HELP_COMMANDS.keys())
@@ -135,7 +135,7 @@ async def start(c: Gojo, m: Message):
 ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
 
 ᴀᴠᴀɪʟᴀʙʟᴇ ᴍᴏᴅᴜʟᴇs:
-ᴄʜᴏᴏsᴇ ᴀ ᴍᴏᴅᴜʟᴇ ғʀᴏᴍ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴅᴇᴛᴀɪʟᴇᴅ ʜᴇʟᴘ."""
+ᴄʜᴏᴏsᴇ ᴀ ᴍᴏᴅᴜʜᴇ ғʀᴏᴍ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴅᴇᴛᴀɪʟᴇᴅ ʜᴇʟᴘ."""
                 await m.reply_video(video=CATBOX_VIDEO_URL, caption=msg, reply_markup=keyboard)
                 return
 
@@ -179,7 +179,7 @@ async def start(c: Gojo, m: Message):
 ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
 ʜɪᴛ /help ᴛᴏ ғɪɴᴅ ᴏᴜᴛ ᴍᴏʀᴇ ᴀʙᴏᴜᴛ ʜᴏᴡ ᴛᴏ ᴜsᴇ ᴍᴇ ɪɴ ᴍʏ ғᴜʟʟ ᴘᴏᴛᴇɴᴛɪᴀʟ!
 
-ᴊᴏɪɴ ᴍʏ [ɴᴇᴡs ᴄʜᴀɴɴᴇʟ](http://t.me/shadowbotshq) ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ᴏɴ ᴀʟʙ ᴛʜᴇ ʟᴀᴛᴇsᴛ ᴜᴘᴅᴀᴛᴇs."""
+ᴊᴏɪɴ ᴍʏ [ɴᴇᴡs ᴄʜᴀɴɴᴇʟ](http://t.me/shadowbotshq) ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ᴏɴ ᴀʟʟ ᴛʜᴇ ʟᴀᴛᴇsᴛ ᴜᴘᴅᴀᴛᴇs."""
             await m.reply_video(
                 video=CATBOX_VIDEO_URL,
                 caption=cpt,
@@ -208,7 +208,7 @@ async def start_back(c: Gojo, q: CallbackQuery):
         cpt = f"""
 ʜᴇʏ [{q.from_user.first_name}](http://t.me/{q.from_user.username})! ɪ ᴀᴍ {c.me.first_name} ✨.
 ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴜᴏ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
-ʜɪᴛ /help ᴛᴏ ғɪɴᴅ ᴏᴜᴛ ᴍᴏʀᴇ ᴀʙᴏᴜᴛ ʜᴏᴡ ᴛᴏ ᴜsᴇ ᴍᴇ ɪɴ ᴍʏ ғᴜʟʟ ᴘᴏᴛᴇɴᴛɪᴀʟ!
+ʜɪᴛ /help ᴛᴏ ғɪɴᴅ ᴏᴜᴛ ᴍᴏʀᴇ ᴀʙᴏᴜᴛ ʜᴏᴡ ᴛᴜ ᴜsᴇ ᴍᴇ ɪɴ ᴍʏ ғᴜʟʟ ᴘᴏᴛᴇɴᴛɪᴀʟ!
 
 ᴊᴏɪɴ ᴍʏ [ɴᴇᴡs ᴄʜᴀɴɴᴇʟ](http://t.me/shadowbotshq) ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴜɴ ᴏɴ ᴀʟʟ ᴛʜᴇ ʟᴀᴛᴇsᴛ ᴜᴘᴅᴀᴛᴇs."""
         await q.edit_message_caption(caption=cpt, reply_markup=(await gen_start_kb(q.message)))
@@ -288,7 +288,7 @@ async def help_menu(c: Gojo, m: Message):
 ʜᴇʏ **[{m.from_user.first_name}](http://t.me/{m.from_user.username})**! ɪ ᴀᴍ {c.me.first_name}✨.
 ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
 
-ᴀᴠᴀɪʟᴀʙʟᴇ ᴍᴏᴅᴜʟᴇs:
+ᴀᴠᴀɪʟᴀʙʟᴇ ᴍᴏᴑᴜʟᴇs:
 ᴄʜᴏᴏsᴇ ᴀ ᴍᴏᴅᴜʟᴇ ғʀᴏᴍ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴅᴇᴛᴀɪʟᴇᴅ ʜᴇʟᴘ."""
             await m.reply_video(video=CATBOX_VIDEO_URL, caption=msg, reply_markup=keyboard)
         else:
@@ -325,7 +325,7 @@ async def give_curr_info(c: Gojo, q: CallbackQuery):
     txt = f"""
 🏓 ᴘɪɴɢ : {delta_ping * 1000:.3f} ms
 📈 ᴜᴘᴛɪᴍᴇ : {up}
-🤖 ʙᴏᴛ's ᴠᴇʀsɪᴏɴ: {VERSION}
+🤖 ʙᴏᴘ's ᴠᴇʀsɪᴏɴ: {VERSION}
 🐍 ᴘʏᴛʜᴏɴ's ᴠᴇʀsɪᴏɴ: {PYTHON_VERSION}
 🔥 ᴘʏʀᴏɢʀᴀᴍ's ᴠᴇʀsɪᴏɴ : {PYROGRAM_VERSION}
     """
