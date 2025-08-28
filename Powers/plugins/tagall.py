@@ -25,12 +25,13 @@ async def tag_all_members(c: Gojo, m: Message):
         if not m.reply_to_message and len(m.command) == 1:
             return await m.reply_text("ℹ️ Reply to a message or provide text to mention others!")
 
-        # Extract query if provided
+        # Extract query / reply mode
         query = ""
+        reply_mode = False
         if len(m.command) > 1:
             query = " ".join(m.command[1:])
         elif m.reply_to_message:
-            query = m.reply_to_message.text or m.reply_to_message.caption or ""
+            reply_mode = True
 
         # Send initial processing message
         processing_msg = await m.reply_text("🔄 Fetching members...")
@@ -60,9 +61,12 @@ async def tag_all_members(c: Gojo, m: Message):
 
         for idx, batch in enumerate(member_batches, start=1):
             batch_text = f"📢 **Tagging Members ({done + 1}–{done + len(batch)}/{total})**\n\n"
-            if query and idx == 1:  # show query only in the first message
+
+            # If text provided → show in every batch
+            if query:
                 batch_text += f"💬 **Message:** {query}\n\n"
 
+            # Add mentions
             for user in batch:
                 batch_text += f"• [{user.first_name}](tg://user?id={user.id})\n"
 
@@ -71,13 +75,13 @@ async def tag_all_members(c: Gojo, m: Message):
                     m.chat.id,
                     batch_text,
                     disable_web_page_preview=True,
-                    reply_to_message_id=m.reply_to_message.id if (idx == 1 and m.reply_to_message) else None
+                    reply_to_message_id=m.reply_to_message.id if reply_mode else None
                 )
                 if first_msg is None:
                     first_msg = sent
             except Exception as e:
                 await c.send_message(m.chat.id, f"⚠️ Failed to send batch {idx}: {e}")
-            
+
             done += len(batch)
             await asyncio.sleep(1.5)  # 1.5 second delay between batches
 
@@ -86,7 +90,7 @@ async def tag_all_members(c: Gojo, m: Message):
             await c.send_message(
                 m.chat.id,
                 f"✅ All {total} members tagged successfully!",
-                reply_to_message_id=first_msg.id
+                reply_to_message_id=first_msg.id if not reply_mode else m.reply_to_message.id
             )
 
     except Exception as e:
@@ -102,14 +106,14 @@ __HELP__ = """
 • 5 mentions per message
 • 1.5s delay between batches
 • Bullet point formatting
-• Can include a custom message or reply to a message
+• Custom text appears in every batch
+• Reply mode: bot replies to the same message for every batch
 
 **Requirements:**
 - Must be used in groups/supergroups
 - User must be an admin
 
 **Usage:**
-- `/tagall` → warns if no text/reply
-- `/tagall Hello everyone!` → tags with custom message
-- Reply to a message with `/tagall` → tags with replied message
+- `/tagall Hello everyone!` → tags all with custom text in every batch
+- Reply to a message with `/tagall` → tags all while replying to that message in every batch
 """
