@@ -252,7 +252,7 @@ async def help_menu(c: Gojo, m: Message):
     if m.chat.type == ChatType.PRIVATE:
         # Send loading animation for help command in private chat
 
-    
+    await send_loading_animation(m)
     if len(m.text.split()) >= 2:
         textt = m.text.replace(" ", "_").replace("_", " ", 1)
         help_option = (textt.split(None)[1]).lower()
