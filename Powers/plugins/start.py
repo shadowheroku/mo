@@ -71,10 +71,8 @@ async def close_admin_callback(_, q: CallbackQuery):
     user_status = (await q.message.chat.get_member(user_id)).status
     if user_status not in {CMS.OWNER, CMS.ADMINISTRATOR}:
         await q.answer("ʏᴏᴜ'ʀᴇ ɴᴏᴛ ᴇᴠᴇɴ ᴀɴ ᴀᴅᴍɪɴ, ᴅᴏɴ'ᴛ ᴛʀʏ ᴛʜɪs ᴇxᴘʟᴏsɪᴠᴇ sʜɪᴛ!", show_alert=True)
-        return
     if user_status != CMS.OWNER:
         await q.answer("ʏᴏᴜ'ʀᴇ ᴊᴜsᴛ ᴀɴ ᴀᴅᴍɪɴ, ɴᴏᴛ ᴏᴡɴᴇʀ\nsᴛᴀʏ ɪɴ ʏᴏᴜʀ ʟɪᴍɪᴛs!", show_alert=True)
-        return
     await q.message.edit_text("ᴄʟᴏsᴇᴅ!")
     await q.answer("ᴄʟᴏsᴇᴅ ᴍᴇɴᴜ!", show_alert=True)
 
@@ -209,7 +207,7 @@ async def start_back(c: Gojo, q: CallbackQuery):
     try:
         cpt = f"""
 ʜᴇʏ [{q.from_user.first_name}](http://t.me/{q.from_user.username})! ɪ ᴀᴍ {c.me.first_name} ✨.
-ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
+ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴜᴏ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
 ʜɪᴛ /help ᴛᴏ ғɪɴᴅ ᴏᴜᴛ ᴍᴏʀᴇ ᴀʙᴏᴜᴛ ʜᴏᴡ ᴛᴏ ᴜsᴇ ᴍᴇ ɪɴ ᴍʏ ғᴜʟʟ ᴘᴏᴛᴇɴᴛɪᴀʟ!
 
 ᴊᴏɪɴ ᴍʏ [ɴᴇᴡs ᴄʜᴀɴɴᴇʟ](http://t.me/shadowbotshq) ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴜɴ ᴏɴ ᴀʟʟ ᴛʜᴇ ʟᴀᴛᴇsᴛ ᴜᴘᴅᴀᴛᴇs."""
@@ -249,6 +247,7 @@ async def commands_menu(c: Gojo, q: CallbackQuery):
 # ─── Help ───
 @Gojo.on_message(command("help"))
 async def help_menu(c: Gojo, m: Message):
+    # No loading animation for help command in any chat type
     if len(m.text.split()) >= 2:
         textt = m.text.replace(" ", "_").replace("_", " ", 1)
         help_option = (textt.split(None)[1]).lower()
