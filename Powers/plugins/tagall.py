@@ -44,7 +44,10 @@ async def tag_all_members(c: Gojo, m: Message):
         batch_size = 5
         member_batches = [members[i:i + batch_size] for i in range(0, len(members), batch_size)]
         
-        # Send initial message with first batch
+        # Delete the processing message first
+        await processing_msg.delete()
+        
+        # Send first batch as a new message
         first_batch = member_batches[0]
         tag_text = f"**📢 Mentioning all members**\n\n"
         if query:
@@ -53,8 +56,13 @@ async def tag_all_members(c: Gojo, m: Message):
         for user in first_batch:
             tag_text += f"• [{user.first_name}](tg://user?id={user.id})\n"
         
-        # Edit the processing message with the first batch
-        await processing_msg.edit_text(tag_text, disable_web_page_preview=True)
+        # Send first batch as new message
+        await c.send_message(
+            m.chat.id,
+            tag_text,
+            disable_web_page_preview=True,
+            reply_to_message_id=m.id
+        )
         
         # Send remaining batches as new messages
         for batch in member_batches[1:]:
@@ -65,12 +73,16 @@ async def tag_all_members(c: Gojo, m: Message):
             await c.send_message(
                 m.chat.id,
                 batch_text,
-                disable_web_page_preview=True,
-                reply_to_message_id=m.id
+                disable_web_page_preview=True
             )
             await asyncio.sleep(1.5)  # Avoid rate limits
         
-        await processing_msg.edit_text("✅ All members tagged successfully!")
+        # Send completion message
+        await c.send_message(
+            m.chat.id,
+            "✅ All members tagged successfully!",
+            reply_to_message_id=m.id
+        )
         
     except Exception as e:
         await m.reply_text(f"⚠️ An unexpected error occurred: {str(e)}")
