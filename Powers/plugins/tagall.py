@@ -20,10 +20,16 @@ async def tag_all_members(c: Gojo, m: Message):
         except Exception as e:
             return await m.reply_text(f"⚠️ Failed to check your permissions: {e}")
         
+        # Check if message is a reply or has text
+        if not m.reply_to_message and len(m.command) == 1:
+            return await m.reply_text("𝖱𝖾𝗉𝗅𝗒 𝗍𝗈 𝖺 𝗆𝖾𝗌𝗌𝖺𝗀𝖾 𝗈𝗋 𝗉𝗋𝗈𝗏𝗂𝖽𝖾 𝗍𝖾𝗑𝗍 𝗍𝗈 𝗆𝖾𝗇𝗍𝗂𝗈𝗇 𝗈𝗍𝗁𝖾𝗋𝗌!")
+        
         # Extract query if provided
         query = ""
         if len(m.command) > 1:
             query = " ".join(m.command[1:])
+        elif m.reply_to_message:
+            query = m.reply_to_message.text or m.reply_to_message.caption or ""
         
         # Send initial processing message
         processing_msg = await m.reply_text("🔄 Tagging all members...")
@@ -57,14 +63,14 @@ async def tag_all_members(c: Gojo, m: Message):
             tag_text += f"• [{user.first_name}](tg://user?id={user.id})\n"
         
         # Send first batch as new message
-        await c.send_message(
+        first_msg = await c.send_message(
             m.chat.id,
             tag_text,
             disable_web_page_preview=True,
-            reply_to_message_id=m.id
+            reply_to_message_id=m.reply_to_message.message_id if m.reply_to_message else m.id
         )
         
-        # Send remaining batches as new messages
+        # Send remaining batches as new messages with 1.5 second gap
         for batch in member_batches[1:]:
             batch_text = ""
             for user in batch:
@@ -75,13 +81,13 @@ async def tag_all_members(c: Gojo, m: Message):
                 batch_text,
                 disable_web_page_preview=True
             )
-            await asyncio.sleep(1.5)  # Avoid rate limits
+            await asyncio.sleep(1.5)  # 1.5 second gap between batches
         
         # Send completion message
         await c.send_message(
             m.chat.id,
             "✅ All members tagged successfully!",
-            reply_to_message_id=m.id
+            reply_to_message_id=first_msg.id
         )
         
     except Exception as e:
@@ -90,20 +96,21 @@ async def tag_all_members(c: Gojo, m: Message):
 __PLUGIN__ = "ᴛᴀɢᴀʟʟ"
 
 __HELP__ = """
-**👥 ᴀᴅᴠᴀɴᴄᴇᴅ ᴍᴇᴍʙᴇʀ ᴛᴀɢɢᴇʀ**
+**👥 ᴀᴅᴠᴀɴᴄᴇᴅ ᴍᴇᴍʙ𝖾𝗋 𝗍𝖺𝗀𝗀𝖾𝗋**
 
-`/tagall` - ᴛᴀɢs ᴀʟʟ ᴍᴇᴍʙᴇʀs ɪɴ ʙᴀᴛᴄʜᴇs
-• 5 ᴍᴇɴᴛɪᴏɴs ᴘᴇʀ ᴍᴇssᴀɢᴇ
-• 1.5 sᴇᴄᴏɴᴅ ᴅᴇʟᴀʏ ʙᴇᴛᴡᴇᴇɴ ʙᴀᴛᴄʜᴇs
-• ʙᴜʟʟᴇᴛ ᴘᴏɪɴᴛ ғᴏʀᴍᴀᴛᴛɪɴɢ
-• sᴜᴘᴘᴏʀᴛs ᴀᴅᴅɪɴɢ ᴀ ᴍᴇssᴀɢᴇ ᴀғᴛᴇʀ ᴄᴏᴍᴍᴀɴᴅ
+`/tagall` - 𝗍𝖺𝗀𝗌 𝖺𝗅𝗅 𝗆𝖾𝗆𝖻𝖾𝗋𝗌 𝗂𝗇 𝖻𝖺𝗍𝖼𝗁𝖾𝗌
+• 5 𝗆𝖾𝗇𝗍𝗂𝗈𝗇𝗌 𝗉𝖾𝗋 𝗆𝖾𝗌𝗌𝖺𝗀𝖾
+• 1.5 𝗌𝖾𝖼𝗈𝗇𝖽 𝖽𝖾𝗅𝖺𝗒 𝖻𝖾𝗍𝗐𝖾𝖾𝗇 𝖻𝖺𝗍𝖼𝗁𝖾𝗌
+• 𝖻𝗎𝗅𝗅𝖾𝗍 𝗉𝗈𝗂𝗇𝗍 𝖿𝗈𝗋𝗆𝖺𝗍𝗍𝗂𝗇𝗀
+• 𝗌𝗎𝗉𝗉𝗈𝗋𝗍𝗌 𝖺𝖽𝖽𝗂𝗇𝗀 𝖺 𝗆𝖾𝗌𝗌𝖺𝗀𝖾 𝖺𝖿𝗍𝖾𝗋 𝖼𝗈𝗆𝗆𝖺𝗇𝖽
 
-**ʀᴇǫᴜɪʀᴇᴍᴇɴᴛs:**
-- ᴍᴜsᴛ ʙᴇ ᴜsᴇᴅ ɪɴ ɢʀᴏᴜᴘs/sᴜᴘᴇʀɢʀᴏᴜᴘs
-- ᴜsᴇʀ ᴍᴜsᴛ ʙᴇ ᴀɴ ᴀᴅᴍɪɴ
-- ɢʀᴏᴜᴘ ᴍᴜsᴛ ʜᴀᴠᴇ ᴍᴇᴍʙᴇʀs
+**𝗋𝖾𝗊𝗎𝗂𝗋𝖾𝗆𝖾𝗇𝗍𝗌:**
+- 𝗆𝗎𝗌𝗍 𝖻𝖾 𝗎𝗌𝖾𝖽 𝗂𝗇 𝗀𝗋𝗈𝗎𝗉𝗌/𝗌𝗎𝗉𝖾𝗋𝗀𝗋𝗈𝗎𝗉𝗌
+- 𝗎𝗌𝖾𝗋 𝗆𝗎𝗌𝗍 𝖻𝖾 𝖺𝗇 𝖺𝖽𝗆𝗂𝗇
+- 𝗀𝗋𝗈𝗎𝗉 𝗆𝗎𝗌𝗍 𝗁𝖺𝗏𝖾 𝗆𝖾𝗆𝖻𝖾𝗋𝗌
 
-**ᴜsᴀɢᴇ:**
-`/tagall` - ᴛᴀɢ ᴀʟʟ ᴍᴇᴍʙᴇʀs
-`/tagall Hello everyone!` - ᴛᴀɢ ᴀʟʟ ᴡɪᴛʜ ᴍᴇssᴀɢᴇ
+**𝗎𝗌𝖺𝗀𝖾:**
+`/tagall` - 𝗍𝖺𝗀 𝖺𝗅𝗅 𝗆𝖾𝗆𝖻𝖾𝗋𝗌 (𝗐𝗂𝗅𝗅 𝗌𝗁𝗈𝗐 𝗐𝖺𝗋𝗇𝗂𝗇𝗀)
+`/tagall Hello everyone!` - 𝗍𝖺𝗀 𝖺𝗅𝗅 𝗐𝗂𝗍𝗁 𝗆𝖾𝗌𝗌𝖺𝗀𝖾
+𝖱𝖾𝗉𝗅𝗒 𝗍𝗈 𝖺 𝗆𝖾𝗌𝗌𝖺𝗀𝖾 𝗐𝗂𝗍𝗁 `/tagall` - 𝗍𝖺𝗀 𝖺𝗅𝗅 𝗐𝗂𝗍𝗁 𝗋𝖾𝗉𝗅𝗂𝖾𝖽 𝗆𝖾𝗌𝗌𝖺𝗀𝖾
 """
