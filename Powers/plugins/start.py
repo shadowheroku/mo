@@ -77,10 +77,38 @@ async def close_admin_callback(_, q: CallbackQuery):
     await q.answer("ᴄʟᴏsᴇᴅ ᴍᴇɴᴜ!", show_alert=True)
 
 
+async def send_loading_animation(m: Message):
+    """
+    Display a fire emoji, then a loading animation in a new bot message,
+    and finally show a 'Done' checkmark.
+    """
+    # Step 1: Send fire emoji
+    fire_msg = await m.reply_text("⚡", quote=True)
+    await asyncio.sleep(1.5)
+    await fire_msg.delete()
+
+    # Step 2: Send a new message for loading animation
+    loading_msg = await m.reply_text("ʟᴏᴀᴅɪɴɢ", quote=True)
+
+    # Step 3: Edit the bot's own message
+    for _ in range(1):  # Repeat 3 cycles
+        for dots in range(1, 4):  # 1 to 3 dots
+            await loading_msg.edit_text(f"ʟᴏᴀᴅɪɴɢ{'.' * dots}")
+            await asyncio.sleep(0.8)
+
+    # Step 4: Final confirmation
+    await loading_msg.edit_text(" ᴍᴏɴɪᴄ sᴛᴀʀᴛᴇᴅ !")
+    await asyncio.sleep(1)
+    await loading_msg.delete()
+
+
 # ─── Start ───
 @Gojo.on_message(command("start") & (filters.group | filters.private))
 async def start(c: Gojo, m: Message):
     if m.chat.type == ChatType.PRIVATE:
+        # Send loading animation only for private chats
+        await send_loading_animation(m)
+        
         if len(m.text.strip().split()) > 1:
             arg = m.text.split(None, 1)[1]
             help_option = arg.lower()
@@ -151,7 +179,7 @@ async def start(c: Gojo, m: Message):
 ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
 ʜɪᴛ /help ᴛᴏ ғɪɴᴅ ᴏᴜᴛ ᴍᴏʀᴇ ᴀʙᴏᴜᴛ ʜᴏᴡ ᴛᴏ ᴜsᴇ ᴍᴇ ɪɴ ᴍʏ ғᴜʟʟ ᴘᴏᴛᴇɴᴛɪᴀʟ!
 
-ᴊᴏɪɴ ᴍʏ [ɴᴇᴡs ᴄʜᴀɴɴᴇʟ](http://t.me/shadowbotshq) ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ᴏɴ ᴀʟʟ ᴛʜᴇ ʟᴀᴛᴇsᴛ ᴜᴘᴅᴀᴛᴇs."""
+ᴊᴏɪɴ ᴍʏ [ɴᴇᴡs ᴄʜᴀɴɴᴇʟ](http://t.me/shadowbotshq) ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ᴏɴ ᴀʟʙ ᴛʜᴇ ʟᴀᴛᴇsᴛ ᴜᴘᴅᴀᴛᴇs."""
             await m.reply_video(
                 video=CATBOX_VIDEO_URL,
                 caption=cpt,
@@ -161,7 +189,7 @@ async def start(c: Gojo, m: Message):
         except UserIsBlocked:
             LOGGER.warning(f"ʙᴏᴛ ʙʟᴏᴄᴋᴇᴅ ʙʏ {m.from_user.id}")
     else:
-        # For groups
+        # For groups, no loading animation
         kb = InlineKeyboardMarkup(
             [[InlineKeyboardButton("ᴄᴏɴɴᴇᴄᴛ ᴍᴇ ᴛᴏ ᴘᴍ", url=f"https://{c.me.username}.t.me/")]]
         )
