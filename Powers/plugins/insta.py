@@ -81,7 +81,7 @@ async def instagram_downloader(c, m):
                     pass
 
 # Metadata
-__PLUGIN__ = "Instagram Downloader"
+__PLUGIN__ = "ɪɴsᴛᴀɢʀᴀᴍ"
 
 __HELP__ = """
 📸 ᴅᴏᴡɴʟᴏᴀᴅ ʀᴇᴇʟs/ᴠɪᴅᴇᴏs ғʀᴏᴍ ɪɴsᴛᴀɢʀᴀᴍ:
