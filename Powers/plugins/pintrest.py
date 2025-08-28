@@ -103,7 +103,7 @@ async def pinterest_downloader(c, m):
                     pass
 
 # Metadata
-__PLUGIN__ = "Pinterest"
+__PLUGIN__ = "ᴘɪɴᴛᴇʀᴇsᴛ"
 
 __HELP__ = """
 🎥 ᴅᴏᴡɴʟᴏᴀᴅ ᴠɪᴅᴇᴏs ғʀᴏᴍ ᴘɪɴᴛᴇʀᴇsᴛ:
