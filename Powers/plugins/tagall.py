@@ -6,6 +6,10 @@ from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
 
+# Dictionary to track running tag tasks {chat_id: bool}
+tagging_tasks = {}
+
+
 # Handler for both `/tagall` and `@all`
 @Gojo.on_message(command("tagall") | filters.regex(r"^@all(\s+.*)?$"))
 async def tag_all_members(c: Gojo, m: Message):
@@ -23,6 +27,12 @@ async def tag_all_members(c: Gojo, m: Message):
         except Exception as e:
             return await m.reply_text(f"⚠️ Failed to check your permissions: {e}")
 
+        # Prevent multiple tag sessions in same chat
+        if tagging_tasks.get(m.chat.id):
+            return await m.reply_text("⚠️ A tagging session is already running here! Use /cancel to stop it.")
+
+        tagging_tasks[m.chat.id] = True  # Mark task as active
+
         # Extract query / reply mode
         query = ""
         reply_mode = False
@@ -39,6 +49,7 @@ async def tag_all_members(c: Gojo, m: Message):
 
         # If nothing provided
         if not query and not reply_mode:
+            tagging_tasks[m.chat.id] = False
             return await m.reply_text("ℹ️ Provide text or reply to a message to mention everyone!")
 
         # Send initial processing message
@@ -51,9 +62,11 @@ async def tag_all_members(c: Gojo, m: Message):
                 if not member.user.is_bot and not member.user.is_deleted:
                     members.append(member.user)
         except Exception as e:
+            tagging_tasks[m.chat.id] = False
             return await processing_msg.edit_text(f"⚠️ Failed to fetch members: {e}")
 
         if not members:
+            tagging_tasks[m.chat.id] = False
             return await processing_msg.edit_text("❌ No members available to tag!")
 
         # Create batches of 5 members
@@ -68,6 +81,11 @@ async def tag_all_members(c: Gojo, m: Message):
         first_msg = None
 
         for idx, batch in enumerate(member_batches, start=1):
+            # Check if cancelled
+            if not tagging_tasks.get(m.chat.id):
+                await c.send_message(m.chat.id, "⏹️ Tagging cancelled by admin.")
+                return
+
             batch_text = f"📢 **Tagging Members ({done + 1}–{done + len(batch)}/{total})**\n\n"
 
             if query:
@@ -92,15 +110,29 @@ async def tag_all_members(c: Gojo, m: Message):
             await asyncio.sleep(1.5)
 
         # Completion message
-        if first_msg:
+        if first_msg and tagging_tasks.get(m.chat.id):
             await c.send_message(
                 m.chat.id,
                 f"✅ All {total} members tagged successfully!",
                 reply_to_message_id=first_msg.id if not reply_mode else m.reply_to_message.id
             )
 
+        tagging_tasks[m.chat.id] = False  # Mark task as finished
+
     except Exception as e:
+        tagging_tasks[m.chat.id] = False
         await m.reply_text(f"⚠️ An unexpected error occurred: {str(e)}")
+
+
+# Cancel handler
+@Gojo.on_message(command("cancel"))
+async def cancel_tagging(c: Gojo, m: Message):
+    """Cancel ongoing tagall in the chat"""
+    if not tagging_tasks.get(m.chat.id):
+        return await m.reply_text("ℹ️ No tagging session is currently running here.")
+
+    tagging_tasks[m.chat.id] = False
+    await m.reply_text("⏹️ Tagging process has been cancelled!")
 
 
 __PLUGIN__ = "ᴛᴀɢᴀʟʟ"
@@ -110,9 +142,10 @@ __HELP__ = """
 
 Works with both `/tagall` and `@all`
 
-- `/tagall <text>` → tags all with text in every batch
-- `@all <text>` → same as above
-- Reply to a message with `/tagall` or `@all` → tags all while replying to that message
+- `/tagall <text>` → tags all with text in every batch  
+- `@all <text>` → same as above  
+- Reply to a message with `/tagall` or `@all` → tags all while replying to that message  
+- `/cancel` or `@cancel` → stop ongoing tagging session  
 
 **Features:**
 • 5 mentions per message  
@@ -120,8 +153,9 @@ Works with both `/tagall` and `@all`
 • Bullet point formatting  
 • Custom text shown in every batch  
 • Reply mode replies to same message every time  
+• Cancel tagging anytime with `/cancel`  
 
 **Requirements:**
-- Must be used in groups/supergroups
-- User must be an admin
+- Must be used in groups/supergroups  
+- User must be an admin  
 """
