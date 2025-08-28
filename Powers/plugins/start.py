@@ -79,12 +79,6 @@ async def close_admin_callback(_, q: CallbackQuery):
     await q.answer("ᴄʟᴏsᴇᴅ ᴍᴇɴᴜ!", show_alert=True)
 
 
-import asyncio
-from pyrogram.types import Message
-
-import asyncio
-from pyrogram.types import Message
-
 async def send_loading_animation(m: Message):
     """
     Display a fire emoji, then a loading animation in a new bot message,
@@ -110,7 +104,6 @@ async def send_loading_animation(m: Message):
     await loading_msg.delete()
 
 
-
 # ─── Start ───
 @Gojo.on_message(command("start") & (filters.group | filters.private))
 async def start(c: Gojo, m: Message):
@@ -132,7 +125,8 @@ async def start(c: Gojo, m: Message):
 
             # Handle help pagination in private chat
             if help_option == "help":
-                modules = sorted(list(HELP_COMMANDS.keys()))
+                # Sort modules alphabetically by their name (the part after "plugins.")
+                modules = sorted(list(HELP_COMMANDS.keys()), key=lambda x: x.split(".")[-1])
                 buttons = [
                     InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}")
                     for x in modules
@@ -187,7 +181,7 @@ async def start(c: Gojo, m: Message):
 ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
 ʜɪᴛ /help ᴛᴏ ғɪɴᴅ ᴏᴜᴛ ᴍᴏʀᴇ ᴀʙᴏᴜᴛ ʜᴏᴡ ᴛᴏ ᴜsᴇ ᴍᴇ ɪɴ ᴍʏ ғᴜʟʟ ᴘᴏᴛᴇɴᴛɪᴀʟ!
 
-ᴊᴏɪɴ ᴍʏ [ɴᴇᴡs ᴄʜᴀɴɴᴇʟ](http://t.me/shadowbotshq) ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ᴏɴ ᴀʟʟ ᴛʜᴇ ʟᴀᴛᴇsᴛ ᴜᴘᴅᴀᴛᴇs."""
+ᴊᴏɪɴ ᴍʏ [ɴᴇᴡs ᴄʜᴀɴɴᴇʟ](http://t.me/shadowbotshq) ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ᴏɴ ᴀʟʙ ᴛʜᴇ ʟᴀᴛᴇsᴛ ᴜᴘᴅᴀᴛᴇs."""
             await m.reply_video(
                 video=CATBOX_VIDEO_URL,
                 caption=cpt,
@@ -218,7 +212,7 @@ async def start_back(c: Gojo, q: CallbackQuery):
 ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
 ʜɪᴛ /help ᴛᴏ ғɪɴᴅ ᴏᴜᴛ ᴍᴏʀᴇ ᴀʙᴏᴜᴛ ʜᴏᴡ ᴛᴏ ᴜsᴇ ᴍᴇ ɪɴ ᴍʏ ғᴜʟʟ ᴘᴏᴛᴇɴᴛɪᴀʟ!
 
-ᴊᴏɪɴ ᴍʏ [ɴᴇᴡs ᴄʜᴀɴɴᴇʟ](http://t.me/shadowbotshq) ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ᴏɴ ᴀʟʟ ᴛʜᴇ ʟᴀᴛᴇsᴛ ᴜᴘᴅᴀᴛᴇs."""
+ᴊᴏɪɴ ᴍʏ [ɴᴇᴡs ᴄʜᴀɴɴᴇʟ](http://t.me/shadowbotshq) ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴜɴ ᴏɴ ᴀʟʟ ᴛʜᴇ ʟᴀᴛᴇsᴛ ᴜᴘᴅᴀᴛᴇs."""
         await q.edit_message_caption(caption=cpt, reply_markup=(await gen_start_kb(q.message)))
     except MessageNotModified:
         pass
@@ -228,7 +222,8 @@ async def start_back(c: Gojo, q: CallbackQuery):
 # ─── Commands ───
 @Gojo.on_callback_query(filters.regex("^commands$"))
 async def commands_menu(c: Gojo, q: CallbackQuery):
-    modules = sorted(list(HELP_COMMANDS.keys()))
+    # Sort modules alphabetically by their name (the part after "plugins.")
+    modules = sorted(list(HELP_COMMANDS.keys()), key=lambda x: x.split(".")[-1])
     buttons = [
         InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}")
         for x in modules
@@ -287,7 +282,8 @@ async def help_menu(c: Gojo, m: Message):
             )
     else:
         if m.chat.type == ChatType.PRIVATE:
-            modules = sorted(list(HELP_COMMANDS.keys()))
+            # Sort modules alphabetically by their name (the part after "plugins.")
+            modules = sorted(list(HELP_COMMANDS.keys()), key=lambda x: x.split(".")[-1])
             buttons = [
                 InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}")
                 for x in modules
@@ -298,7 +294,7 @@ async def help_menu(c: Gojo, m: Message):
 ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
 
 ᴀᴠᴀɪʟᴀʙʟᴇ ᴍᴏᴅᴜʟᴇs:
-ᴄʜᴏᴏsᴇ ᴀ ᴍᴏᴑᴜʟᴇ ғʀᴏᴍ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴅᴇᴛᴀɪʟᴇᴅ ʜᴇʟᴘ."""
+ᴄʜᴏᴏsᴇ ᴀ ᴍᴏᴅᴜʟᴇ ғʀᴏᴍ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴅᴇᴛᴀɪʟᴇᴅ ʜᴇʟᴘ."""
             await m.reply_video(video=CATBOX_VIDEO_URL, caption=msg, reply_markup=keyboard)
         else:
             # In groups, redirect to the paginated help menu
@@ -315,7 +311,8 @@ async def help_menu(c: Gojo, m: Message):
 @Gojo.on_callback_query(filters.regex(r"^help_page_[0-9]+$"))
 async def paginate_help(c: Gojo, q: CallbackQuery):
     page = int(q.data.split("_")[-1])
-    modules = sorted(list(HELP_COMMANDS.keys()))
+    # Sort modules alphabetically by their name (the part after "plugins.")
+    modules = sorted(list(HELP_COMMANDS.keys()), key=lambda x: x.split(".")[-1])
     buttons = [InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}") for x in modules]
     keyboard = paginate_buttons(buttons, page=page)
     await q.edit_message_reply_markup(reply_markup=keyboard)
@@ -371,7 +368,7 @@ async def give_bot_staffs(c: Gojo, q: CallbackQuery):
         reply += f"<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴍᴍᴀɴᴅᴇʀ:</b> {(await mention_html(owner_name, OWNER_ID))} (<code>{OWNER_ID}</code>)\n"
     except RPCError as e:
         LOGGER.error(f"Error getting owner info: {e}")
-        reply += f"<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴍᴍᴀɴᴅᴇʀ:</b> <code>{OWNER_ID}</code>\n"
+        reply += f"<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴜᴍᴍᴀɴᴅᴇʀ:</b> <code>{OWNER_ID}</code>\n"
 
     # Developers information (excluding owner)
     true_dev = get_support_staff("dev")
