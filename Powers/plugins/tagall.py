@@ -1,5 +1,6 @@
 import asyncio
 from pyrogram.types import Message
+from pyrogram.enums import ChatType
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
@@ -7,15 +8,10 @@ from Powers.utils.custom_filters import command
 async def tag_all_members(c: Gojo, m: Message):
     """Mention all members in batches of 5 every 1.5 seconds"""
     try:
-        # Debug: Check what chat type we're getting
-        print(f"Chat type: {m.chat.type}")
-        print(f"Chat title: {m.chat.title}")
-        
         # Check if the command is used in a group
-        if m.chat.type not in ("group", "supergroup"):
+        if m.chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
             return await m.reply_text(f"❌ This command only works in groups! (Current type: {m.chat.type})")
         
-        # Rest of the code remains the same...
         # Check if the bot has permission to mention users
         try:
             bot_member = await m.chat.get_member((await c.get_me()).id)
@@ -66,6 +62,7 @@ async def tag_all_members(c: Gojo, m: Message):
         
     except Exception as e:
         await m.reply_text(f"⚠️ An unexpected error occurred: {str(e)}")
+
 __PLUGIN__ = "ᴛᴀɢᴀʟʟ"
 
 __HELP__ = """
