@@ -1,6 +1,6 @@
 import asyncio
 from pyrogram.types import Message
-from pyrogram.enums import ChatType
+from pyrogram.enums import ChatType, ChatMemberStatus
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
@@ -10,12 +10,12 @@ async def tag_all_members(c: Gojo, m: Message):
     try:
         # Check if the command is used in a group
         if m.chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
-            return await m.reply_text(f"❌ This command only works in groups! (Current type: {m.chat.type})")
+            return await m.reply_text(f"❌ This command only works in groups! (Current type: {m.chat.type}")
         
         # Check if user is admin
         try:
             user = await m.chat.get_member(m.from_user.id)
-            if user.status not in ["administrator", "creator"]:
+            if user.status not in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]:
                 return await m.reply_text("❌ You need to be an admin to use this command.")
         except Exception as e:
             return await m.reply_text(f"⚠️ Failed to check your permissions: {e}")
