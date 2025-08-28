@@ -1,13 +1,23 @@
 import os
-from asyncio import sleep
+import asyncio
 from datetime import datetime
 from traceback import format_exc
 
 from pyrogram import enums
-from pyrogram.errors import EntityBoundsInvalid, MediaCaptionTooLong, RPCError
+from pyrogram.errors import (
+    EntityBoundsInvalid, 
+    MediaCaptionTooLong, 
+    RPCError,
+    PeerIdInvalid,
+    UsernameInvalid,
+    UsernameNotOccupied,
+    ChannelInvalid,
+    ChatAdminRequired,
+    FloodWait
+)
 from pyrogram.raw.functions.channels import GetFullChannel
 from pyrogram.raw.functions.users import GetFullUser
-from pyrogram.raw.types import Channel, UserFull, users
+from pyrogram.raw.types import Channel, UserFull
 from pyrogram.types import Message
 
 from Powers import BDB_URI, LOGGER, OWNER_ID
@@ -23,386 +33,351 @@ gban_db = GBan()
 if BDB_URI:
     from Powers.plugins import bday_info
 
-async def count(c: Gojo, chat):
+async def count(c: Gojo, chat_id):
+    """Count admins, bots, and banned members in a chat"""
     try:
-        administrator = []
+        # Get administrators
+        administrators = []
         async for admin in c.get_chat_members(
-                chat_id=chat, filter=enums.ChatMembersFilter.ADMINISTRATORS
+            chat_id=chat_id, 
+            filter=enums.ChatMembersFilter.ADMINISTRATORS
         ):
-            administrator.append(admin)
-        total_admin = administrator
-        bot = []
-        async for tbot in c.get_chat_members(
-                chat_id=chat, filter=enums.ChatMembersFilter.BOTS
+            administrators.append(admin)
+        
+        # Get bots
+        bots = []
+        async for bot in c.get_chat_members(
+            chat_id=chat_id, 
+            filter=enums.ChatMembersFilter.BOTS
         ):
-            bot.append(tbot)
+            bots.append(bot)
 
-        total_bot = bot
-        bot_admin = 0
-        ban = []
-        async for banned in c.get_chat_members(
-                chat, filter=enums.ChatMembersFilter.BANNED
+        # Get banned members
+        banned = []
+        async for banned_member in c.get_chat_members(
+            chat_id, 
+            filter=enums.ChatMembersFilter.BANNED
         ):
-            ban.append(banned)
+            banned.append(banned_member)
 
-        total_banned = ban
-        for x in total_admin:
-            for y in total_bot:
-                if x == y:
-                    bot_admin += 1
-        total_admin = len(total_admin)
-        total_bot = len(total_bot)
-        total_banned = len(total_banned)
-        return total_bot, total_admin, bot_admin, total_banned
-    except Exception as e:
-        total_bot = total_admin = bot_admin = total_banned = "`Can't fetch because I am not part of the chat.`"
+        # Count bot admins
+        bot_admin_count = 0
+        admin_ids = {admin.user.id for admin in administrators}
+        for bot in bots:
+            if bot.user.id in admin_ids:
+                bot_admin_count += 1
 
-    return total_bot, total_admin, bot_admin, total_banned
-
-
-async def user_info(c: Gojo, user, already=False):
-    user_all: users.UserFull = await c.invoke(
-        GetFullUser(
-            id=await c.resolve_peer(user)
-        )
-    )
-    user = await c.get_users(user)
-    full_user: UserFull = user_all.full_user
-    channel: Channel = user_all.chats
-    if user.is_deleted:
-        return "Deleted account", None
-
+        return len(bots), len(administrators), bot_admin_count, len(banned)
     
-    gbanned, reason_gban = gban_db.get_gban(user.id)
-    if gbanned:
-        gban = True
-        reason = reason_gban
-    else:
-        gban = False
-        reason = "User is not gbanned"
+    except (PeerIdInvalid, ChannelInvalid, ChatAdminRequired):
+        return "Not in chat", "Not in chat", "Not in chat", "Not in chat"
+    except FloodWait as e:
+        await asyncio.sleep(e.value)
+        return await count(c, chat_id)
+    except Exception as e:
+        LOGGER.error(f"Error counting chat members: {e}")
+        return "Error", "Error", "Error", "Error"
 
-    user_id = user.id
-    about = full_user.about
-    SUPPORT_STAFF = get_support_staff()
-    username = user.username
-    full_name = user.full_name
-    dc_id = user.dc_id
-    is_verified = user.is_verified
-    mention = user.mention
-    dob = False
-    if dob := full_user.birthday:
-        dob = datetime(int(dob.year), int(dob.month), int(dob.day)).strftime("%d %B %Y")
-    else:
-        if BDB_URI:  
-            try:      
-                if result := bday_info.find_one({"user_id": user}):
+
+async def user_info(c: Gojo, user_id, already=False):
+    """Get comprehensive information about a user"""
+    try:
+        # Get user full information
+        user_all = await c.invoke(GetFullUser(id=await c.resolve_peer(user_id)))
+        user = await c.get_users(user_id)
+        
+        if user.is_deleted:
+            return "❌ **Deleted Account**\nThis user has deleted their account.", None
+
+        full_user = user_all.full_user
+        
+        # Check if user is GBanned
+        gbanned, reason_gban = gban_db.get_gban(user.id)
+        
+        # Get support staff information
+        SUPPORT_STAFF = get_support_staff()
+        
+        # Process birthday information
+        dob = None
+        if full_user.birthday:
+            dob = datetime(
+                int(full_user.birthday.year), 
+                int(full_user.birthday.month), 
+                int(full_user.birthday.day)
+            ).strftime("%d %B %Y")
+        elif BDB_URI:
+            try:
+                if result := bday_info.find_one({"user_id": user_id}):
                     u_dob = datetime.strptime(result["dob"], "%d/%m/%Y")
                     day = u_dob.day
                     formatted = u_dob.strftime("%B %Y")
                     suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
                     dob = f"{day}{suffix} {formatted}"
-            except:
-                pass
-
-    is_restricted = user.is_restricted
-    photo_id = user.photo.big_file_id if user.photo else None
-    is_support = user_id in SUPPORT_STAFF
-    if user_id == c.me.id:
-        is_support = "A person is a great support to himself"
-    omp = "Hmmm.......Who is that again?"
-    if is_support or c.me.id:
-        if user_id in get_support_staff("dev"):
-            omp = "Dev"
-        elif user_id in get_support_staff("sudo"):
-            omp = "Sudoer"
-        elif user_id in get_support_staff("whitelist"):
-            omp = "Whitelist"
-        elif user_id == c.me.id:
-            omp = "I am the targeted user"
-        elif user_id == OWNER_ID:
-            omp = "Owner of the bot"
-        if user_id in get_support_staff("dev") and user_id == OWNER_ID:
-            omp = "Dev and Owner"
-
-    is_scam = user.is_scam
-    is_bot = user.is_bot
-    is_fake = user.is_fake
-    status = user.status
-    last_date = "Unable to fetch"
-    if is_bot is True:
-        last_date = "Targeted user is a bot"
-    if status == enums.UserStatus.RECENTLY:
-        last_date = "User was seen recently"
-    if status == enums.UserStatus.LAST_WEEK:
-        last_date = "User was seen last week"
-    if status == enums.UserStatus.LAST_MONTH:
-        last_date = "User was seen last month"
-    if status == enums.UserStatus.LONG_AGO:
-        last_date = "User was seen long ago or may be I am blocked by the user  :("
-    if status == enums.UserStatus.ONLINE:
-        last_date = "User is online"
-    if status == enums.UserStatus.OFFLINE:
-        try:
-            last_date = datetime.fromtimestamp(user.status.date).strftime("%Y-%m-%d %H:%M:%S")
-        except Exception:
-            last_date = "User is offline"
-
-    caption = f"""
-<b><i><u>⚡️ Extracted User info From Telegram ⚡️</b></i></u>
-
-<b>🆔 User ID</b>: <code>{user_id}</code>
-<b>🫵 Mention</b>: {mention}
-<b>🗣 Full Name</b>: <code>{full_name}</code>
-<b>🔍 Username</b>: {("@" + username) if username else "NA"}
-<b>✍️ Bio</b>: `{about}`\n"""
-    if dob:
-        caption += f"<b>🎂 Birthday<b>: {dob}\n<b>🧑‍💻 Support</b>: {is_support}\n"
-    else:
-        caption += f"<b>🧑‍💻 Support</b>: {is_support}\n"
-    if is_support:
-        caption += f"<b>🥷 Support user type</b>: <code>{omp}</code>\n<b>💣 Gbanned</b>: {gban}\n"
-    else:
-        caption += f"<b>💣 Gbanned</b>: {gban}\n"
-
-    if gban:
-        caption += f"<b>☠️ Gban reason</b>: <code>{reason}</code>"
-    caption += f"""<b>🌐 DC ID</b>: {dc_id}
-<b>✋ RESTRICTED</b>: {is_restricted}
-<b>✅ VERIFIED</b>: {is_verified}
-<b>❌ FAKE</b> : {is_fake}
-<b>⚠️ SCAM</b> : {is_scam}
-<b>🤖 BOT</b>: {is_bot}
-<b>👀 Last seen</b>: <code>{last_date}</code>
-"""
-
-    return caption, photo_id
-
-
-async def chat_info(c: Gojo, chat, already=False):
-    u_name = False
-    if not already:
-        try:
-            chat = await c.get_chat(chat)
-            try:
-                chat_r = (await c.resolve_peer(chat.id))
-                ll = await c.invoke(
-                    GetFullChannel(
-                        channel=chat_r
-                    )
-                )
-                u_name = ll.chats[0].usernames
             except Exception:
                 pass
-        except Exception:
-            try:
-                chat_r = await c.resolve_peer(chat)
-                chat = await c.get_chat(chat_r.channel_id)
+
+        # Determine user role/type
+        user_role = "User"
+        if user_id == c.me.id:
+            user_role = "Bot"
+        elif user_id == OWNER_ID:
+            user_role = "Owner"
+        elif user_id in get_support_staff("dev"):
+            user_role = "Developer"
+        elif user_id in get_support_staff("sudo"):
+            user_role = "Sudo User"
+        elif user_id in get_support_staff("whitelist"):
+            user_role = "Whitelisted User"
+
+        # Get last seen status
+        last_seen = "Unknown"
+        if user.status:
+            if user.status == enums.UserStatus.RECENTLY:
+                last_seen = "Recently"
+            elif user.status == enums.UserStatus.LAST_WEEK:
+                last_seen = "Last Week"
+            elif user.status == enums.UserStatus.LAST_MONTH:
+                last_seen = "Last Month"
+            elif user.status == enums.UserStatus.LONG_AGO:
+                last_seen = "Long Ago"
+            elif user.status == enums.UserStatus.ONLINE:
+                last_seen = "Online"
+            elif user.status == enums.UserStatus.OFFLINE:
                 try:
-                    ll = await c.invoke(
-                        GetFullChannel(
-                            channel=chat_r
-                        )
-                    )
-                    u_name = ll.chats[0].usernames
+                    last_seen = datetime.fromtimestamp(user.status.date).strftime("%Y-%m-%d %H:%M:%S")
                 except Exception:
-                    pass
-            except KeyError as e:
-                caption = f"Failed to find the chat due to\n{e}"
-                return caption, None
-    chat_id = chat.id
-    username = " ".join([f"@{i}" for i in u_name]) if u_name else chat.username
-    total_bot, total_admin, total_bot_admin, total_banned = await count(c, chat.id)
-    title = chat.title
-    type_ = str(chat.type).split(".")[1]
-    is_scam = chat.is_scam
-    is_fake = chat.is_fake
-    description = chat.description
-    members = chat.members_count
-    is_restricted = chat.is_restricted
-    dc_id = chat.dc_id
-    photo_id = chat.photo.big_file_id if chat.photo else None
-    can_save = chat.has_protected_content
-    linked_chat = chat.linked_chat
+                    last_seen = "Offline"
 
-    caption = f"""
-🔰 <b>CHAT INFO</b> 🔰
+        # Build information caption
+        caption = f"""
+👤 **USER INFORMATION**
 
-<b>🆔 ID</b>: <code>{chat_id}</code>
-<b>🚀 Chat Title</b>: {title}
-<b>✨ Chat Type</b>: {type_}
-<b>🌐 DataCentre ID</b>: {dc_id}
-<b>🔍 Username</b>: {f"@{username}" if username else "NA"}
-<b>⚜️ Administrators</b>: {total_admin}
-<b>🤖 Bots</b>: {total_bot}
-<b>🚫 Banned</b>: {total_banned}
-<b>⚜️ Admin 🤖 Bots</b>: {total_bot_admin}
-<b>⁉️ Scam</b>: {is_scam}
-<b>❌ Fake</b>: {is_fake}
-<b>✋ Restricted</b>: {is_restricted}
-<b>👨🏿‍💻 Description</b>: <code>{description}</code>
-<b>👪 Total members</b>: {members}
-<b>🚫 Has Protected Content</b>: {can_save}
-<b>🔗 Linked Chat</b>: <code>{linked_chat.id if linked_chat else "Not Linked"}</code>
+**🆔 User ID:** `{user.id}`
+**👤 Mention:** {user.mention}
+**📛 Full Name:** `{user.first_name or 'No first name'} {user.last_name or ''}`.strip()
+**🔗 Username:** @{user.username if user.username else 'None'}
+**📝 Bio:** `{full_user.about or 'No bio available'}`
 
+**🎂 Birthday:** {dob or 'Not set'}
+**👥 Role:** {user_role}
+**🔒 GBanned:** {'Yes' if gbanned else 'No'}
 """
 
-    return caption, photo_id
+        if gbanned:
+            caption += f"**📋 GBan Reason:** `{reason_gban}`\n"
+
+        caption += f"""
+**🌐 DC ID:** {user.dc_id or 'Unknown'}
+**✅ Verified:** {'Yes' if user.is_verified else 'No'}
+**🚫 Restricted:** {'Yes' if user.is_restricted else 'No'}
+**⚠️ Scam:** {'Yes' if user.is_scam else 'No'}
+**❌ Fake:** {'Yes' if user.is_fake else 'No'}
+**🤖 Bot:** {'Yes' if user.is_bot else 'No'}
+**👀 Last Seen:** {last_seen}
+"""
+
+        return caption, user.photo.big_file_id if user.photo else None
+
+    except (PeerIdInvalid, UsernameInvalid, UsernameNotOccupied):
+        return "❌ **User Not Found**\nThe specified user could not be found.", None
+    except FloodWait as e:
+        await asyncio.sleep(e.value)
+        return await user_info(c, user_id, already)
+    except Exception as e:
+        LOGGER.error(f"Error getting user info: {e}")
+        return f"❌ **Error**\nFailed to fetch user information: {str(e)}", None
+
+
+async def chat_info(c: Gojo, chat_id, already=False):
+    """Get comprehensive information about a chat"""
+    try:
+        if not already:
+            chat = await c.get_chat(chat_id)
+        else:
+            chat = chat_id
+
+        # Get full chat information
+        try:
+            chat_r = await c.resolve_peer(chat.id)
+            full_chat = await c.invoke(GetFullChannel(channel=chat_r))
+            usernames = getattr(full_chat.chats[0], 'usernames', [])
+        except Exception:
+            usernames = []
+            full_chat = None
+
+        # Count members
+        total_bot, total_admin, total_bot_admin, total_banned = await count(c, chat.id)
+
+        # Build information caption
+        caption = f"""
+🏢 **CHAT INFORMATION**
+
+**🆔 Chat ID:** `{chat.id}`
+**📛 Title:** {chat.title}
+**📊 Type:** {str(chat.type).split('.')[-1].title()}
+**🌐 DC ID:** {chat.dc_id or 'Unknown'}
+
+**🔗 Usernames:** {' '.join([f'@{u}' for u in usernames]) if usernames else '@' + chat.username if chat.username else 'None'}
+**👥 Members:** {chat.members_count or 'Unknown'}
+**⚜️ Administrators:** {total_admin}
+**🤖 Bots:** {total_bot}
+**🚫 Banned Users:** {total_banned}
+**🤖 Admin Bots:** {total_bot_admin}
+
+**⚠️ Scam:** {'Yes' if chat.is_scam else 'No'}
+**❌ Fake:** {'Yes' if chat.is_fake else 'No'}
+**🔒 Restricted:** {'Yes' if chat.is_restricted else 'No'}
+**🛡️ Protected Content:** {'Yes' if chat.has_protected_content else 'No'}
+
+**📝 Description:**\n`{chat.description or 'No description available'}`
+"""
+
+        if chat.linked_chat:
+            caption += f"**🔗 Linked Chat:** `{chat.linked_chat.id}`\n"
+
+        return caption, chat.photo.big_file_id if chat.photo else None
+
+    except (PeerIdInvalid, UsernameInvalid, UsernameNotOccupied, ChannelInvalid):
+        return "❌ **Chat Not Found**\nThe specified chat could not be found.", None
+    except FloodWait as e:
+        await asyncio.sleep(e.value)
+        return await chat_info(c, chat_id, already)
+    except Exception as e:
+        LOGGER.error(f"Error getting chat info: {e}")
+        return f"❌ **Error**\nFailed to fetch chat information: {str(e)}", None
 
 
 @Gojo.on_message(command(["info", "whois"]))
 async def info_func(c: Gojo, message: Message):
+    """Handle /info and /whois commands"""
     if message.reply_to_message and message.reply_to_message.sender_chat:
-        await message.reply_text("This is not a user, but rather a channel. Use `/chinfo` to fetch its information.")
+        await message.reply_text("ℹ️ This is a channel, not a user. Use `/chinfo` to get channel information.")
         return
+
     try:
         user, _, user_name = await extract_user(c, message)
     except Exception as e:
-        await message.reply_text(f"Got Some errors failed to fetch user info\n{e}")
-        LOGGER.error(e)
-        LOGGER.error(format_exc())
+        await message.reply_text(f"❌ Failed to extract user: {str(e)}")
+        LOGGER.error(f"Error extracting user: {e}\n{format_exc()}")
         return
 
-    m = await message.reply_text(
-        f"Fetching {f'@{user_name}' if user_name else 'user'} info from telegram's database..."
-    )
+    m = await message.reply_text(f"🔍 Fetching information for {'@' + user_name if user_name else 'user'}...")
 
     try:
         info_caption, photo_id = await user_info(c, user)
-
     except Exception as e:
-        LOGGER.error(e)
-        LOGGER.error(format_exc())
-        return await m.edit(str(e))
-    
+        await m.edit_text(f"❌ Error fetching user information: {str(e)}")
+        LOGGER.error(f"Error in user_info: {e}\n{format_exc()}")
+        return
 
-    status = False
-    if m.from_user and (m.chat.id != m.from_user.id):
+    # Get user status in current chat if applicable
+    if message.chat.type != enums.ChatType.PRIVATE:
         try:
-            if status:= await m.chat.get_member(user):
-                status = str(status.status.value).capitalize()
-        except:
-            pass
-        if not status or status == "Member":
-            approved_users = Approve(m.chat.id).check_approve(user)
-            if Approve(m.chat.id).check_approve(user):
-                status = "Member, Approved"
+            member = await message.chat.get_member(user)
+            status = str(member.status).split(".")[-1].title()
+            
+            # Check if user is approved
+            if status == "Member" and Approve(message.chat.id).check_approve(user):
+                status = "Member (Approved)"
+                
+            info_caption += f"\n**💬 Current Chat Status:** {status}"
+        except Exception:
+            pass  # Skip if we can't get member status
 
-    if status:
-        info_caption += f"<b>👥 Status </b>: {status}"
-
+    # Send the information
     if not photo_id:
         await m.delete()
-        await sleep(2)
+        await asyncio.sleep(1)
         return await message.reply_text(info_caption, disable_web_page_preview=True)
-    photo = await c.download_media(photo_id)
 
-    await m.delete()
-    await sleep(2)
     try:
-        await message.reply_photo(photo, caption=info_caption, quote=False)
-    except MediaCaptionTooLong:
-        x = await message.reply_photo(photo)
+        photo = await c.download_media(photo_id)
+        await m.delete()
+        await asyncio.sleep(1)
+        
         try:
-            await x.reply_text(info_caption)
+            await message.reply_photo(photo, caption=info_caption, quote=False)
+        except MediaCaptionTooLong:
+            # If caption is too long, send photo and text separately
+            sent_photo = await message.reply_photo(photo, quote=False)
+            await sent_photo.reply_text(info_caption)
         except EntityBoundsInvalid:
-            await x.delete()
-            await message.reply_text(info_caption)
-        except RPCError as rpc:
-            await message.reply_text(rpc)
-            LOGGER.error(rpc)
-            LOGGER.error(format_exc())
+            # If entity bounds are invalid, send text only
+            await message.reply_text(info_caption, disable_web_page_preview=True)
+        
+        # Clean up downloaded photo
+        if os.path.exists(photo):
+            os.remove(photo)
+            
     except Exception as e:
-        if e == "User not found ! Error: 'InputPeerChannel' object has no attribute 'user_id'":
-            await m.reply_text(
-                "Looks like you are trying to fetch info of a chat not an user. In that case please use /chinfo")
-            return
-
-        await message.reply_text(text=e)
-        LOGGER.error(e)
-        LOGGER.error(format_exc())
-
-    os.remove(photo)
-
-    return
+        await m.edit_text(f"❌ Error sending information: {str(e)}")
+        LOGGER.error(f"Error sending user info: {e}\n{format_exc()}")
 
 
 @Gojo.on_message(command(["chinfo", "chatinfo", "chat_info"]))
 async def chat_info_func(c: Gojo, message: Message):
-    splited = message.text.split()
-    if len(splited) == 1:
-        if message.reply_to_message and message.reply_to_message.sender_chat:
-            chat = message.reply_to_message.sender_chat.id
-        else:
-            chat = message.chat.id
-
+    """Handle /chinfo, /chatinfo, and /chat_info commands"""
+    chat_input = None
+    
+    # Determine which chat to get info for
+    if len(message.command) > 1:
+        chat_input = message.command[1]
+    elif message.reply_to_message and message.reply_to_message.sender_chat:
+        chat_input = message.reply_to_message.sender_chat.id
     else:
-        chat = splited[1]
+        chat_input = message.chat.id
+
+    m = await message.reply_text("🔍 Fetching chat information...")
 
     try:
-        chat = int(chat)
-    except Exception as ef:
-        if "invalid literal for int() with base 10:" not in str(ef):
-            return await message.reply_text(
-                f"Got and exception {ef}\n**Usage:**/chinfo [USERNAME|ID]"
-            )
-
-        chat = str(chat)
-        if chat.startswith("https://"):
-            chat = '@' + chat.split("/")[-1]
-    m = await message.reply_text(
-        "Fetching chat info of chat from telegram's database....."
-    )
-
-    try:
-        info_caption, photo_id = await chat_info(c, chat=chat)
-        if info_caption.startswith("Failed to find the chat due"):
-            await message.reply_text(info_caption)
-            return
+        info_caption, photo_id = await chat_info(c, chat_input)
     except Exception as e:
-        await m.delete()
-        await sleep(0.5)
-        return await message.reply_text(f"**GOT AN ERROR:**\n {e}")
+        await m.edit_text(f"❌ Error fetching chat information: {str(e)}")
+        LOGGER.error(f"Error in chat_info: {e}\n{format_exc()}")
+        return
+
+    # Send the information
     if not photo_id:
         await m.delete()
-        await sleep(2)
+        await asyncio.sleep(1)
         return await message.reply_text(info_caption, disable_web_page_preview=True)
 
-    photo = await c.download_media(photo_id)
-    await m.delete()
-    await sleep(2)
     try:
-        await message.reply_photo(photo, caption=info_caption, quote=False)
-    except MediaCaptionTooLong:
-        x = await message.reply_photo(photo)
+        photo = await c.download_media(photo_id)
+        await m.delete()
+        await asyncio.sleep(1)
+        
         try:
-            await x.reply_text(info_caption)
+            await message.reply_photo(photo, caption=info_caption, quote=False)
+        except MediaCaptionTooLong:
+            # If caption is too long, send photo and text separately
+            sent_photo = await message.reply_photo(photo, quote=False)
+            await sent_photo.reply_text(info_caption)
         except EntityBoundsInvalid:
-            await x.delete()
-            await message.reply_text(info_caption)
-        except RPCError as rpc:
-            await message.reply_text(rpc)
-            LOGGER.error(rpc)
-            LOGGER.error(format_exc())
+            # If entity bounds are invalid, send text only
+            await message.reply_text(info_caption, disable_web_page_preview=True)
+        
+        # Clean up downloaded photo
+        if os.path.exists(photo):
+            os.remove(photo)
+            
     except Exception as e:
-        await message.reply_text(text=e)
-        LOGGER.error(e)
-        LOGGER.error(format_exc())
-
-    os.remove(photo)
-
-    return
+        await m.edit_text(f"❌ Error sending information: {str(e)}")
+        LOGGER.error(f"Error sending chat info: {e}\n{format_exc()}")
 
 
 __PLUGIN__ = "ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ"
-__alt_name__ = [
-    "info",
-    "chinfo",
-]
+__alt_name__ = ["info", "chinfo", "whois", "chatinfo"]
 
 __HELP__ = """
-**ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ**
+**📊 Information Module**
 
-• /info - ᴛᴏ ɢᴇᴛ ɪɴꜰᴏ ᴀʙᴏᴜᴛ ᴛʜᴇ ᴜsᴇʀ
-• /chinfo - ᴛᴏ ɢᴇᴛ ɪɴꜰᴏ ᴀʙᴏᴜᴛ ᴛʜᴇ ᴄʜᴀᴛ
+• /info or /whois [username|id|reply] - Get detailed information about a user
+• /chinfo or /chatinfo [username|id|reply] - Get detailed information about a chat/channel
+
+**Examples:**
+- `/info @username` - Get info about a user
+- `/info` (reply to a message) - Get info about the replied user
+- `/chinfo @channelname` - Get info about a channel
+- `/chinfo` (in a group) - Get info about the current group
 """
-
