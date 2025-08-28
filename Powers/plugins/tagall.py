@@ -4,14 +4,15 @@ from pyrogram.enums import ChatType, ChatMemberStatus
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
+
 @Gojo.on_message(command("tagall"))
 async def tag_all_members(c: Gojo, m: Message):
-    """Mention all members in batches of 5 with bullet points"""
+    """Mention all members in batches of 5 with bullet points and delay"""
     try:
         # Check if the command is used in a group
         if m.chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
-            return await m.reply_text(f"❌ This command only works in groups! (Current type: {m.chat.type}")
-        
+            return await m.reply_text("❌ This command only works in groups!")
+
         # Check if user is admin
         try:
             user = await m.chat.get_member(m.from_user.id)
@@ -19,21 +20,21 @@ async def tag_all_members(c: Gojo, m: Message):
                 return await m.reply_text("❌ You need to be an admin to use this command.")
         except Exception as e:
             return await m.reply_text(f"⚠️ Failed to check your permissions: {e}")
-        
+
         # Check if message is a reply or has text
         if not m.reply_to_message and len(m.command) == 1:
-            return await m.reply_text("𝖱𝖾𝗉𝗅𝗒 𝗍𝗈 𝖺 𝗆𝖾𝗌𝗌𝖺𝗀𝖾 𝗈𝗋 𝗉𝗋𝗈𝗏𝗂𝖽𝖾 𝗍𝖾𝗑𝗍 𝗍𝗈 𝗆𝖾𝗇𝗍𝗂𝗈𝗇 𝗈𝗍𝗁𝖾𝗋𝗌!")
-        
+            return await m.reply_text("ℹ️ Reply to a message or provide text to mention others!")
+
         # Extract query if provided
         query = ""
         if len(m.command) > 1:
             query = " ".join(m.command[1:])
         elif m.reply_to_message:
             query = m.reply_to_message.text or m.reply_to_message.caption or ""
-        
+
         # Send initial processing message
-        processing_msg = await m.reply_text("🔄 Tagging all members...")
-        
+        processing_msg = await m.reply_text("🔄 Fetching members...")
+
         # Fetch all members
         members = []
         try:
@@ -42,75 +43,73 @@ async def tag_all_members(c: Gojo, m: Message):
                     members.append(member.user)
         except Exception as e:
             return await processing_msg.edit_text(f"⚠️ Failed to fetch members: {e}")
-        
+
         if not members:
             return await processing_msg.edit_text("❌ No members available to tag!")
-        
+
         # Create batches of 5 members
         batch_size = 5
         member_batches = [members[i:i + batch_size] for i in range(0, len(members), batch_size)]
-        
-        # Delete the processing message first
+
         await processing_msg.delete()
-        
-        # Send first batch as a new message
-        first_batch = member_batches[0]
-        tag_text = f"**📢 Mentioning all members**\n\n"
-        if query:
-            tag_text += f"**Message:** {query}\n\n"
-        
-        for user in first_batch:
-            tag_text += f"• [{user.first_name}](tg://user?id={user.id})\n"
-        
-        # Send first batch as new message
-        first_msg = await c.send_message(
-            m.chat.id,
-            tag_text,
-            disable_web_page_preview=True,
-            reply_to_message_id=m.reply_to_message.id if m.reply_to_message else m.id
-        )
-        
-        # Send remaining batches as new messages with 1.5 second gap
-        for batch in member_batches[1:]:
-            batch_text = ""
+
+        # Send batches one by one
+        total = len(members)
+        done = 0
+        first_msg = None
+
+        for idx, batch in enumerate(member_batches, start=1):
+            batch_text = f"📢 **Tagging Members ({done + 1}–{done + len(batch)}/{total})**\n\n"
+            if query and idx == 1:  # show query only in the first message
+                batch_text += f"💬 **Message:** {query}\n\n"
+
             for user in batch:
                 batch_text += f"• [{user.first_name}](tg://user?id={user.id})\n"
+
+            try:
+                sent = await c.send_message(
+                    m.chat.id,
+                    batch_text,
+                    disable_web_page_preview=True,
+                    reply_to_message_id=m.reply_to_message.id if (idx == 1 and m.reply_to_message) else None
+                )
+                if first_msg is None:
+                    first_msg = sent
+            except Exception as e:
+                await c.send_message(m.chat.id, f"⚠️ Failed to send batch {idx}: {e}")
             
+            done += len(batch)
+            await asyncio.sleep(1.5)  # 1.5 second delay between batches
+
+        # Send completion message
+        if first_msg:
             await c.send_message(
                 m.chat.id,
-                batch_text,
-                disable_web_page_preview=True
+                f"✅ All {total} members tagged successfully!",
+                reply_to_message_id=first_msg.id
             )
-            await asyncio.sleep(1.5)  # 1.5 second gap between batches
-        
-        # Send completion message
-        await c.send_message(
-            m.chat.id,
-            "✅ All members tagged successfully!",
-            reply_to_message_id=first_msg.id
-        )
-        
+
     except Exception as e:
         await m.reply_text(f"⚠️ An unexpected error occurred: {str(e)}")
+
 
 __PLUGIN__ = "ᴛᴀɢᴀʟʟ"
 
 __HELP__ = """
-**👥 ᴀᴅᴠᴀɴᴄᴇᴅ ᴍᴇᴍʙ𝖾𝗋 𝗍𝖺𝗀𝗀𝖾𝗋**
+**👥 Advanced Member Tagger**
 
-`/tagall` - 𝗍𝖺𝗀𝗌 𝖺𝗅𝗅 𝗆𝖾𝗆𝖻𝖾𝗋𝗌 𝗂𝗇 𝖻𝖺𝗍𝖼𝗁𝖾𝗌
-• 5 𝗆𝖾𝗇𝗍𝗂𝗈𝗇𝗌 𝗉𝖾𝗋 𝗆𝖾𝗌𝗌𝖺𝗀𝖾
-• 1.5 𝗌𝖾𝖼𝗈𝗇𝖽 𝖽𝖾𝗅𝖺𝗒 𝖻𝖾𝗍𝗐𝖾𝖾𝗇 𝖻𝖺𝗍𝖼𝗁𝖾𝗌
-• 𝖻𝗎𝗅𝗅𝖾𝗍 𝗉𝗈𝗂𝗇𝗍 𝖿𝗈𝗋𝗆𝖺𝗍𝗍𝗂𝗇𝗀
-• 𝗌𝗎𝗉𝗉𝗈𝗋𝗍𝗌 𝖺𝖽𝖽𝗂𝗇𝗀 𝖺 𝗆𝖾𝗌𝗌𝖺𝗀𝖾 𝖺𝖿𝗍𝖾𝗋 𝖼𝗈𝗆𝗆𝖺𝗇𝖽
+`/tagall` - Tags all members in batches
+• 5 mentions per message
+• 1.5s delay between batches
+• Bullet point formatting
+• Can include a custom message or reply to a message
 
-**𝗋𝖾𝗊𝗎𝗂𝗋𝖾𝗆𝖾𝗇𝗍𝗌:**
-- 𝗆𝗎𝗌𝗍 𝖻𝖾 𝗎𝗌𝖾𝗍 𝗂𝗇 𝗀𝗋𝗈𝗎𝗉𝗌/𝗌𝗎𝗉𝖾𝗋𝗀𝗋𝗈𝗎𝗉𝗌
-- 𝗎𝗌𝖾𝗋 𝗆𝗎𝗌𝗍 𝖻𝖾 𝖺𝗇 𝖺𝖽𝗆𝗂𝗇
-- 𝗀𝗋𝗈𝗎𝗉 𝗆𝗎𝗌𝗍 𝗁𝖺𝗏𝖾 𝗆𝖾𝗆𝖻𝖾𝗋𝗌
+**Requirements:**
+- Must be used in groups/supergroups
+- User must be an admin
 
-**𝗎𝗌𝖺𝗀𝖾:**
-`/tagall` - 𝗍𝖺𝗀 𝖺𝗅𝗅 𝗆𝖾𝗆𝖻𝖾𝗋𝗌 (𝗐𝗂𝗅𝗅 𝗌𝗁𝗈𝗐 𝗐𝖺𝗋𝗇𝗂𝗇𝗀)
-`/tagall Hello everyone!` - 𝗍𝖺𝗀 𝖺𝗅𝗅 𝗐𝗂𝗍𝗁 𝗆𝖾𝗌𝗌𝖺𝗀𝖾
-𝖱𝖾𝗉𝗅𝗒 𝗍𝗈 𝖺 𝗆𝖾𝗌𝗌𝖺𝗀𝖾 𝗐𝗂𝗍𝗁 `/tagall` - 𝗍𝖺𝗀 𝖺𝗅𝗅 𝗐𝗂𝗍𝗁 𝗋𝖾𝗉𝗅𝗂𝖾𝖽 𝗆𝖾𝗌𝗌𝖺𝗀𝖾
+**Usage:**
+- `/tagall` → warns if no text/reply
+- `/tagall Hello everyone!` → tags with custom message
+- Reply to a message with `/tagall` → tags with replied message
 """
