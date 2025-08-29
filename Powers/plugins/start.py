@@ -317,7 +317,8 @@ async def paginate_help(c: Gojo, q: CallbackQuery):
 
 
 # ─── Current Info ───
-@Gojo.on_callback_query(filters.regex("^bot_curr_info$"))
+@Gojo.on_message(command("botinfo") & (filters.group | filters.private))
+@sudo_only
 async def give_curr_info(c: Gojo, q: CallbackQuery):
     start = time()
     up = strftime("%Hh %Mm %Ss", gmtime(time() - UPTIME))
@@ -331,7 +332,7 @@ async def give_curr_info(c: Gojo, q: CallbackQuery):
 🐍 ᴘʏᴛʜᴏɴ's ᴠᴇʀsɪᴏɴ: {PYTHON_VERSION}
 🔥 ᴘʏʀᴏɢʀᴀᴍ's ᴠᴇʀsɪᴏɴ : {PYROGRAM_VERSION}
     """
-    await q.answer(txt, show_alert=True)
+    await q.reply_text(txt, show_alert=True)
 
 
 # ─── Module Info ───
