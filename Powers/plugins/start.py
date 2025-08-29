@@ -352,20 +352,38 @@ async def get_module_info(c: Gojo, q: CallbackQuery):
 
 
 # ─── Staffs ───
-@Gojo.on_callback_query(filters.regex("^give_bot_staffs$"))
-async def give_bot_staffs(c: Gojo, q: CallbackQuery):
+from pyrogram import filters
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
+from pyrogram.errors import RPCError
+from Powers.bot_class import Gojo
+from Powers.utils.helpers import mention_html, get_support_staff, OWNER_ID
+from Powers.utils.logger import LOGGER
+
+# Custom filter to allow only owner or sudo users, silently ignores others
+def sudo_only(func):
+    async def wrapper(c: Gojo, m: Message):
+        user_id = m.from_user.id
+        sudo_users = get_support_staff("sudo") or []
+        if user_id != OWNER_ID and str(user_id) not in sudo_users:
+            return  # silently ignore
+        return await func(c, m)
+    return wrapper
+
+@Gojo.on_message(filters.command("botstaff") & (filters.group | filters.private))
+@sudo_only
+async def give_bot_staffs(c: Gojo, m: Message):
     reply = ""
 
-    # Owner information
+    # Owner
     try:
         owner = await c.get_users(OWNER_ID)
         owner_name = owner.first_name or "ᴛʜᴇ ᴄʀᴇᴀᴛᴏʀ"
         reply += f"<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴍᴍᴀɴᴅᴇʀ:</b> {(await mention_html(owner_name, OWNER_ID))} (<code>{OWNER_ID}</code>)\n"
     except RPCError as e:
         LOGGER.error(f"Error getting owner info: {e}")
-        reply += f"<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴜᴍᴍᴀɴᴅᴇʀ:</b> <code>{OWNER_ID}</code>\n"
+        reply += f"<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴍᴍᴀɴᴅᴇʀ:</b> <code>{OWNER_ID}</code>\n"
 
-    # Developers information (excluding owner)
+    # Developers
     true_dev = get_support_staff("dev")
     reply += "\n<b>⚡️ ᴄᴏᴅᴇ ᴡɪᴢᴀʀᴅs:</b>\n"
     if not true_dev:
@@ -388,7 +406,7 @@ async def give_bot_staffs(c: Gojo, q: CallbackQuery):
         if dev_count == 0:
             reply += "No mystical coders found\n"
 
-    # Sudo users information (excluding owner and developers)
+    # Sudo users
     true_sudo = get_support_staff("sudo")
     reply += "\n<b>🐲 ᴅʀᴀɢᴏɴ ʀɪᴅᴇʀs:</b>\n"
     if not true_sudo:
@@ -411,7 +429,7 @@ async def give_bot_staffs(c: Gojo, q: CallbackQuery):
         if sudo_count == 0:
             reply += "No dragon masters available\n"
 
-    # Whitelisted users information (excluding owner, devs, and sudo)
+    # Whitelisted users
     wl = get_support_staff("whitelist")
     reply += "\n<b>🦊 sʜᴀᴅᴏᴡ ᴀɢᴇɴᴛs:</b>\n"
     if not wl:
@@ -439,12 +457,12 @@ async def give_bot_staffs(c: Gojo, q: CallbackQuery):
     # Flavor text
     reply += "\n\n<i>These are whitelisted users — those chosen to wield the bot's power across the digital realm!</i> ✨"
 
-    # Edit the callback message
-    await q.edit_message_caption(
-        caption=reply,
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back to Start", callback_data="start_back")]])
+    await m.reply_text(
+        reply,
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back to Start", callback_data="start_back")]]),
+        disable_web_page_preview=True,
+        parse_mode="html"
     )
-    await q.answer()
 
 
 # ─── Delete ───
