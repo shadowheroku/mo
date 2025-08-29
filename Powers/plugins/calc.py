@@ -7,7 +7,6 @@ from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
 # ─── ALLOWED CHARACTERS ───
-# Updated pattern to properly handle decimal numbers
 MATH_PATTERN = re.compile(r"^[\d\s\+\-\*\/\%\(\)\.]+$")
 
 # Pattern to detect if it's a simple number (no operators)
@@ -24,7 +23,27 @@ def safe_eval(expr: str):
         if not MATH_PATTERN.match(expr):
             return None
         # Eval in restricted namespace
-        return eval(expr, {"__builtins__": {}}, {})
+        result = eval(expr, {"__builtins__": {}}, {})
+        
+        # Handle floating point precision issues
+        if isinstance(result, float):
+            # Check if the result is effectively an integer
+            if result.is_integer():
+                return int(result)
+            # Round to reasonable precision for decimal results
+            else:
+                # Count decimal places in the original expression
+                decimal_places = 0
+                numbers = re.findall(r"\d*\.\d+", expr)
+                for num in numbers:
+                    places = len(num.split('.')[1])
+                    decimal_places = max(decimal_places, places)
+                
+                # Round to maximum of 10 places or the original precision + 2
+                round_to = min(max(decimal_places + 2, 2), 10)
+                return round(result, round_to)
+        
+        return result
     except Exception:
         return None
 
@@ -64,5 +83,5 @@ __HELP__ = """
 • `2+2`
 • `(10*5)/2`
 • `50%5`
-• `3.14 * 2`  (decimals now work)
+• `0.1+0.2` (now shows 0.3 instead of 0.30000000000000004)
 """
