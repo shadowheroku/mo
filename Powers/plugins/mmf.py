@@ -4,6 +4,8 @@ from PIL import Image, ImageDraw, ImageFont, ImageSequence
 from pyrogram import filters, enums
 from pyrogram.types import Message
 from Powers.bot_class import Gojo
+import subprocess
+import tempfile
 
 @Gojo.on_message(filters.command("mmf"))
 async def mmf(c: Gojo, m: Message):
@@ -24,10 +26,21 @@ async def mmf(c: Gojo, m: Message):
     try:
         file = await c.download_media(reply_message)
         
-        # Check if it's a sticker and if it's animated
+        # Check media type
         is_animated = False
+        is_video_sticker = False
+        
         if reply_message.sticker:
             is_animated = reply_message.sticker.is_animated
+            # Check if it's a video sticker (webm)
+            if file.endswith('.webm'):
+                is_video_sticker = True
+                is_animated = False
+        
+        if is_video_sticker:
+            await msg.edit_text("**Video stickers are not supported yet.**")
+            os.remove(file)
+            return
         
         if is_animated:
             meme = await drawTextAnimated(file, text)
@@ -52,13 +65,24 @@ async def mmf(c: Gojo, m: Message):
 
 
 async def drawText(image_path, text):
-    img = Image.open(image_path)
+    try:
+        img = Image.open(image_path)
+    except Exception as e:
+        # If it's not a supported image format, try to convert it
+        if image_path.endswith(('.webm', '.mp4')):
+            raise Exception("Video files are not supported. Please use images or static stickers.")
+        else:
+            raise e
     
     # Convert to RGB if needed (for PNG transparency)
-    if img.mode in ('RGBA', 'LA'):
+    if img.mode in ('RGBA', 'LA', 'P'):
         background = Image.new('RGB', img.size, (255, 255, 255))
-        background.paste(img, mask=img.split()[-1])
+        if img.mode == 'P':
+            img = img.convert('RGBA')
+        background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
         img = background
+    elif img.mode != 'RGB':
+        img = img.convert('RGB')
     
     i_width, i_height = img.size
 
@@ -68,6 +92,7 @@ async def drawText(image_path, text):
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
         "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
         "arial.ttf",
         "Arial.ttf"
     ]
@@ -77,8 +102,9 @@ async def drawText(image_path, text):
 
     for font_path in font_paths:
         try:
-            font = ImageFont.truetype(font_path, font_size)
-            break
+            if os.path.exists(font_path):
+                font = ImageFont.truetype(font_path, font_size)
+                break
         except (OSError, IOError):
             continue
 
@@ -87,6 +113,7 @@ async def drawText(image_path, text):
         try:
             font = ImageFont.load_default()
         except:
+            # Create a simple default font
             font = ImageFont.load_default()
 
     if ";" in text:
@@ -115,10 +142,12 @@ async def drawText(image_path, text):
                 u_width = bbox[2] - bbox[0]
                 u_height = bbox[3] - bbox[1]
             except:
-                u_width, u_height = 100, 20
+                # Estimate size if textbbox fails
+                u_width = len(u_text) * font_size // 2
+                u_height = font_size
 
             x = (i_width - u_width) / 2
-            y = int((current_h / 640) * i_width)
+            y = max(10, int((current_h / 640) * i_width))
             
             draw_text_with_outline(x, y, u_text, font)
             current_h += u_height + pad
@@ -130,51 +159,58 @@ async def drawText(image_path, text):
                 u_width = bbox[2] - bbox[0]
                 u_height = bbox[3] - bbox[1]
             except:
-                u_width, u_height = 100, 20
+                u_width = len(l_text) * font_size // 2
+                u_height = font_size
 
             x = (i_width - u_width) / 2
-            y = i_height - u_height - int((20 / 640) * i_width)
+            y = i_height - u_height - max(20, int((20 / 640) * i_width))
             
             draw_text_with_outline(x, y, l_text, font)
             current_h += u_height + pad
 
     image_name = "memify.webp"
-    img.save(image_name, "WEBP")
+    img.save(image_name, "WEBP", quality=95)
     return image_name
 
 
 async def drawTextAnimated(image_path, text):
-    # Open the animated WebP
-    img = Image.open(image_path)
+    try:
+        img = Image.open(image_path)
+    except Exception as e:
+        raise Exception(f"Cannot open image: {str(e)}")
     
     frames = []
     durations = []
     
-    # Get font (same as static version)
-    font_paths = [
-        "./Powers/assets/default.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-        "arial.ttf",
-        "Arial.ttf"
-    ]
-    
     # Use first frame to determine font size
-    first_frame = img.copy()
-    if first_frame.mode in ('RGBA', 'LA'):
+    first_frame = next(ImageSequence.Iterator(img)).copy()
+    if first_frame.mode in ('RGBA', 'LA', 'P'):
+        if first_frame.mode == 'P':
+            first_frame = first_frame.convert('RGBA')
         background = Image.new('RGB', first_frame.size, (255, 255, 255))
         background.paste(first_frame, mask=first_frame.split()[-1])
         first_frame = background
     
     i_width, i_height = first_frame.size
     font_size = max(20, int((70 / 640) * i_width))
+    
+    # Try multiple font options
+    font_paths = [
+        "./Powers/assets/default.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
+        "arial.ttf",
+        "Arial.ttf"
+    ]
+    
     font = None
-
     for font_path in font_paths:
         try:
-            font = ImageFont.truetype(font_path, font_size)
-            break
+            if os.path.exists(font_path):
+                font = ImageFont.truetype(font_path, font_size)
+                break
         except (OSError, IOError):
             continue
 
@@ -215,10 +251,11 @@ async def drawTextAnimated(image_path, text):
                     u_width = bbox[2] - bbox[0]
                     u_height = bbox[3] - bbox[1]
                 except:
-                    u_width, u_height = 100, 20
+                    u_width = len(u_text) * font_size // 2
+                    u_height = font_size
 
                 x = (i_width - u_width) / 2
-                y = int((current_h / 640) * i_width)
+                y = max(10, int((current_h / 640) * i_width))
                 
                 draw_text_with_outline_anim(x, y, u_text, font)
                 current_h += u_height + pad
@@ -230,16 +267,17 @@ async def drawTextAnimated(image_path, text):
                     u_width = bbox[2] - bbox[0]
                     u_height = bbox[3] - bbox[1]
                 except:
-                    u_width, u_height = 100, 20
+                    u_width = len(l_text) * font_size // 2
+                    u_height = font_size
 
                 x = (i_width - u_width) / 2
-                y = i_height - u_height - int((20 / 640) * i_width)
+                y = i_height - u_height - max(20, int((20 / 640) * i_width))
                 
                 draw_text_with_outline_anim(x, y, l_text, font)
                 current_h += u_height + pad
         
         frames.append(frame_draw)
-        durations.append(frame.info.get('duration', 100))  # Default 100ms
+        durations.append(frame.info.get('duration', 100))
     
     # Save as animated WebP
     image_name = "memify_animated.webp"
