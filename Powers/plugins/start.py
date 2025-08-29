@@ -1,35 +1,24 @@
-# Powers/plugins/start.py
-from __future__ import annotations
+rewrite this whole plugin 
 
-import asyncio
+from random import choice
 from time import gmtime, strftime, time
-from typing import List
+import asyncio
 
 from pyrogram import enums, filters
-from pyrogram.enums import ChatMemberStatus as CMS, ChatType
+from pyrogram.enums import ChatMemberStatus as CMS
+from pyrogram.enums import ChatType
 from pyrogram.errors import (
-    MediaCaptionTooLong,
-    MessageNotModified,
-    QueryIdInvalid,
-    RPCError,
-    UserIsBlocked,
+    MediaCaptionTooLong, MessageNotModified,
+    QueryIdInvalid, RPCError, UserIsBlocked
 )
 from pyrogram.types import (
-    CallbackQuery,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    Message,
+    CallbackQuery, InlineKeyboardButton,
+    InlineKeyboardMarkup, Message
 )
 
-# Project imports (expected to exist in your project)
 from Powers import (
-    HELP_COMMANDS,
-    LOGGER,
-    OWNER_ID,
-    PYROGRAM_VERSION,
-    PYTHON_VERSION,
-    UPTIME,
-    VERSION,
+    HELP_COMMANDS, LOGGER, OWNER_ID, PREFIX_HANDLER,
+    PYROGRAM_VERSION, PYTHON_VERSION, UPTIME, VERSION
 )
 from Powers.bot_class import Gojo
 from Powers.database.captcha_db import CAPTCHA_DATA
@@ -37,342 +26,240 @@ from Powers.supports import get_support_staff
 from Powers.utils.custom_filters import command
 from Powers.utils.extras import StartPic
 from Powers.utils.kbhelpers import ikb
+from Powers.utils.parser import mention_html
 from Powers.utils.start_utils import (
-    gen_cmds_kb,
-    gen_start_kb,
-    get_help_msg,
-    get_private_note,
-    get_private_rules,
-    get_divided_msg,
+    gen_cmds_kb, gen_start_kb, get_help_msg,
+    get_private_note, get_private_rules, get_divided_msg
 )
 from Powers.utils.string import encode_decode
 
-# Some helper imports that might be placed elsewhere in your project.
-# If you moved mention_html/get_support_staff/OWNER_ID to another module,
-# adjust the import above accordingly. The import above should work when
-# your project layout is correct; otherwise adjust to your config.
-try:
-    # preferred helpers (if available)
-    from Powers.utils.helpers import mention_html, get_support_staff as _gs, OWNER_ID as _OWN
-    # if project has helpers, override references above
-    get_support_staff = _gs  # type: ignore
-    OWNER_ID = _OWN  # type: ignore
-except Exception:
-    # fallback mention generator (simple)
-    async def mention_html(name: str, user_id: int) -> str:
-        return f'<a href="tg://user?id={user_id}">{name}</a>'
 
-# Replace with your working Catbox/hosted video url or file_id
-CATBOX_VIDEO_URL = "https://files.catbox.moe/6qhbt4.MP4"
+# ─── Catbox Video URL ───
+CATBOX_VIDEO_URL = "https://files.catbox.moe/6qhbt4.MP4"  # Replace with your actual Catbox video URL
 
 
-# -----------------------
-# Pagination helper
-# -----------------------
-def paginate_buttons(buttons: List[InlineKeyboardButton], page: int = 1, per_page: int = 9) -> InlineKeyboardMarkup:
+# ─── Pagination helper ───
+def paginate_buttons(buttons: list, page: int = 1, per_page: int = 9):
     """
-    Paginate a flat list of InlineKeyboardButton into rows of 3 buttons,
-    with navigation controls and a back-to-start button.
+    Split buttons into pages of `per_page` (default 9) arranged in 3x3 grid.
     """
-    if per_page <= 0:
-        per_page = 9
-
-    total = len(buttons)
-    total_pages = (total + per_page - 1) // per_page or 1
-    page = max(1, min(page, total_pages))
-
+    total_pages = (len(buttons) + per_page - 1) // per_page
     start = (page - 1) * per_page
     end = start + per_page
     page_buttons = buttons[start:end]
 
-    # chunk into rows of 3
-    rows: List[List[InlineKeyboardButton]] = [page_buttons[i : i + 3] for i in range(0, len(page_buttons), 3)]
+    # reshape into 3x3 grid
+    rows = [page_buttons[i:i + 3] for i in range(0, len(page_buttons), 3)]
 
-    # nav row
-    nav: List[InlineKeyboardButton] = []
+    # navigation row
+    nav = []
     if page > 1:
         nav.append(InlineKeyboardButton("◀ ᴘʀᴇᴠ", callback_data=f"help_page_{page-1}"))
     if page < total_pages:
         nav.append(InlineKeyboardButton("ɴᴇxᴛ ▶", callback_data=f"help_page_{page+1}"))
     if nav:
         rows.append(nav)
-
-    # Back to start always present
+    
+    # Add back button
     rows.append([InlineKeyboardButton("« ʙᴀᴄᴋ ᴛᴏ sᴛᴀʀᴛ", callback_data="start_back")])
 
     return InlineKeyboardMarkup(rows)
 
 
-# -----------------------
-# Admin-only "close" callback
-# -----------------------
+# ─── Admin Close ───
 @Gojo.on_callback_query(filters.regex("^close_admin$"))
-async def close_admin_callback(_: Gojo, q: CallbackQuery):
-    try:
-        user_id = q.from_user.id
-        # get member status in the chat where callback was triggered
-        member = await q.message.chat.get_member(user_id)
-        user_status = member.status
-    except Exception as e:
-        LOGGER.exception("Failed to fetch member status: %s", e)
-        await q.answer("Unable to verify permissions.", show_alert=True)
-        return
-
-    # Only allow owner or chat owners/admins to close (owner stronger check)
+async def close_admin_callback(_, q: CallbackQuery):
+    user_id = q.from_user.id
+    user_status = (await q.message.chat.get_member(user_id)).status
     if user_status not in {CMS.OWNER, CMS.ADMINISTRATOR}:
-        await q.answer("ʏᴏᴜ'ʀᴇ ɴᴏᴛ ᴀɴ ᴀᴅᴍɪɴ.", show_alert=True)
-        return
-
-    # If you want only chat owner (not admin) to perform final close:
+        await q.answer("ʏᴏᴜ'ʀᴇ ɴᴏᴛ ᴇᴠᴇɴ ᴀɴ ᴀᴅᴍɪɴ, ᴅᴏɴ'ᴛ ᴛʀʏ ᴛʜɪs ᴇxᴘʟᴏsɪᴠᴇ sʜɪᴛ!", show_alert=True)
     if user_status != CMS.OWNER:
-        await q.answer("Only the chat owner can fully close this.", show_alert=True)
-        return
-
-    try:
-        await q.message.edit_text("ᴄʟᴏsᴇᴅ!")
-        await q.answer("Closed.", show_alert=True)
-    except MessageNotModified:
-        await q.answer("Already closed.", show_alert=False)
-    except Exception as e:
-        LOGGER.exception("Failed to close admin menu: %s", e)
-        await q.answer("Failed to close.", show_alert=True)
+        await q.answer("ʏᴏᴜ'ʀᴇ ᴊᴜsᴛ ᴀɴ ᴀᴅᴍɪɴ, ɴᴏᴛ ᴏᴡɴᴇʀ\nsᴛᴀʏ ɪɴ ʏᴏᴜʀ ʟɪᴍɪᴛs!", show_alert=True)
+    await q.message.edit_text("ᴄʟᴏsᴇᴅ!")
+    await q.answer("ᴄʟᴏsᴇᴅ ᴍᴇɴᴜ!", show_alert=True)
 
 
-# -----------------------
-# Small loading animation helper
-# -----------------------
 async def send_loading_animation(m: Message):
     """
-    Shows a tiny loading animation by editing a bot message.
-    Keeps it minimal to avoid rate limits.
+    Display a fire emoji, then a loading animation in a new bot message,
+    and finally show a 'Done' checkmark.
     """
-    try:
-        fire_msg = await m.reply_text("⚡", quote=True)
-        await asyncio.sleep(1)
-        await fire_msg.delete()
-    except Exception:
-        # ignore if we can't send/delete the emoji
-        pass
+    # Step 1: Send fire emoji
+    fire_msg = await m.reply_text("⚡", quote=True)
+    await asyncio.sleep(1.5)
+    await fire_msg.delete()
 
-    try:
-        loading_msg = await m.reply_text("ʟᴏᴀᴅɪɴɢ", quote=True)
-    except Exception:
-        return
+    # Step 2: Send a new message for loading animation
+    loading_msg = await m.reply_text("ʟᴏᴀᴅɪɴɢ", quote=True)
 
-    try:
-        # 3 cycles of dot animation
-        for _ in range(3):
-            for dots in range(1, 4):
-                await loading_msg.edit_text(f"ʟᴏᴀᴅɪɴɢ{'.' * dots}")
-                await asyncio.sleep(0.6)
-        await loading_msg.edit_text(" ᴍᴏɴɪᴄ sᴛᴀʀᴛᴇᴅ !")
-        await asyncio.sleep(0.7)
-        await loading_msg.delete()
-    except Exception:
-        # editing might fail due to rate limits; ignore gracefully
-        try:
-            await loading_msg.delete()
-        except Exception:
-            pass
+    # Step 3: Edit the bot's own message
+    for _ in range(1):  # Repeat 3 cycles
+        for dots in range(1, 4):  # 1 to 3 dots
+            await loading_msg.edit_text(f"ʟᴏᴀᴅɪɴɢ{'.' * dots}")
+            await asyncio.sleep(0.8)
+
+    # Step 4: Final confirmation
+    await loading_msg.edit_text(" ᴍᴏɴɪᴄ sᴛᴀʀᴛᴇᴅ !")
+    await asyncio.sleep(1)
+    await loading_msg.delete()
 
 
-# -----------------------
-# /start handler
-# -----------------------
+# ─── Start ───
 @Gojo.on_message(command("start") & (filters.group | filters.private))
 async def start(c: Gojo, m: Message):
-    """
-    Start command handler:
-     - In private: show animated "loading" then start content and support start parameters.
-     - In group: replies with a small 'I'm alive' style message and a connect button.
-    """
-    # Ensure m.text is a string
-    text = (m.text or "") .strip()
-
-    # PRIVATE CHAT
     if m.chat.type == ChatType.PRIVATE:
-        # show loading animation (non-blocking enough)
+        # Send loading animation only for private chats in start command
         await send_loading_animation(m)
-
-        # parse start parameter (if present)
-        if text and len(text.split()) > 1:
-            # the arg is everything after '/start '
-            arg = text.split(None, 1)[1].strip()
+        
+        if len(m.text.strip().split()) > 1:
+            arg = m.text.split(None, 1)[1]
             help_option = arg.lower()
 
-            # private note handling: start note<...>
-            if help_option.startswith("note") and help_option not in ("note", "notes"):
+            if help_option.startswith("note") and (help_option not in ("note", "notes")):
                 await get_private_note(c, m, help_option)
                 return
 
-            # private rules handling
             if help_option.startswith("rules"):
                 await get_private_rules(c, m, help_option)
                 return
 
-            # /start help  -> paginated help menu
+            # Handle help pagination in private chat - NO LOADING ANIMATION FOR HELP
             if help_option == "help":
+                # Use the original order of plugins as they are queued
                 modules = list(HELP_COMMANDS.keys())
                 buttons = [
                     InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}")
                     for x in modules
                 ]
                 keyboard = paginate_buttons(buttons, page=1)
-                msg = (
-                    f"ʜᴇʏ {m.from_user.first_name or 'there'}! ɪ ᴀᴍ {c.me.first_name}✨.\n\n"
-                    "ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!\n\n"
-                    "ᴄʜᴏᴏsᴇ ᴀ ᴍᴏᴅᴜʟᴇ ғʀᴏᴍ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴅᴇᴛᴀɪʟᴇᴅ ʜᴇʟᴘ."
-                )
-                await m.reply_video(video=CATBOX_VIDEO_URL, caption=msg, reply_markup=keyboard, quote=True)
+                msg = f"""
+ʜᴇʏ **[{m.from_user.first_name}](http://t.me/{m.from_user.username})**! ɪ ᴀᴍ {c.me.first_name}✨.
+ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
+
+ᴀᴠᴀɪʟᴀʙʟᴇ ᴍᴏᴅᴜʟᴇs:
+ᴄʜᴏᴏsᴇ ᴀ ᴍᴏᴅᴜʜᴇ ғʀᴏᴍ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴅᴇᴛᴀɪʟᴇᴅ ʜᴇʟᴘ."""
+                await m.reply_video(video=CATBOX_VIDEO_URL, caption=msg, reply_markup=keyboard)
                 return
 
-            # /start qr_xxx  -> captcha unban flow
-            if "_" in arg and arg.split("_", 1)[0] == "qr":
-                try:
-                    decoded = encode_decode(arg.split("_", 1)[1], "decode")
-                except Exception:
-                    await m.reply_text("Invalid QR token.")
-                    return
+            help_msg, help_kb = await get_help_msg(c, m, help_option)
+            if help_msg:
+                await m.reply_video(
+                    video=CATBOX_VIDEO_URL,
+                    caption=help_msg,
+                    parse_mode=enums.ParseMode.MARKDOWN,
+                    reply_markup=help_kb,
+                    quote=True,
+                )
+                return
 
-                if ":" not in decoded:
-                    await m.reply_text("Invalid QR token.")
-                    return
-
-                chat_str, user_str = decoded.split(":", 1)
-                try:
-                    chat_id = int(chat_str)
-                    user_id = int(user_str)
-                except ValueError:
-                    await m.reply_text("Malformed QR information.")
-                    return
-
-                if m.from_user.id != user_id:
+            # captcha QR handling
+            if len(arg.split("_", 1)) >= 2 and arg.split("_", 1)[0] == "qr":
+                decoded = encode_decode(arg.split("_", 1)[1], "decode")
+                chat, user = decoded.split(":")
+                if m.from_user.id != int(user):
                     await m.reply_text("ɴᴏᴛ ғᴏʀ ʏᴏᴜ ʙᴀᴋᴀ")
                     return
-
                 try:
-                    await c.unban_chat_member(chat_id, user_id)
+                    await c.unban_chat_member(int(chat), int(user))
+                    msg = CAPTCHA_DATA().del_message_id(chat, user)
+                    try:
+                        chat_ = await c.get_chat(chat)
+                        kb = ikb([["ʟɪɴᴋ ᴛᴏ ᴄʜᴀᴛ", f"{chat_.invite_link}", "url"]])
+                    except Exception:
+                        kb = None
+                    await m.reply_text("ʏᴏᴜ ᴄᴀɴ ɴᴏᴡ ᴛᴀʟᴋ ɪɴ ᴛʜᴇ ᴄʜᴀᴛ", reply_markup=kb)
+                    try:
+                        await c.delete_messages(chat, msg)
+                    except Exception:
+                        pass
                 except Exception:
-                    await m.reply_text("Failed to unban. Try again later.")
                     return
 
-                # delete stored captcha message id, and attempt to fetch invite link for keyboard
-                msg_id = CAPTCHA_DATA().del_message_id(chat_id, user_id)
-                kb = None
-                try:
-                    chat_obj = await c.get_chat(chat_id)
-                    invite = getattr(chat_obj, "invite_link", None)
-                    if invite:
-                        kb = ikb([["ʟɪɴᴋ ᴛᴏ ᴄʜᴀᴛ", f"{invite}", "url"]])
-                except Exception:
-                    kb = None
-
-                await m.reply_text("ʏᴏᴜ ᴄᴀɴ ɴᴏᴡ ᴛᴀʟᴋ ɪɴ ᴛʜᴇ ᴄʜᴀᴛ", reply_markup=kb)
-                try:
-                    if msg_id:
-                        await c.delete_messages(chat_id, msg_id)
-                except Exception:
-                    pass
-                return
-
-        # default private start message (no args)
         try:
-            cpt = (
-                f"ʜᴇʏ {m.from_user.first_name or ''}! ɪ ᴀᴍ {c.me.first_name} ✨.\n\n"
-                "ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!\n"
-                "ʜɪᴛ /help ᴛᴏ ғɪɴᴅ ᴏᴜᴛ ᴍᴏʀᴇ ᴀʙᴏᴜᴛ ʜᴏᴡ ᴛᴏ ᴜsᴇ ᴍᴇ ɪɴ ᴍʏ ғᴜʟʟ ᴘᴏᴛᴇɴᴛɪᴀʟ!\n\n"
-                "ᴊᴏɪɴ ᴍʏ ɴᴇᴡs ᴄʜᴀɴɴᴇʟ ᴛᴏ ɢᴇᴛ ʟᴀᴛᴇsᴛ ᴜᴘᴅᴀᴛᴇs."
+            cpt = f"""
+ʜᴇʏ [{m.from_user.first_name}](http://t.me/{m.from_user.username})! ɪ ᴀᴍ {c.me.first_name} ✨.
+ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
+ʜɪᴛ /help ᴛᴏ ғɪɴᴅ ᴏᴜᴛ ᴍᴏʀᴇ ᴀʙᴏᴜᴛ ʜᴏᴡ ᴛᴏ ᴜsᴇ ᴍᴇ ɪɴ ᴍʏ ғᴜʟʟ ᴘᴏᴛᴇɴᴛɪᴀʟ!
+
+ᴊᴏɪɴ ᴍʏ [ɴᴇᴡs ᴄʜᴀɴɴᴇʟ](http://t.me/shadowbotshq) ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ᴏɴ ᴀʟʟ ᴛʜᴇ ʟᴀᴛᴇsᴛ ᴜᴘᴅᴀᴛᴇs."""
+            await m.reply_video(
+                video=CATBOX_VIDEO_URL,
+                caption=cpt,
+                reply_markup=(await gen_start_kb(m)),
+                quote=True,
             )
-            await m.reply_video(video=CATBOX_VIDEO_URL, caption=cpt, reply_markup=(await gen_start_kb(m)), quote=True)
         except UserIsBlocked:
-            LOGGER.warning("Bot blocked by user %s", m.from_user.id)
-        except Exception as e:
-            LOGGER.exception("Failed to send start private message: %s", e)
-
-    # GROUP CHAT
+            LOGGER.warning(f"ʙᴏᴛ ʙʟᴏᴄᴋᴇᴅ ʙʏ {m.from_user.id}")
     else:
+        # For groups, no loading animation
         kb = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("ᴄᴏɴɴᴇᴄᴛ ᴍᴇ ᴛᴏ ᴘᴍ", url=f"https://t.me/{c.me.username}?start=help")]]
+            [[InlineKeyboardButton("ᴄᴏɴɴᴇᴄᴛ ᴍᴇ ᴛᴏ ᴘᴍ", url=f"https://{c.me.username}.t.me/")]]
         )
-        try:
-            await m.reply_video(video=CATBOX_VIDEO_URL, caption="ɪ'ᴍ ᴀʟɪᴠᴇ :3", reply_markup=kb, quote=True)
-        except Exception as e:
-            LOGGER.exception("Failed to reply in group start: %s", e)
+        await m.reply_video(
+            video=CATBOX_VIDEO_URL,
+            caption="ɪ'ᴍ ᴀʟɪᴠᴇ :3",
+            reply_markup=kb,
+            quote=True,
+        )
 
 
-# -----------------------
-# start_back callback
-# -----------------------
+# ─── Start Back ───
 @Gojo.on_callback_query(filters.regex("^start_back$"))
 async def start_back(c: Gojo, q: CallbackQuery):
     try:
-        cpt = (
-            f"ʜᴇʏ {q.from_user.first_name or ''}! ɪ ᴀᴍ {c.me.first_name} ✨.\n\n"
-            "ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!\n\n"
-            "ʜɪᴛ /help ᴛᴏ ғɪɴᴅ ᴏᴜᴛ ᴍᴏʀᴇ ᴀʙᴏᴜᴛ ʜᴏᴡ ᴛᴏ ᴜsᴇ ᴍᴇ ɪɴ ᴍʏ ғᴜʟʟ ᴘᴏᴛᴇɴᴛɪᴀʟ!"
-        )
+        cpt = f"""
+ʜᴇʏ [{q.from_user.first_name}](http://t.me/{q.from_user.username})! ɪ ᴀᴍ {c.me.first_name} ✨.
+ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴜᴏ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
+ʜɪᴛ /help ᴛᴏ ғɪɴᴅ ᴏᴜᴛ ᴍᴏʀᴇ ᴀʙᴏᴜᴛ ʜᴏᴡ ᴛᴜ ᴜsᴇ ᴍᴇ ɪɴ ᴍʏ ғᴜʟʟ ᴘᴏᴛᴇɴᴛɪᴀʟ!
+
+ᴊᴏɪɴ ᴍʏ [ɴᴇᴡs ᴄʜᴀɴɴᴇʟ](http://t.me/shadowbotshq) ᴛᴏ ɢᴇᴛ ɪɴғᴏʀᴍᴀᴛɪᴜɴ ᴏɴ ᴀʟʟ ᴛʜᴇ ʟᴀᴛᴇsᴛ ᴜᴘᴅᴀᴛᴇs."""
         await q.edit_message_caption(caption=cpt, reply_markup=(await gen_start_kb(q.message)))
     except MessageNotModified:
-        # nothing to do
         pass
-    except Exception as e:
-        LOGGER.exception("Failed in start_back: %s", e)
     await q.answer()
 
 
-# -----------------------
-# Commands (paginated) menu
-# -----------------------
+# ─── Commands ───
 @Gojo.on_callback_query(filters.regex("^commands$"))
 async def commands_menu(c: Gojo, q: CallbackQuery):
+    # Use the original order of plugins as they are queued
     modules = list(HELP_COMMANDS.keys())
     buttons = [
         InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}")
         for x in modules
     ]
     keyboard = paginate_buttons(buttons, page=1)
+    
+    msg = f"""
+ʜᴇʏ **[{q.from_user.first_name}](http://t.me/{q.from_user.username})**! ɪ ᴀᴍ {c.me.first_name}✨.
+ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
 
-    msg = (
-        f"ʜᴇʏ {q.from_user.first_name or ''}! ɪ ᴀᴍ {c.me.first_name}✨.\n\n"
-        "ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!\n\n"
-        "ᴄʜᴏᴏsᴇ ᴀ ᴍᴏᴅᴜʟᴇ ғʀᴏᴍ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴅᴇᴛᴀɪʟᴇᴅ ʜᴇʟᴘ."
-    )
+ᴀᴠᴀɪʟᴀʙʟᴇ ᴍᴏᴅᴜʟᴇs:
+ᴄʜᴏᴏsᴇ ᴀ ᴍᴏᴅᴜʟᴇ ғʀᴏᴍ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴅᴇᴛᴀɪʟᴇᴅ ʜᴇʟᴘ."""
 
     try:
         await q.edit_message_caption(caption=msg, reply_markup=keyboard)
     except MessageNotModified:
         pass
     except QueryIdInvalid:
-        # fallback: send as a new message
-        try:
-            await q.message.reply_video(video=CATBOX_VIDEO_URL, caption=msg, reply_markup=keyboard)
-        except Exception as e:
-            LOGGER.exception("Failed to fallback-send commands menu: %s", e)
-    except Exception as e:
-        LOGGER.exception("Failed to edit commands menu: %s", e)
+        await q.message.reply_video(video=CATBOX_VIDEO_URL, caption=msg, reply_markup=keyboard)
     await q.answer()
 
 
-# -----------------------
-# /help handler
-# -----------------------
+# ─── Help ───
 @Gojo.on_message(command("help"))
 async def help_menu(c: Gojo, m: Message):
-    text = (m.text or "").strip()
-
-    # user supplied an option: /help <module>
-    if text and len(text.split()) >= 2:
-        # reconstruct the option in a safe manner
-        textt = text.replace(" ", "_", 1).replace("_", " ", 1)
-        help_option = textt.split(None, 1)[1].lower()
-
+    # No loading animation for help command in any chat type
+    if len(m.text.split()) >= 2:
+        textt = m.text.replace(" ", "_").replace("_", " ", 1)
+        help_option = (textt.split(None)[1]).lower()
         help_msg, help_kb = await get_help_msg(c, m, help_option)
+
         if not help_msg:
-            LOGGER.error("No help_msg found for %s", help_option)
+            LOGGER.error(f"ɴᴏ ʜᴇʟᴘ_ᴍsɢ ғᴏᴜɴᴅ ғᴏʀ ʜᴇʟᴘ_ᴏᴘᴛɪᴏɴ - {help_option}!!")
             return
 
         if m.chat.type == ChatType.PRIVATE:
-            # If the caption is too long for video, send text first
             if len(help_msg) >= 1026:
                 await m.reply_text(help_msg, parse_mode=enums.ParseMode.MARKDOWN, quote=True)
             await m.reply_video(
@@ -383,125 +270,89 @@ async def help_menu(c: Gojo, m: Message):
                 quote=True,
             )
         else:
-            # In groups provide button to open in PM
             await m.reply_video(
                 video=CATBOX_VIDEO_URL,
                 caption=f"ᴘʀᴇss ᴛʜᴇ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ʜᴇʟᴘ ғᴏʀ <i>{help_option}</i>",
                 reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("ʜᴇʟᴘ", url=f"https://t.me/{c.me.username}?start={help_option}")]]
+                    [[InlineKeyboardButton("ʜᴇʟᴘ", url=f"t.me/{c.me.username}?start={help_option}")]]
                 ),
             )
-        return
-
-    # no option -> show paginated module list
-    if m.chat.type == ChatType.PRIVATE:
-        modules = list(HELP_COMMANDS.keys())
-        buttons = [
-            InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}")
-            for x in modules
-        ]
-        keyboard = paginate_buttons(buttons, page=1)
-        msg = (
-            f"ʜᴇʏ {m.from_user.first_name or ''}! ɪ ᴀᴍ {c.me.first_name}✨.\n\n"
-            "ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!\n\n"
-            "ᴄʜᴏᴏsᴇ ᴀ ᴍᴏᴅᴜʟᴇ ғʀᴏᴍ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴅᴇᴛᴀɪʟᴇᴅ ʜᴇʟᴘ."
-        )
-        await m.reply_video(video=CATBOX_VIDEO_URL, caption=msg, reply_markup=keyboard)
     else:
-        # group - ask user to open PM for help menu
-        await m.reply_video(
-            video=CATBOX_VIDEO_URL,
-            caption="ɪ'ʟʟ sᴇɴᴅ ʏᴏᴜ ᴛʜᴇ ʜᴇʟᴘ ᴍᴇɴᴜ ɪɴ ᴘʀɪᴠᴀᴛᴇ!",
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("ᴏᴘᴇɴ ʜᴇʟᴘ ᴍᴇɴᴜ", url=f"https://t.me/{c.me.username}?start=help")]]
-            ),
-        )
+        if m.chat.type == ChatType.PRIVATE:
+            # Use the original order of plugins as they are queued
+            modules = list(HELP_COMMANDS.keys())
+            buttons = [
+                InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}")
+                for x in modules
+            ]
+            keyboard = paginate_buttons(buttons, page=1)
+            msg = f"""
+ʜᴇʏ **[{m.from_user.first_name}](http://t.me/{m.from_user.username})**! ɪ ᴀᴍ {c.me.first_name}✨.
+ɪ'ᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ(s)!
+
+ᴀᴠᴀɪʟᴀʙʟᴇ ᴍᴏᴑᴜʟᴇs:
+ᴄʜᴏᴏsᴇ ᴀ ᴍᴏᴅᴜʟᴇ ғʀᴏᴍ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴅᴇᴛᴀɪʟᴇᴅ ʜᴇʟᴘ."""
+            await m.reply_video(video=CATBOX_VIDEO_URL, caption=msg, reply_markup=keyboard)
+        else:
+            # In groups, redirect to the paginated help menu
+            await m.reply_video(
+                video=CATBOX_VIDEO_URL,
+                caption="ɪ'ʟʟ sᴇɴᴅ ʏᴏᴜ ᴛʜᴇ ʜᴇʟᴘ ᴍᴇɴᴜ ɪɴ ᴘʀɪᴠᴀᴛᴇ!",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("ᴏᴘᴇɴ ʜᴇʟᴘ ᴍᴇɴᴜ", url=f"https://t.me/{c.me.username}?start=help")]]
+                )
+            )
 
 
-# -----------------------
-# pagination callback for help modules
-# -----------------------
+# ─── Pagination Handler ───
 @Gojo.on_callback_query(filters.regex(r"^help_page_[0-9]+$"))
 async def paginate_help(c: Gojo, q: CallbackQuery):
-    try:
-        page = int(q.data.split("_")[-1])
-    except Exception:
-        page = 1
-
+    page = int(q.data.split("_")[-1])
+    # Use the original order of plugins as they are queued
     modules = list(HELP_COMMANDS.keys())
-    buttons = [
-        InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}")
-        for x in modules
-    ]
+    buttons = [InlineKeyboardButton(x.split(".")[-1].title(), callback_data=f"plugins.{x.split('.')[-1]}") for x in modules]
     keyboard = paginate_buttons(buttons, page=page)
-    try:
-        await q.edit_message_reply_markup(reply_markup=keyboard)
-    except Exception as e:
-        LOGGER.exception("Failed to paginate help: %s", e)
+    await q.edit_message_reply_markup(reply_markup=keyboard)
     await q.answer()
 
 
-# -----------------------
-# current info (ping, uptime, versions)
-# -----------------------
+# ─── Current Info ───
 @Gojo.on_callback_query(filters.regex("^bot_curr_info$"))
 async def give_curr_info(c: Gojo, q: CallbackQuery):
-    start_ts = time()
+    start = time()
     up = strftime("%Hh %Mm %Ss", gmtime(time() - UPTIME))
-    try:
-        x = await c.send_message(q.message.chat.id, "ᴘɪɴɢɪɴɢ..")
-        delta_ping = time() - start_ts
-        await x.delete()
-    except Exception:
-        delta_ping = time() - start_ts
-
-    txt = (
-        f"🏓 ᴘɪɴɢ : {delta_ping * 1000:.3f} ms\n"
-        f"📈 ᴜᴘᴛɪᴍᴇ : {up}\n"
-        f"🤖 ʙᴏᴘ's ᴠᴇʀsɪᴏɴ: {VERSION}\n"
-        f"🐍 ᴘʏᴛʜᴏɴ's ᴠᴇʀsɪᴏɴ: {PYTHON_VERSION}\n"
-        f"🔥 ᴘʏʀᴏɢʀᴀᴍ's ᴠᴇʀsɪᴏɴ : {PYROGRAM_VERSION}"
-    )
+    x = await c.send_message(q.message.chat.id, "ᴘɪɴɢɪɴɢ..")
+    delta_ping = time() - start
+    await x.delete()
+    txt = f"""
+🏓 ᴘɪɴɢ : {delta_ping * 1000:.3f} ms
+📈 ᴜᴘᴛɪᴍᴇ : {up}
+🤖 ʙᴏᴘ's ᴠᴇʀsɪᴏɴ: {VERSION}
+🐍 ᴘʏᴛʜᴏɴ's ᴠᴇʀsɪᴏɴ: {PYTHON_VERSION}
+🔥 ᴘʏʀᴏɢʀᴀᴍ's ᴠᴇʀsɪᴏɴ : {PYROGRAM_VERSION}
+    """
     await q.answer(txt, show_alert=True)
 
 
-# -----------------------
-# module info callback
-# -----------------------
-@Gojo.on_callback_query(filters.regex(r"^plugins\."))
+# ─── Module Info ───
+@Gojo.on_callback_query(filters.regex("^plugins."))
 async def get_module_info(c: Gojo, q: CallbackQuery):
-    # data is like "plugins.ModuleName"
-    try:
-        module = q.data.split(".", 1)[1]
-    except Exception:
-        await q.answer("Invalid module.")
-        return
-
-    key = f"plugins.{module}"
-    if key not in HELP_COMMANDS:
-        await q.answer("Unknown module.")
-        return
-
-    help_msg = HELP_COMMANDS[key].get("help_msg", "")
-    help_kb = HELP_COMMANDS[key].get("buttons", [])
+    module = q.data.split(".", 1)[1]
+    help_msg = HELP_COMMANDS[f"plugins.{module}"]["help_msg"]
+    help_kb = HELP_COMMANDS[f"plugins.{module}"]["buttons"]
 
     try:
-        await q.edit_message_caption(caption=help_msg, parse_mode=enums.ParseMode.MARKDOWN, reply_markup=ikb(help_kb, True, todo="commands"))
+        await q.edit_message_caption(
+            caption=help_msg,
+            parse_mode=enums.ParseMode.MARKDOWN,
+            reply_markup=ikb(help_kb, True, todo="commands"),
+        )
     except MediaCaptionTooLong:
-        caption, kb = await get_divided_msg(key, back_to_do="commands")
-        try:
-            await q.edit_message_caption(caption, enums.ParseMode.MARKDOWN, kb)
-        except Exception as e:
-            LOGGER.exception("Failed to edit message caption with divided msg: %s", e)
-    except Exception as e:
-        LOGGER.exception("Failed to show module info: %s", e)
+        caption, kb = await get_divided_msg(f"plugins.{module}", back_to_do="commands")
+        await q.edit_message_caption(caption, enums.ParseMode.MARKDOWN, kb)
     await q.answer()
 
 
-# -----------------------
-# botstaff command (owner/sudo-only - silently ignore others)
-# -----------------------
-from pyrogram.enums import ParseMode
 # -----------------------
 # botstaff command (owner/sudo-only - silently ignore others)
 # -----------------------
@@ -532,7 +383,7 @@ async def give_bot_staffs(c: Gojo, m: Message):
     # Get fresh staff data from vars
     owner_id = getattr(vars_module, "OWNER_ID", OWNER_ID)
     dev_users = getattr(vars_module, "DEV_USERS", []) or []
-    sudo_users = getattr(vars_module, "SUDO_USERS", []) or []
+    sudo_users = getattr(vars_module, "SUDO_USERS", [7732844436]) or []
     whitelist_users = getattr(vars_module, "WHITELIST_USERS", []) or []
 
     # Owner
@@ -631,20 +482,12 @@ async def give_bot_staffs(c: Gojo, m: Message):
         await m.reply_text(
             reply,
             parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("« Back to Start", callback_data="start_back")]]
-            ),
         )
     except Exception as e:
         LOGGER.exception("Failed to send botstaff reply: %s", e)
 
-# -----------------------
-# delete callback
-# -----------------------
+
+# ─── Delete ───
 @Gojo.on_callback_query(filters.regex("^DELETEEEE$"))
-async def delete_back(_: Gojo, q: CallbackQuery):
-    try:
-        await q.message.delete()
-    except Exception:
-        pass
-    await q.answer()
+async def delete_back(_, q: CallbackQuery):
+    await q.message.delete()
