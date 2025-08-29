@@ -151,8 +151,7 @@ async def calc_handler(c: Gojo, m: Message):
         await m.reply_text(
             f"🧮 **Advanced Calculation**\n\n"
             f"**Expression:** `{expr}`\n"
-            f"**Result:** `{result}`\n\n"
-            f"*Powered by advanced math engine*",
+            f"**Result:** `{result}`\n\n",
             parse_mode=PM.MARKDOWN,
             reply_to_message_id=m.id,
             reply_markup=keyboard
