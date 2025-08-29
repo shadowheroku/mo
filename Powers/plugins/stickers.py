@@ -401,44 +401,6 @@ async def remove_sticker_from_pack(c: Gojo, m: Message):
         LOGGER.error(format_exc())
     return
 
-
-@Gojo.on_message(command(["mmfb", "mmfw", "mmf"]))
-async def memify_it(c: Gojo, m: Message):
-    if not m.reply_to_message:
-        await m.reply_text("Invalid type.")
-        return
-    rep_to = m.reply_to_message
-    if not (rep_to.sticker or rep_to.photo or (rep_to.document and "image" in rep_to.document.mime_type.split("/"))):
-        await m.reply_text("I only support memifying of normal sticker and photos for now")
-        return
-    if rep_to.sticker and (rep_to.sticker.is_animated or rep_to.sticker.is_video):
-        await m.reply_text("I only support memifying of normal sticker and photos for now")
-        return
-    if len(m.command) == 1:
-        await m.reply_text("Give me something to write")
-        return
-    filll = m.command[0][-1]
-    fiil = "black" if filll == "b" else "white"
-    x = await m.reply_text("Memifying...")
-    meme = m.text.split(None, 1)[1].strip()
-    name = f"@memesofdank_{m.id}.png"
-    path = await rep_to.download(name)
-    is_sticker = bool(rep_to.sticker)
-    output = await draw_meme(path, meme, is_sticker, fiil)
-    await x.delete()
-    xNx = await xNx.reply_sticker(output[1], reply_markup=kb)
-    try:
-        os.remove(output[0])
-        os.remove(output[1])
-    except Exception as e:
-        LOGGER.error(e)
-        LOGGER.error(format_exc())
-    return
-
-
-
-
-
 @Gojo.on_message(command(["getsticker", "getst"]))
 async def get_sticker_from_file(c: Gojo, m: Message):
     Caption = f"Converted by:\n@{c.me.username}"
