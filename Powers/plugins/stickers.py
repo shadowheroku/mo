@@ -402,194 +402,59 @@ async def remove_sticker_from_pack(c: Gojo, m: Message):
     return
 
 
-import os
-import asyncio
-import tempfile
-import textwrap
-from traceback import format_exc
-from PIL import Image, ImageDraw, ImageFont, ImageOps
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-
-from Powers.bot_class import Gojo
-from Powers.utils.custom_filters import command
-
-# ─── FONT CONFIG ───
-FONTS = ["arialbd.ttf", "arial.ttf"]  # Try bold, then regular
-DEFAULT_FONT_SIZE = 42
-
-# ─── MAIN COMMAND ───
-@Gojo.on_message(command(["mmf", "mmfb", "mmfw"]))
+@Gojo.on_message(command(["mmfb", "mmfw", "mmf"]))
 async def memify_it(c: Gojo, m: Message):
-    """
-    Memify images/stickers with text overlay
-    Supports black (/mmfb) and white (/mmfw) text
-    """
+    if not m.reply_to_message:
+        await m.reply_text("Reply to a sticker/photo/video to memify it.")
+        return
+
+    rep_to = m.reply_to_message
+    if not (rep_to.sticker or rep_to.photo or (rep_to.document and "image" in rep_to.document.mime_type.split("/"))):
+        await m.reply_text("❌ I only support stickers, photos, and image documents.")
+        return
+
+    if len(m.command) == 1:
+        await m.reply_text("⚠️ Give me some text to write on the meme.")
+        return
+
+    x = await m.reply_text("🎨 Memifying...")
+
+    meme = m.text.split(None, 1)[1].strip()
+    name = f"memify_{m.id}"
+
+    # Download input
+    path = await rep_to.download(f"{name}")
+
+    # Handle sticker type
+    if rep_to.sticker:
+        if rep_to.sticker.is_animated:  # .tgs
+            output = await draw_meme_tgs(path, meme)
+        elif rep_to.sticker.is_video:  # .webm
+            output = await draw_meme_webm(path, meme)
+        else:  # static sticker
+            output = await draw_meme(path, meme, True)
+    else:
+        output = await draw_meme(path, meme, False)
+
+    await x.delete()
+    await m.reply_sticker(output)
+
     try:
-        # Must reply to media
-        if not m.reply_to_message:
-            return await m.reply_text("❌ Reply to an image/sticker with some text.")
-
-        rep_to = m.reply_to_message
-
-        # Supported media: photo, static sticker, or image document
-        valid_media = (
-            (rep_to.photo) or
-            (rep_to.sticker and not rep_to.sticker.is_animated and not rep_to.sticker.is_video) or
-            (rep_to.document and rep_to.document.mime_type and rep_to.document.mime_type.startswith("image/"))
-        )
-        if not valid_media:
-            return await m.reply_text("❌ Only static images & stickers are supported.")
-
-        # Text to put on meme
-        if len(m.command) == 1:
-            return await m.reply_text("❌ Give me some text!\nExample: `/mmfb Hello World`")
-
-        meme_text = m.text.split(None, 1)[1].strip()
-        if not meme_text:
-            return await m.reply_text("❌ Meme text cannot be empty.")
-
-        if len(meme_text) > 200:
-            return await m.reply_text("❌ Text too long! (max 200 chars)")
-
-        # Determine color
-        fill_color = "black" if m.command[0].endswith("b") else "white"
-
-        # Check if text contains semicolon for top/bottom text
-        if ";" in meme_text:
-            upper_text, lower_text = meme_text.split(";", 1)
-        else:
-            upper_text = meme_text
-            lower_text = ""
-
-        # Processing notice
-        status = await m.reply_text("🖌️ Memifying...")
-
-        # Temp workspace
-        with tempfile.TemporaryDirectory() as tmpdir:
-            input_path = os.path.join(tmpdir, f"in_{m.id}")
-            await rep_to.download(input_path)
-
-            if not os.path.exists(input_path) or os.path.getsize(input_path) == 0:
-                return await status.edit_text("❌ Failed to download media.")
-
-            output_paths = await draw_meme(input_path, upper_text, lower_text, bool(rep_to.sticker), fill_color, tmpdir)
-
-            if not output_paths:
-                return await status.edit_text("❌ Failed to generate meme.")
-
-            await status.delete()
-
-            # Send as photo
-            photo_msg = await m.reply_photo(
-                output_paths[0],
-                caption=f"🖼️ Meme: `{meme_text}`",
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("🔥 Channel", url="https://t.me/me_and_ghost")]]
-                )
-            )
-
-            # Delay → send as sticker
-            await asyncio.sleep(1)
-            sticker_msg = await m.reply_sticker(output_paths[1])
-
-            # Cleanup (optional auto-delete after 5 mins)
-            await asyncio.sleep(300)
-            try:
-                await photo_msg.delete()
-                await sticker_msg.delete()
-            except:
-                pass
-
+        os.remove(path)
+        os.remove(output)
     except Exception as e:
-        await m.reply_text(f"❌ Error: {str(e)}")
-        LOGGER.error(f"Memify error: {str(e)}\n{format_exc()}")
+        LOGGER.error(e)
+        LOGGER.error(format_exc())
+    return
 
-# ─── DRAW MEME FUNCTION ───
-async def draw_meme(input_path: str, upper_text: str, lower_text: str, is_sticker: bool, fill_color: str, tmpdir: str) -> list:
-    try:
-        with Image.open(input_path) as img:
-            # Ensure RGB
-            if img.mode != "RGB":
-                img = img.convert("RGB")
+from PIL import Image, ImageDraw, ImageFont
 
-            # Resize
-            max_size = (512, 512) if is_sticker else (1024, 1024)
-            img.thumbnail(max_size, Image.Resampling.LANCZOS)
+def draw_text_with_outline(img: Image.Image, text: str, pos: tuple, font: ImageFont.FreeTypeFont):
+    draw = ImageDraw.Draw(img)
+    # Black outline (stroke)
+    draw.text(pos, text, font=font, fill="white", stroke_width=3, stroke_fill="black")
+    return img
 
-            # Prepare drawing
-            draw = ImageDraw.Draw(img)
-            w, h = img.size
-            
-            # Load font
-            font_size = max(15, min(60, h // 12))
-            for f in FONTS:
-                try:
-                    font = ImageFont.truetype(f, font_size)
-                    break
-                except:
-                    continue
-            else:
-                font = ImageFont.load_default()
-
-            # Draw upper text
-            if upper_text:
-                await draw_text_with_outline(draw, upper_text, font, w, h, "top", fill_color)
-            
-            # Draw lower text
-            if lower_text:
-                await draw_text_with_outline(draw, lower_text, font, w, h, "bottom", fill_color)
-
-            # Save outputs
-            photo_out = os.path.join(tmpdir, "out_photo.jpg")
-            sticker_out = os.path.join(tmpdir, "out_sticker.webp")
-
-            img.save(photo_out, "JPEG", quality=95)
-
-            if is_sticker:
-                s_img = ImageOps.fit(img, (512, 512), method=Image.Resampling.LANCZOS)
-                s_img.save(sticker_out, "WEBP", quality=95)
-            else:
-                img.save(sticker_out, "WEBP", quality=95)
-
-            return [photo_out, sticker_out]
-
-    except Exception as e:
-        LOGGER.error(f"Draw meme error: {str(e)}\n{format_exc()}")
-        return []
-
-async def draw_text_with_outline(draw, text, font, width, height, position, fill_color):
-    """Draw text with outline at specified position"""
-    # Wrap text
-    max_chars = int(width / (font.size * 0.6))
-    wrapped = textwrap.wrap(text, width=max(max_chars, 10))
-    
-    # Calculate position
-    line_h = font.size * 1.2
-    total_h = len(wrapped) * line_h
-    
-    if position == "top":
-        y = 10
-    else:  # bottom
-        y = height - total_h - 10
-    
-    # Outline color (opposite of fill color)
-    outline_color = "white" if fill_color == "black" else "black"
-    
-    # Draw each line
-    for line in wrapped:
-        # Get text dimensions
-        bbox = draw.textbbox((0, 0), line, font=font)
-        text_w = bbox[2] - bbox[0]
-        x = (width - text_w) / 2
-
-        # Draw outline (shadow effect)
-        for dx in [-2, 2]:
-            for dy in [-2, 2]:
-                draw.text((x + dx, y + dy), line, font=font, fill=outline_color)
-
-        # Draw main text
-        draw.text((x, y), line, font=font, fill=fill_color)
-        y += line_h
 
 
 @Gojo.on_message(command(["getsticker", "getst"]))
