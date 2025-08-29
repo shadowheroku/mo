@@ -317,6 +317,20 @@ async def paginate_help(c: Gojo, q: CallbackQuery):
 
 
 # ─── Current Info ───
+def sudo_only(func):
+    async def wrapper(c: Gojo, m: Message):
+        try:
+            uid = m.from_user.id
+            # Import vars dynamically each time to get fresh data
+            from Powers import vars as vars_module
+            sudo_users = getattr(vars_module, "SUDO_USERS", []) or []
+            if uid != OWNER_ID and uid not in sudo_users:
+                return  # silently ignore
+        except Exception:
+            # if check fails, be conservative and ignore
+            return
+        return await func(c, m)
+    return wrapper
 @Gojo.on_message(command("botinfo") & (filters.group | filters.private))
 @sudo_only
 async def give_curr_info(c: Gojo, q: CallbackQuery):
