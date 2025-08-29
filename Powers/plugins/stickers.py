@@ -405,7 +405,7 @@ async def remove_sticker_from_pack(c: Gojo, m: Message):
 import os
 import asyncio
 import tempfile
-from textwrap import wrap
+import textwrap
 from traceback import format_exc
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
@@ -413,11 +413,9 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from Powers.bot_class import Gojo
 from Powers.utils.custom_filters import command
 
-
 # ─── FONT CONFIG ───
 FONTS = ["arialbd.ttf", "arial.ttf"]  # Try bold, then regular
 DEFAULT_FONT_SIZE = 42
-
 
 # ─── MAIN COMMAND ───
 @Gojo.on_message(command(["mmf", "mmfb", "mmfw"]))
@@ -456,6 +454,13 @@ async def memify_it(c: Gojo, m: Message):
         # Determine color
         fill_color = "black" if m.command[0].endswith("b") else "white"
 
+        # Check if text contains semicolon for top/bottom text
+        if ";" in meme_text:
+            upper_text, lower_text = meme_text.split(";", 1)
+        else:
+            upper_text = meme_text
+            lower_text = ""
+
         # Processing notice
         status = await m.reply_text("🖌️ Memifying...")
 
@@ -467,7 +472,7 @@ async def memify_it(c: Gojo, m: Message):
             if not os.path.exists(input_path) or os.path.getsize(input_path) == 0:
                 return await status.edit_text("❌ Failed to download media.")
 
-            output_paths = await draw_meme(input_path, meme_text, bool(rep_to.sticker), fill_color, tmpdir)
+            output_paths = await draw_meme(input_path, upper_text, lower_text, bool(rep_to.sticker), fill_color, tmpdir)
 
             if not output_paths:
                 return await status.edit_text("❌ Failed to generate meme.")
@@ -499,9 +504,8 @@ async def memify_it(c: Gojo, m: Message):
         await m.reply_text(f"❌ Error: {str(e)}")
         LOGGER.error(f"Memify error: {str(e)}\n{format_exc()}")
 
-
 # ─── DRAW MEME FUNCTION ───
-async def draw_meme(input_path: str, text: str, is_sticker: bool, fill_color: str, tmpdir: str) -> list:
+async def draw_meme(input_path: str, upper_text: str, lower_text: str, is_sticker: bool, fill_color: str, tmpdir: str) -> list:
     try:
         with Image.open(input_path) as img:
             # Ensure RGB
@@ -515,9 +519,9 @@ async def draw_meme(input_path: str, text: str, is_sticker: bool, fill_color: st
             # Prepare drawing
             draw = ImageDraw.Draw(img)
             w, h = img.size
-            font_size = max(15, min(60, h // 12))
-
+            
             # Load font
+            font_size = max(15, min(60, h // 12))
             for f in FONTS:
                 try:
                     font = ImageFont.truetype(f, font_size)
@@ -527,30 +531,13 @@ async def draw_meme(input_path: str, text: str, is_sticker: bool, fill_color: st
             else:
                 font = ImageFont.load_default()
 
-            # Wrap text
-            max_chars = int(w / (font_size * 0.6))
-            wrapped = wrap(text, width=max(max_chars, 10))
-
-            # Center vertically
-            line_h = font_size * 1.2
-            total_h = len(wrapped) * line_h
-            y = (h - total_h) / 2
-
-            # Draw lines
-            outline_color = "white" if fill_color == "black" else "black"
-            for line in wrapped:
-                bbox = draw.textbbox((0, 0), line, font=font)
-                text_w = bbox[2] - bbox[0]
-                x = (w - text_w) / 2
-
-                # Outline
-                for dx in [-2, 2]:
-                    for dy in [-2, 2]:
-                        draw.text((x + dx, y + dy), line, font=font, fill=outline_color)
-
-                # Main text
-                draw.text((x, y), line, font=font, fill=fill_color)
-                y += line_h
+            # Draw upper text
+            if upper_text:
+                await draw_text_with_outline(draw, upper_text, font, w, h, "top", fill_color)
+            
+            # Draw lower text
+            if lower_text:
+                await draw_text_with_outline(draw, lower_text, font, w, h, "bottom", fill_color)
 
             # Save outputs
             photo_out = os.path.join(tmpdir, "out_photo.jpg")
@@ -569,6 +556,40 @@ async def draw_meme(input_path: str, text: str, is_sticker: bool, fill_color: st
     except Exception as e:
         LOGGER.error(f"Draw meme error: {str(e)}\n{format_exc()}")
         return []
+
+async def draw_text_with_outline(draw, text, font, width, height, position, fill_color):
+    """Draw text with outline at specified position"""
+    # Wrap text
+    max_chars = int(width / (font.size * 0.6))
+    wrapped = textwrap.wrap(text, width=max(max_chars, 10))
+    
+    # Calculate position
+    line_h = font.size * 1.2
+    total_h = len(wrapped) * line_h
+    
+    if position == "top":
+        y = 10
+    else:  # bottom
+        y = height - total_h - 10
+    
+    # Outline color (opposite of fill color)
+    outline_color = "white" if fill_color == "black" else "black"
+    
+    # Draw each line
+    for line in wrapped:
+        # Get text dimensions
+        bbox = draw.textbbox((0, 0), line, font=font)
+        text_w = bbox[2] - bbox[0]
+        x = (width - text_w) / 2
+
+        # Draw outline (shadow effect)
+        for dx in [-2, 2]:
+            for dy in [-2, 2]:
+                draw.text((x + dx, y + dy), line, font=font, fill=outline_color)
+
+        # Draw main text
+        draw.text((x, y), line, font=font, fill=fill_color)
+        y += line_h
 
 
 @Gojo.on_message(command(["getsticker", "getst"]))
