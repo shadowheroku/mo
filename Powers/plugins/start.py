@@ -333,12 +333,14 @@ def sudo_only(func):
     return wrapper
 @Gojo.on_message(command("botinfo") & (filters.group | filters.private))
 @sudo_only
-async def give_curr_info(c: Gojo, q: CallbackQuery):
+async def give_curr_info(c: Gojo, m: Message):
     start = time()
     up = strftime("%Hh %Mm %Ss", gmtime(time() - UPTIME))
-    x = await c.send_message(q.message.chat.id, "ᴘɪɴɢɪɴɢ..")
+    
+    x = await c.send_message(m.chat.id, "ᴘɪɴɢɪɴɢ..")
     delta_ping = time() - start
     await x.delete()
+    
     txt = f"""
 🏓 ᴘɪɴɢ : {delta_ping * 1000:.3f} ms
 📈 ᴜᴘᴛɪᴍᴇ : {up}
@@ -346,7 +348,8 @@ async def give_curr_info(c: Gojo, q: CallbackQuery):
 🐍 ᴘʏᴛʜᴏɴ's ᴠᴇʀsɪᴏɴ: {PYTHON_VERSION}
 🔥 ᴘʏʀᴏɢʀᴀᴍ's ᴠᴇʀsɪᴏɴ : {PYROGRAM_VERSION}
     """
-    await q.reply_text(txt, show_alert=True)
+    await m.reply_text(txt)
+
 
 
 # ─── Module Info ───
