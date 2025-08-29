@@ -501,6 +501,11 @@ async def get_module_info(c: Gojo, q: CallbackQuery):
 # -----------------------
 # botstaff command (owner/sudo-only - silently ignore others)
 # -----------------------
+from pyrogram.enums import ParseMode
+
+# -----------------------
+# botstaff command (owner/sudo-only - silently ignore others)
+# -----------------------
 def sudo_only(func):
     async def wrapper(c: Gojo, m: Message):
         try:
@@ -515,7 +520,7 @@ def sudo_only(func):
     return wrapper
 
 
-@Gojo.on_message(filters.command("botstaff") & (filters.group | filters.private))
+@Gojo.on_message(command("botstaff") & (filters.group | filters.private))
 @sudo_only
 async def give_bot_staffs(c: Gojo, m: Message):
     reply_lines: List[str] = []
@@ -524,10 +529,13 @@ async def give_bot_staffs(c: Gojo, m: Message):
     try:
         owner = await c.get_users(OWNER_ID)
         owner_name = owner.first_name or "ᴛʜᴇ ᴄʀᴇᴀᴛᴏʀ"
-        reply_lines.append(f"<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴍᴍᴀɴᴅᴇʀ:</b> {(await mention_html(owner_name, OWNER_ID))} (<code>{OWNER_ID}</code>)")
+        reply_lines.append(
+            f"<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴍᴍᴀɴᴅᴇʀ:</b> "
+            f"{(await mention_html(owner_name, OWNER_ID))} (<code>{OWNER_ID}</code>)"
+        )
     except RPCError as e:
         LOGGER.error("Error getting owner info: %s", e)
-        reply_lines.append(f"<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴜᴍᴍᴀɴᴅᴇʀ:</b> <code>{OWNER_ID}</code>")
+        reply_lines.append(f"<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴍᴍᴀɴᴅᴇʀ:</b> <code>{OWNER_ID}</code>")
 
     # Developers
     true_dev = get_support_staff("dev") or []
@@ -550,7 +558,9 @@ async def give_bot_staffs(c: Gojo, m: Message):
             try:
                 user = await c.get_users(user_id)
                 user_name = user.first_name or "ᴀɴᴏɴʏᴍᴏᴜs ᴄᴏᴅᴇʀ"
-                reply_lines.append(f"• {(await mention_html(user_name, user_id))} (<code>{user_id}</code>)")
+                reply_lines.append(
+                    f"• {(await mention_html(user_name, user_id))} (<code>{user_id}</code>)"
+                )
             except RPCError:
                 reply_lines.append(f"• <code>{user_id}</code>")
             dev_count += 1
@@ -575,10 +585,13 @@ async def give_bot_staffs(c: Gojo, m: Message):
 
             if user_id == OWNER_ID or (true_dev and str(user_id) in true_dev):
                 continue
+
             try:
                 user = await c.get_users(user_id)
                 user_name = user.first_name or "ᴍʏsᴛᴇʀɪᴏᴜs ʀɪᴅᴇʀ"
-                reply_lines.append(f"• {(await mention_html(user_name, user_id))} (<code>{user_id}</code>)")
+                reply_lines.append(
+                    f"• {(await mention_html(user_name, user_id))} (<code>{user_id}</code>)"
+                )
             except RPCError:
                 reply_lines.append(f"• <code>{user_id}</code>")
             sudo_count += 1
@@ -586,7 +599,7 @@ async def give_bot_staffs(c: Gojo, m: Message):
         if sudo_count == 0:
             reply_lines.append("No dragon masters available")
 
-    # Whitelisted
+    # Whitelisted users
     wl = get_support_staff("whitelist") or []
     reply_lines.append("\n<b>🦊 sʜᴀᴅᴏᴡ ᴀɢᴇɴᴛs:</b>")
     if not wl:
@@ -601,15 +614,19 @@ async def give_bot_staffs(c: Gojo, m: Message):
                 wl_count += 1
                 continue
 
-            if (user_id == OWNER_ID or
-                (true_dev and str(user_id) in true_dev) or
-                (true_sudo and str(user_id) in true_sudo)):
+            if (
+                user_id == OWNER_ID
+                or (true_dev and str(user_id) in true_dev)
+                or (true_sudo and str(user_id) in true_sudo)
+            ):
                 continue
 
             try:
                 user = await c.get_users(user_id)
                 user_name = user.first_name or "sᴇᴄʀᴇᴛ ᴀɢᴇɴᴛ"
-                reply_lines.append(f"• {(await mention_html(user_name, user_id))} (<code>{user_id}</code>)")
+                reply_lines.append(
+                    f"• {(await mention_html(user_name, user_id))} (<code>{user_id}</code>)"
+                )
             except RPCError:
                 reply_lines.append(f"• <code>{user_id}</code>")
             wl_count += 1
@@ -617,20 +634,24 @@ async def give_bot_staffs(c: Gojo, m: Message):
         if wl_count == 0:
             reply_lines.append("No covert operatives deployed")
 
-    # final note
-    reply_lines.append("\n\n<i>These are whitelisted users — those chosen to wield the bot's power across the digital realm!</i> ✨")
+    # Flavor text
+    reply_lines.append(
+        "\n\n<i>These are whitelisted users — those chosen to wield the bot's power across the digital realm!</i> ✨"
+    )
 
     reply = "\n".join(reply_lines)
 
     try:
         await m.reply_text(
             reply,
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back to Start", callback_data="start_back")]]),
-            disable_web_page_preview=True,
-            parse_mode="html",
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("« Back to Start", callback_data="start_back")]]
+            ),
         )
     except Exception as e:
         LOGGER.exception("Failed to send botstaff reply: %s", e)
+
 
 
 # -----------------------
