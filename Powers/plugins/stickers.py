@@ -1013,5 +1013,3 @@ __HELP__ = """
 mmf ᴀɴᴅ getsticker ᴏɴʟʏ sᴜᴘᴘᴏʀᴛ ᴘʜᴏᴛᴏ ᴀɴᴅ ɴᴏʀᴍᴀʟ sᴛɪᴄᴋᴇʀs ғᴏʀ ɴᴏᴡ.
 """
 
-
-update this all and make everything working
