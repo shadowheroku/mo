@@ -502,7 +502,6 @@ async def get_module_info(c: Gojo, q: CallbackQuery):
 # botstaff command (owner/sudo-only - silently ignore others)
 # -----------------------
 from pyrogram.enums import ParseMode
-
 # -----------------------
 # botstaff command (owner/sudo-only - silently ignore others)
 # -----------------------
@@ -510,8 +509,10 @@ def sudo_only(func):
     async def wrapper(c: Gojo, m: Message):
         try:
             uid = m.from_user.id
-            sudo_users = get_support_staff("sudo") or []
-            if uid != OWNER_ID and str(uid) not in sudo_users:
+            # Import vars dynamically each time to get fresh data
+            from Powers import vars as vars_module
+            sudo_users = getattr(vars_module, "SUDO_USERS", []) or []
+            if uid != OWNER_ID and uid not in sudo_users:
                 return  # silently ignore
         except Exception:
             # if check fails, be conservative and ignore
@@ -523,36 +524,37 @@ def sudo_only(func):
 @Gojo.on_message(command("botstaff") & (filters.group | filters.private))
 @sudo_only
 async def give_bot_staffs(c: Gojo, m: Message):
+    # Import vars dynamically each time to get fresh data
+    from Powers import vars as vars_module
+    
     reply_lines: List[str] = []
+
+    # Get fresh staff data from vars
+    owner_id = getattr(vars_module, "OWNER_ID", OWNER_ID)
+    dev_users = getattr(vars_module, "DEV_USERS", []) or []
+    sudo_users = getattr(vars_module, "SUDO_USERS", []) or []
+    whitelist_users = getattr(vars_module, "WHITELIST_USERS", []) or []
 
     # Owner
     try:
-        owner = await c.get_users(OWNER_ID)
+        owner = await c.get_users(owner_id)
         owner_name = owner.first_name or "ᴛʜᴇ ᴄʀᴇᴀᴛᴏʀ"
         reply_lines.append(
             f"<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴍᴍᴀɴᴅᴇʀ:</b> "
-            f"{(await mention_html(owner_name, OWNER_ID))} (<code>{OWNER_ID}</code>)"
+            f"{(await mention_html(owner_name, owner_id))} (<code>{owner_id}</code>)"
         )
     except RPCError as e:
         LOGGER.error("Error getting owner info: %s", e)
-        reply_lines.append(f"<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴍᴍᴀɴᴅᴇʀ:</b> <code>{OWNER_ID}</code>")
+        reply_lines.append(f"<b>👑 sᴜᴘʀᴇᴍᴇ ᴄᴏᴍᴍᴀɴᴅᴇʀ:</b> <code>{owner_id}</code>")
 
     # Developers
-    true_dev = get_support_staff("dev") or []
     reply_lines.append("\n<b>⚡️ ᴄᴏᴅᴇ ᴡɪᴢᴀʀᴅs:</b>")
-    if not true_dev:
+    if not dev_users:
         reply_lines.append("No mystical coders found")
     else:
         dev_count = 0
-        for each_user in true_dev:
-            try:
-                user_id = int(each_user)
-            except Exception:
-                reply_lines.append(f"• <code>{each_user}</code>")
-                dev_count += 1
-                continue
-
-            if user_id == OWNER_ID:
+        for user_id in dev_users:
+            if user_id == owner_id:
                 continue
 
             try:
@@ -569,21 +571,13 @@ async def give_bot_staffs(c: Gojo, m: Message):
             reply_lines.append("No mystical coders found")
 
     # Sudo users
-    true_sudo = get_support_staff("sudo") or []
     reply_lines.append("\n<b>🐲 ᴅʀᴀɢᴏɴ ʀɪᴅᴇʀs:</b>")
-    if not true_sudo:
+    if not sudo_users:
         reply_lines.append("No dragon masters available")
     else:
         sudo_count = 0
-        for each_user in true_sudo:
-            try:
-                user_id = int(each_user)
-            except Exception:
-                reply_lines.append(f"• <code>{each_user}</code>")
-                sudo_count += 1
-                continue
-
-            if user_id == OWNER_ID or (true_dev and str(user_id) in true_dev):
+        for user_id in sudo_users:
+            if user_id == owner_id or user_id in dev_users:
                 continue
 
             try:
@@ -600,24 +594,16 @@ async def give_bot_staffs(c: Gojo, m: Message):
             reply_lines.append("No dragon masters available")
 
     # Whitelisted users
-    wl = get_support_staff("whitelist") or []
     reply_lines.append("\n<b>🦊 sʜᴀᴅᴏᴡ ᴀɢᴇɴᴛs:</b>")
-    if not wl:
+    if not whitelist_users:
         reply_lines.append("No covert operatives deployed")
     else:
         wl_count = 0
-        for each_user in wl:
-            try:
-                user_id = int(each_user)
-            except Exception:
-                reply_lines.append(f"• <code>{each_user}</code>")
-                wl_count += 1
-                continue
-
+        for user_id in whitelist_users:
             if (
-                user_id == OWNER_ID
-                or (true_dev and str(user_id) in true_dev)
-                or (true_sudo and str(user_id) in true_sudo)
+                user_id == owner_id
+                or user_id in dev_users
+                or user_id in sudo_users
             ):
                 continue
 
@@ -651,8 +637,6 @@ async def give_bot_staffs(c: Gojo, m: Message):
         )
     except Exception as e:
         LOGGER.exception("Failed to send botstaff reply: %s", e)
-
-
 
 # -----------------------
 # delete callback
