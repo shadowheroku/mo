@@ -465,28 +465,37 @@ async def memify_it(c: Gojo, m: Message):
 
 
 # ─── DRAW STATIC MEME ───────────────────────────────
+from PIL import Image, ImageDraw, ImageFont
+import os
+
 async def draw_meme(path: str, text: str, is_sticker: bool) -> str:
     """Draw meme text (white fill with black outline) on static sticker/photo."""
     img = Image.open(path).convert("RGBA")
     draw = ImageDraw.Draw(img)
 
-    # Font setup
-    font_size = int(img.width / 10)
-    font = ImageFont.truetype("arial.ttf", font_size)
+    # Try to load a proper font
+    try:
+        font_size = int(img.width / 10)
+        font = ImageFont.truetype("DejaVuSans-Bold.ttf", font_size)
+    except Exception:
+        font = ImageFont.load_default()
 
-    # Text position (bottom centered)
+    # Prepare text
     text = text.upper()
     w, h = draw.textsize(text, font=font)
+
+    # Position at bottom center
     x = (img.width - w) / 2
     y = img.height - h - 20
 
-    # Draw outlined text
+    # Draw with white fill + black outline
     draw.text((x, y), text, font=font, fill="white", stroke_width=3, stroke_fill="black")
 
     # Save output
     out_path = f"{path}_meme.webp"
     img.save(out_path, "WEBP")
     return out_path
+
 
 
 # ─── PLACEHOLDER: ANIMATED STICKER (TGS) ───────────
