@@ -3,7 +3,7 @@
 from random import choice
 from time import gmtime, strftime, time
 import asyncio
-
+from pyrogram.enums import ParseMode
 from pyrogram import enums, filters
 from pyrogram.enums import ChatMemberStatus as CMS
 from pyrogram.enums import ChatType
