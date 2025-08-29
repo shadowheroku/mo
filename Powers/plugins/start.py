@@ -1,4 +1,4 @@
-rewrite this whole plugin 
+
 
 from random import choice
 from time import gmtime, strftime, time
