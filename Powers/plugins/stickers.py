@@ -402,6 +402,17 @@ async def remove_sticker_from_pack(c: Gojo, m: Message):
     return
 
 
+import os
+from traceback import format_exc
+from PIL import Image, ImageDraw, ImageFont
+from pyrogram.types import Message
+from Powers.bot_class import Gojo
+from Powers.utils.custom_filters import command
+from logging import getLogger
+
+LOGGER = getLogger(__name__)
+
+
 @Gojo.on_message(command(["mmfb", "mmfw", "mmf"]))
 async def memify_it(c: Gojo, m: Message):
     if not m.reply_to_message:
@@ -425,35 +436,76 @@ async def memify_it(c: Gojo, m: Message):
     # Download input
     path = await rep_to.download(f"{name}")
 
-    # Handle sticker type
-    if rep_to.sticker:
-        if rep_to.sticker.is_animated:  # .tgs
-            output = await draw_meme_tgs(path, meme)
-        elif rep_to.sticker.is_video:  # .webm
-            output = await draw_meme_webm(path, meme)
-        else:  # static sticker
-            output = await draw_meme(path, meme, True)
-    else:
-        output = await draw_meme(path, meme, False)
-
-    await x.delete()
-    await m.reply_sticker(output)
-
     try:
-        os.remove(path)
-        os.remove(output)
+        # Handle sticker type
+        if rep_to.sticker:
+            if rep_to.sticker.is_animated:  # .tgs
+                output = await draw_meme_tgs(path, meme)
+            elif rep_to.sticker.is_video:  # .webm
+                output = await draw_meme_webm(path, meme)
+            else:  # static sticker
+                output = await draw_meme(path, meme, is_sticker=True)
+        else:
+            output = await draw_meme(path, meme, is_sticker=False)
+
+        await x.delete()
+        await m.reply_sticker(output)
+
     except Exception as e:
+        await x.edit_text("❌ Failed to memify!")
         LOGGER.error(e)
         LOGGER.error(format_exc())
-    return
+    finally:
+        try:
+            os.remove(path)
+            if "output" in locals() and output and os.path.exists(output):
+                os.remove(output)
+        except Exception as e:
+            LOGGER.error(e)
 
-from PIL import Image, ImageDraw, ImageFont
 
-def draw_text_with_outline(img: Image.Image, text: str, pos: tuple, font: ImageFont.FreeTypeFont):
+# ─── DRAW STATIC MEME ───────────────────────────────
+async def draw_meme(path: str, text: str, is_sticker: bool) -> str:
+    """Draw meme text (white fill with black outline) on static sticker/photo."""
+    img = Image.open(path).convert("RGBA")
     draw = ImageDraw.Draw(img)
-    # Black outline (stroke)
-    draw.text(pos, text, font=font, fill="white", stroke_width=3, stroke_fill="black")
-    return img
+
+    # Font setup
+    font_size = int(img.width / 10)
+    font = ImageFont.truetype("arial.ttf", font_size)
+
+    # Text position (bottom centered)
+    text = text.upper()
+    w, h = draw.textsize(text, font=font)
+    x = (img.width - w) / 2
+    y = img.height - h - 20
+
+    # Draw outlined text
+    draw.text((x, y), text, font=font, fill="white", stroke_width=3, stroke_fill="black")
+
+    # Save output
+    out_path = f"{path}_meme.webp"
+    img.save(out_path, "WEBP")
+    return out_path
+
+
+# ─── PLACEHOLDER: ANIMATED STICKER (TGS) ───────────
+async def draw_meme_tgs(path: str, text: str) -> str:
+    """
+    TODO: Implement .tgs meme rendering with lottie.
+    For now just return original path to avoid crashing.
+    """
+    return path
+
+
+# ─── PLACEHOLDER: VIDEO STICKER (WEBM) ─────────────
+async def draw_meme_webm(path: str, text: str) -> str:
+    """
+    TODO: Implement .webm meme rendering with ffmpeg.
+    For now just return original path to avoid crashing.
+    """
+    return path
+
 
 
 
