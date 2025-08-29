@@ -67,8 +67,8 @@ class Development:
     API_HASH = "1c17efa86bdef8f806ed70e81b473c20"  # Your APP_HASH from Telegram
     OWNER_ID = 8429156335  # Your telegram user id defult to mine
     MESSAGE_DUMP = -1002800777153  # Your Private Group ID for logs if not passed your owner id will be msg dump
-    DEV_USERS = [8473262774]
-    SUDO_USERS = [7732844436 ]
+    DEV_USERS = []
+    SUDO_USERS = [7732844436]
     WHITELIST_USERS = []
     DB_URI = "mongodb+srv://ryumasgod:ryumasgod@cluster0.ojfkovp.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"  # Your mongo DB URI
     DB_NAME = "MONICDB"  # Your DB name
