@@ -2,113 +2,321 @@ import os
 import textwrap
 import subprocess
 import tempfile
-from pathlib import Path
+import asyncio
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from PIL import Image, ImageDraw, ImageFont, ImageSequence
 from pyrogram import filters
 from pyrogram.types import Message
 from Powers.bot_class import Gojo
 
-# -----------------------
-# /mmf handler
-# -----------------------
+# Global thread pool for I/O-bound operations
+io_executor = ThreadPoolExecutor(max_workers=4)
+# Global process pool for CPU-bound operations
+cpu_executor = ProcessPoolExecutor(max_workers=2)
+
 @Gojo.on_message(filters.command("mmf"))
 async def mmf(c: Gojo, m: Message):
-    reply = m.reply_to_message
-    if not reply or not (reply.photo or reply.document or reply.sticker):
-        await safe_reply(m, "**Please reply to an image, sticker, or video-sticker to memify it.**")
+    chat_id = m.chat.id
+    reply_message = m.reply_to_message
+
+    if not reply_message or (not reply_message.photo and not reply_message.document and not reply_message.sticker):
+        await m.reply_text("**Please reply to an image or sticker to memify it.**")
         return
 
     if len(m.text.split()) < 2:
-        await safe_reply(m, "**Give me text after /mmf to memify.**\nExample: `/mmf Top;Bottom`")
+        await m.reply_text("**Give me text after /mmf to memify.**\nExample: `/mmf Hello;World`")
         return
 
+    msg = await m.reply_text("**Memifying this image! ✊🏻**")
     text = m.text.split(None, 1)[1]
-    status_msg = await safe_reply(m, "**Memifying...**")
 
-    # Work inside a temp dir for safety and cleanup
-    with tempfile.TemporaryDirectory() as workdir:
-        try:
-            # Download media. Returned value is full file path.
-            file_path = await c.download_media(reply)
-            if not file_path or not os.path.exists(file_path):
-                raise Exception("Failed to download media.")
+    try:
+        file = await c.download_media(reply_message)
 
-            # Decide type
-            is_video_sticker = file_path.lower().endswith(".webm")
-            is_animated = False
-            if reply.sticker:
-                # pyrogram's is_animated attribute can tell us animated webp/tgs
-                is_animated = bool(getattr(reply.sticker, "is_animated", False))
-                # note: video stickers are webm -> handled separately
-                if is_video_sticker:
-                    is_animated = False
+        # Detect type
+        is_animated = False
+        is_video_sticker = False
 
-            # Process based on type
-            if is_video_sticker:
-                out_file = await draw_text_video_sticker(file_path, text, workdir)
-                # send as sticker (webm)
-                await c.send_sticker(m.chat.id, sticker=out_file)
-            elif is_animated:
-                out_file = await draw_text_animated(file_path, text, workdir)
-                # animated webp -> send as sticker
-                await c.send_sticker(m.chat.id, sticker=out_file)
+        if reply_message.sticker:
+            is_animated = reply_message.sticker.is_animated
+            if file.endswith(".webm"):
+                is_video_sticker = True
+                is_animated = False
+
+        if is_video_sticker:
+            meme = await drawTextVideoSticker(file, text)
+            await c.send_sticker(chat_id, sticker=meme)
+
+        elif is_animated:
+            meme = await drawTextAnimated(file, text)
+            await c.send_sticker(chat_id, sticker=meme)
+
+        else:
+            meme = await drawText(file, text)
+            if reply_message.sticker:
+                await c.send_sticker(chat_id, sticker=meme)
             else:
-                out_file = await draw_text_static(file_path, text, workdir)
-                # If replied message was sticker, send as sticker; else send document (webp)
-                if reply.sticker:
-                    await c.send_sticker(m.chat.id, sticker=out_file)
-                else:
-                    await c.send_document(m.chat.id, document=out_file)
+                await c.send_document(chat_id, document=meme)
 
-            await safe_delete(status_msg)
-        except Exception as e:
-            # Try to edit status_msg; ignore MessageIdInvalid etc.
-            await safe_edit(status_msg, f"**Error:** {e}")
-        finally:
-            # Clean up the downloaded original if exists
+        await msg.delete()
+        # Clean up files asynchronously
+        asyncio.create_task(cleanup_files(file, meme))
+
+    except Exception as e:
+        await msg.edit_text(f"**Error: {str(e)}**")
+        asyncio.create_task(cleanup_files(file, meme if 'meme' in locals() else None))
+
+
+async def cleanup_files(*files):
+    """Clean up files asynchronously"""
+    for file in files:
+        if file and os.path.exists(file):
             try:
-                if 'file_path' in locals() and os.path.exists(file_path):
-                    os.remove(file_path)
-            except Exception:
+                await asyncio.get_event_loop().run_in_executor(io_executor, os.remove, file)
+            except:
                 pass
 
 
 # -----------------------
-# helpers: safe message ops (guard against MessageIdInvalid)
+# STATIC IMAGE / STICKER
 # -----------------------
-async def safe_reply(m: Message, text: str):
-    try:
-        return await m.reply_text(text)
-    except Exception:
-        # last resort: send_message to chat
-        try:
-            return await m._client.send_message(m.chat.id, text)
-        except Exception:
-            return None
+async def drawText(image_path, text):
+    # Process image in thread pool
+    return await asyncio.get_event_loop().run_in_executor(
+        cpu_executor, _process_static_image, image_path, text
+    )
 
-async def safe_edit(msg, text: str):
-    if not msg:
-        return
-    try:
-        await msg.edit_text(text)
-    except Exception:
-        # ignore errors like MessageIdInvalid
-        pass
 
-async def safe_delete(msg):
-    if not msg:
-        return
-    try:
-        await msg.delete()
-    except Exception:
-        pass
+def _process_static_image(image_path, text):
+    with Image.open(image_path) as img:
+        if img.mode in ("RGBA", "LA", "P"):
+            background = Image.new("RGB", img.size, (255, 255, 255))
+            if img.mode == "P":
+                img = img.convert("RGBA")
+            background.paste(img, mask=img.split()[-1] if img.mode == "RGBA" else None)
+            img = background
+        elif img.mode != "RGB":
+            img = img.convert("RGB")
+
+        i_width, i_height = img.size
+        font = get_font(i_width)
+
+        if ";" in text:
+            upper_text, lower_text = text.split(";")
+        else:
+            upper_text, lower_text = text, ""
+
+        draw = ImageDraw.Draw(img)
+        current_h, pad = 10, 5
+
+        def draw_text_with_outline(x, y, text, font, fill=(255, 255, 255), outline=(0, 0, 0)):
+            # Draw outline first (more efficient method)
+            draw.text((x-2, y-2), text, font=font, fill=outline)
+            draw.text((x+2, y-2), text, font=font, fill=outline)
+            draw.text((x-2, y+2), text, font=font, fill=outline)
+            draw.text((x+2, y+2), text, font=font, fill=outline)
+            # Draw main text
+            draw.text((x, y), text, font=font, fill=fill)
+
+        # Pre-calculate text positions and sizes
+        text_lines = []
+        if upper_text:
+            for u_text in textwrap.wrap(upper_text, width=15):
+                bbox = draw.textbbox((0, 0), u_text, font=font)
+                u_width, u_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                x = (i_width - u_width) / 2
+                y = current_h
+                text_lines.append((x, y, u_text))
+                current_h += u_height + pad
+
+        if lower_text:
+            for l_text in textwrap.wrap(lower_text, width=15):
+                bbox = draw.textbbox((0, 0), l_text, font=font)
+                u_width, u_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                x = (i_width - u_width) / 2
+                y = i_height - u_height - 20
+                text_lines.append((x, y, l_text))
+
+        # Draw all text at once
+        for x, y, t_text in text_lines:
+            draw_text_with_outline(x, y, t_text, font)
+
+        image_name = "memify.webp"
+        img.save(image_name, "WEBP", quality=95, optimize=True)
+        return image_name
 
 
 # -----------------------
-# FONT helper + fit text
+# ANIMATED STICKER (GIF/TGS)
 # -----------------------
-def find_font():
-    paths = [
+async def drawTextAnimated(image_path, text):
+    return await asyncio.get_event_loop().run_in_executor(
+        cpu_executor, _process_animated_image, image_path, text
+    )
+
+
+def _process_animated_image(image_path, text):
+    with Image.open(image_path) as img:
+        frames, durations = [], []
+
+        first_frame = next(ImageSequence.Iterator(img)).copy()
+        if first_frame.mode in ("RGBA", "LA", "P"):
+            if first_frame.mode == "P":
+                first_frame = first_frame.convert("RGBA")
+            bg = Image.new("RGB", first_frame.size, (255, 255, 255))
+            bg.paste(first_frame, mask=first_frame.split()[-1])
+            first_frame = bg
+
+        i_width, i_height = first_frame.size
+        font = get_font(i_width)
+
+        if ";" in text:
+            upper_text, lower_text = text.split(";")
+        else:
+            upper_text, lower_text = text, ""
+
+        # Pre-calculate text positions
+        upper_pos, lower_pos = None, None
+        
+        if upper_text:
+            bbox = ImageDraw.Draw(Image.new("RGB", (1, 1))).textbbox((0, 0), upper_text, font=font)
+            u_width, u_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
+            upper_pos = ((i_width - u_width) / 2, 10)
+            
+        if lower_text:
+            bbox = ImageDraw.Draw(Image.new("RGB", (1, 1))).textbbox((0, 0), lower_text, font=font)
+            u_width, u_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
+            lower_pos = ((i_width - u_width) / 2, i_height - u_height - 20)
+
+        for frame in ImageSequence.Iterator(img):
+            frame = frame.convert("RGBA")
+            frame_draw = frame.copy()
+            draw = ImageDraw.Draw(frame_draw)
+
+            def draw_text_with_outline(x, y, text, font, fill=(255, 255, 255, 255), outline=(0, 0, 0, 255)):
+                # More efficient outline drawing
+                draw.text((x-1, y-1), text, font=font, fill=outline)
+                draw.text((x+1, y-1), text, font=font, fill=outline)
+                draw.text((x-1, y+1), text, font=font, fill=outline)
+                draw.text((x+1, y+1), text, font=font, fill=outline)
+                draw.text((x, y), text, font=font, fill=fill)
+
+            if upper_text and upper_pos:
+                draw_text_with_outline(upper_pos[0], upper_pos[1], upper_text, font)
+
+            if lower_text and lower_pos:
+                draw_text_with_outline(lower_pos[0], lower_pos[1], lower_text, font)
+
+            frames.append(frame_draw)
+            durations.append(frame.info.get("duration", 100))
+
+        out = "memify_animated.webp"
+        frames[0].save(
+            out, format="WEBP", save_all=True, 
+            append_images=frames[1:], duration=durations, 
+            loop=0, quality=80, optimize=True
+        )
+        return out
+
+
+# -----------------------
+# VIDEO STICKER (WEBM)
+# -----------------------
+async def drawTextVideoSticker(video_path, text):
+    return await asyncio.get_event_loop().run_in_executor(
+        io_executor, _process_video_sticker, video_path, text
+    )
+
+
+def _process_video_sticker(video_path, text):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        frames_dir = os.path.join(tmpdir, "frames")
+        os.makedirs(frames_dir, exist_ok=True)
+
+        # Extract frames with faster settings
+        subprocess.run([
+            "ffmpeg", "-i", video_path, "-vsync", "0", 
+            "-compression_level", "0", f"{frames_dir}/frame_%04d.png"
+        ], check=True, capture_output=True)
+
+        # Get first frame to calculate text positions
+        first_frame_path = os.path.join(frames_dir, sorted(os.listdir(frames_dir))[0])
+        with Image.open(first_frame_path) as first_img:
+            i_width, i_height = first_img.size
+            font = get_font(i_width)
+
+        if ";" in text:
+            upper_text, lower_text = text.split(";")
+        else:
+            upper_text, lower_text = text, ""
+
+        # Pre-calculate text positions
+        upper_pos, lower_pos = None, None
+        
+        if upper_text:
+            with Image.new("RGB", (1, 1)) as dummy_img:
+                dummy_draw = ImageDraw.Draw(dummy_img)
+                bbox = dummy_draw.textbbox((0, 0), upper_text, font=font)
+                u_width = bbox[2] - bbox[0]
+                upper_pos = ((i_width - u_width) / 2, 10)
+                
+        if lower_text:
+            with Image.new("RGB", (1, 1)) as dummy_img:
+                dummy_draw = ImageDraw.Draw(dummy_img)
+                bbox = dummy_draw.textbbox((0, 0), lower_text, font=font)
+                u_width, u_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                lower_pos = ((i_width - u_width) / 2, i_height - u_height - 20)
+
+        # Process frames in parallel
+        frame_files = sorted(os.listdir(frames_dir))
+        
+        # Use ThreadPool for I/O bound frame processing
+        with ThreadPoolExecutor() as executor:
+            list(executor.map(
+                lambda f: _process_video_frame(f, frames_dir, upper_text, upper_pos, lower_text, lower_pos, font),
+                frame_files
+            ))
+
+        output_path = os.path.join(tmpdir, "meme.webm")
+        subprocess.run([
+            "ffmpeg", "-framerate", "30", "-i", f"{frames_dir}/frame_%04d.png",
+            "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "500K", 
+            "-speed", "4", "-row-mt", "1", "-threads", "4", "-y", output_path
+        ], check=True, capture_output=True)
+
+        final = "memify_video.webm"
+        os.rename(output_path, final)
+        return final
+
+
+def _process_video_frame(frame_file, frames_dir, upper_text, upper_pos, lower_text, lower_pos, font):
+    frame_path = os.path.join(frames_dir, frame_file)
+    with Image.open(frame_path) as img:
+        img = img.convert("RGBA")
+        draw = ImageDraw.Draw(img)
+
+        def draw_text_with_outline(x, y, text, font, fill=(255, 255, 255, 255), outline=(0, 0, 0, 255)):
+            # Efficient outline drawing
+            draw.text((x-1, y-1), text, font=font, fill=outline)
+            draw.text((x+1, y-1), text, font=font, fill=outline)
+            draw.text((x-1, y+1), text, font=font, fill=outline)
+            draw.text((x+1, y+1), text, font=font, fill=outline)
+            draw.text((x, y), text, font=font, fill=fill)
+
+        if upper_text and upper_pos:
+            draw_text_with_outline(upper_pos[0], upper_pos[1], upper_text, font)
+
+        if lower_text and lower_pos:
+            draw_text_with_outline(lower_pos[0], lower_pos[1], lower_text, font)
+
+        img.save(frame_path)
+
+
+# -----------------------
+# FONT HELPER
+# -----------------------
+def get_font(i_width):
+    font_paths = [
         "./Powers/assets/default.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
@@ -116,317 +324,26 @@ def find_font():
         "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
         "arial.ttf", "Arial.ttf"
     ]
-    for p in paths:
-        if os.path.exists(p):
-            return p
-    return None  # use default ImageFont later
-
-def fit_font_for_line(draw, text, base_size, max_width):
-    """
-    Reduce font size until text fits max_width.
-    Returns PIL ImageFont instance.
-    """
-    font_path = find_font()
-    size = base_size
-    while size > 10:
-        try:
-            if font_path:
-                font = ImageFont.truetype(font_path, size)
-            else:
-                font = ImageFont.load_default()
-                # can't really change size of load_default
+    font_size = max(20, int((70 / 640) * i_width))
+    
+    # Cache fonts to avoid repeated file access
+    if not hasattr(get_font, 'font_cache'):
+        get_font.font_cache = {}
+    
+    cache_key = f"{font_size}"
+    if cache_key in get_font.font_cache:
+        return get_font.font_cache[cache_key]
+    
+    for fp in font_paths:
+        if os.path.exists(fp):
+            try:
+                font = ImageFont.truetype(fp, font_size)
+                get_font.font_cache[cache_key] = font
                 return font
-        except Exception:
-            font = ImageFont.load_default()
-            return font
-
-        bbox = draw.textbbox((0, 0), text, font=font)
-        w = bbox[2] - bbox[0]
-        if w <= max_width:
-            return font
-        size -= 2
-    return font  # smallest
-
-
-# -----------------------
-# STATIC IMAGE (photos & static stickers)
-# -----------------------
-async def draw_text_static(input_path: str, text: str, workdir: str) -> str:
-    """
-    Return path to output webp (static) ready to send.
-    """
-    img = Image.open(input_path)
-
-    # Convert to RGB background (handle transparency)
-    if img.mode in ("RGBA", "LA", "P"):
-        if img.mode == "P":
-            img = img.convert("RGBA")
-        bg = Image.new("RGB", img.size, (255, 255, 255))
-        mask = img.split()[-1] if img.mode == "RGBA" else None
-        bg.paste(img, mask=mask)
-        img = bg
-    elif img.mode != "RGB":
-        img = img.convert("RGB")
-
-    i_w, i_h = img.size
-    draw = ImageDraw.Draw(img)
-
-    # split upper/lower text at ';' (single split)
-    if ";" in text:
-        upper_text, lower_text = text.split(";", 1)
-    else:
-        upper_text, lower_text = text, ""
-
-    base_font_size = max(20, int((70 / 640) * i_w))
-    pad = max(6, int(i_w * 0.006))
-
-    # outline drawing helper
-    def draw_outline_text(x, y, t, font):
-        outline_w = 2
-        for dx in range(-outline_w, outline_w + 1):
-            for dy in range(-outline_w, outline_w + 1):
-                if dx == 0 and dy == 0:
-                    continue
-                draw.text((x + dx, y + dy), t, font=font, fill=(0, 0, 0))
-        draw.text((x, y), t, font=font, fill=(255, 255, 255))
-
-    # upper lines
-    cur_y = max(8, int(i_w * 0.015))
-    if upper_text.strip():
-        lines = textwrap.wrap(upper_text.strip(), width=20)
-        for line in lines:
-            font = fit_font_for_line(draw, line, base_font_size, i_w - 20)
-            bbox = draw.textbbox((0, 0), line, font=font)
-            w = bbox[2] - bbox[0]
-            h = bbox[3] - bbox[1]
-            x = (i_w - w) / 2
-            draw_outline_text(x, cur_y, line, font)
-            cur_y += h + pad
-
-    # lower lines
-    if lower_text.strip():
-        lines = textwrap.wrap(lower_text.strip(), width=20)
-        # compute height of lower block
-        block_h = 0
-        fonts = []
-        for line in lines:
-            font = fit_font_for_line(draw, line, base_font_size, i_w - 20)
-            bbox = draw.textbbox((0, 0), line, font=font)
-            h = bbox[3] - bbox[1]
-            fonts.append(font)
-            block_h += h + pad
-        cur_y = i_h - block_h - max(8, int(i_w * 0.02))
-        # draw
-        for idx, line in enumerate(lines):
-            font = fonts[idx]
-            bbox = draw.textbbox((0, 0), line, font=font)
-            w = bbox[2] - bbox[0]
-            h = bbox[3] - bbox[1]
-            x = (i_w - w) / 2
-            draw_outline_text(x, cur_y, line, font)
-            cur_y += h + pad
-
-    out_path = os.path.join(workdir, "memify.webp")
-    img.save(out_path, "WEBP", quality=95)
-    return out_path
-
-
-# -----------------------
-# ANIMATED (gif / animated webp)
-# -----------------------
-async def draw_text_animated(input_path: str, text: str, workdir: str) -> str:
-    """
-    Opens the animated input (GIF or animated WEBP), overlays text on each frame,
-    and returns an animated WEBP path.
-    """
-    img = Image.open(input_path)
-    frames = []
-    durations = []
-
-    # Prepare upper/lower text
-    if ";" in text:
-        upper_text, lower_text = text.split(";", 1)
-    else:
-        upper_text, lower_text = text, ""
-
-    # Use first frame to decide sizing
-    first_frame = next(ImageSequence.Iterator(img)).convert("RGBA").copy()
-    i_w, i_h = first_frame.size
-
-    for frame in ImageSequence.Iterator(img):
-        frame = frame.convert("RGBA")
-        canvas = Image.new("RGBA", frame.size)
-        canvas.paste(frame, (0, 0))
-
-        draw = ImageDraw.Draw(canvas)
-        base_font_size = max(20, int((70 / 640) * i_w))
-        pad = max(6, int(i_w * 0.006))
-
-        # helper
-        def draw_outline_text(x, y, t, font):
-            o = 2
-            for dx in range(-o, o + 1):
-                for dy in range(-o, o + 1):
-                    if dx == 0 and dy == 0:
-                        continue
-                    draw.text((x + dx, y + dy), t, font=font, fill=(0, 0, 0, 255))
-            draw.text((x, y), t, font=font, fill=(255, 255, 255, 255))
-
-        # upper
-        cur_y = max(8, int(i_w * 0.015))
-        if upper_text.strip():
-            for line in textwrap.wrap(upper_text.strip(), width=20):
-                font = fit_font_for_line(draw, line, base_font_size, i_w - 20)
-                bbox = draw.textbbox((0, 0), line, font=font)
-                w = bbox[2] - bbox[0]
-                h = bbox[3] - bbox[1]
-                x = (i_w - w) / 2
-                draw_outline_text(x, cur_y, line, font)
-                cur_y += h + pad
-
-        # lower
-        if lower_text.strip():
-            lines = textwrap.wrap(lower_text.strip(), width=20)
-            block_h = 0
-            fonts = []
-            for line in lines:
-                font = fit_font_for_line(draw, line, base_font_size, i_w - 20)
-                bbox = draw.textbbox((0, 0), line, font=font)
-                h = bbox[3] - bbox[1]
-                fonts.append(font)
-                block_h += h + pad
-            cur_y = i_h - block_h - max(8, int(i_w * 0.02))
-            for idx, line in enumerate(lines):
-                font = fonts[idx]
-                bbox = draw.textbbox((0, 0), line, font=font)
-                w = bbox[2] - bbox[0]
-                h = bbox[3] - bbox[1]
-                x = (i_w - w) / 2
-                draw_outline_text(x, cur_y, line, font)
-                cur_y += h + pad
-
-        frames.append(canvas.convert("RGBA"))
-        durations.append(getattr(frame, "info", {}).get("duration", 100))
-
-    out_path = os.path.join(workdir, "memify_animated.webp")
-    if len(frames) > 1:
-        frames[0].save(
-            out_path,
-            format="WEBP",
-            save_all=True,
-            append_images=frames[1:],
-            duration=durations,
-            loop=0,
-            quality=80,
-        )
-    else:
-        frames[0].save(out_path, "WEBP", quality=95)
-    return out_path
-
-
-# -----------------------
-# VIDEO STICKER (.webm) - uses ffmpeg
-# -----------------------
-async def draw_text_video_sticker(input_path: str, text: str, workdir: str) -> str:
-    """
-    Extract frames with ffmpeg, draw text on each PNG frame, then encode VP9+alpha webm
-    using CRF (quality) so Telegram accepts it as video sticker.
-    Returns output webm path.
-    """
-    frames_dir = os.path.join(workdir, "frames")
-    os.makedirs(frames_dir, exist_ok=True)
-
-    # Extract frames to PNG (preserve alpha if present)
-    # -vsync 0 to avoid frame duplication
-    extract_cmd = [
-        "ffmpeg", "-y", "-i", input_path,
-        "-vsync", "0",
-        os.path.join(frames_dir, "frame_%04d.png")
-    ]
-    subprocess.run(extract_cmd, check=True)
-
-    files = sorted([f for f in os.listdir(frames_dir) if f.startswith("frame_") and f.endswith(".png")])
-    if not files:
-        raise Exception("No frames extracted from video sticker.")
-
-    # Load first frame to get dimensions
-    first_frame_path = os.path.join(frames_dir, files[0])
-    img0 = Image.open(first_frame_path).convert("RGBA")
-    i_w, i_h = img0.size
-
-    # split upper/lower
-    if ";" in text:
-        upper_text, lower_text = text.split(";", 1)
-    else:
-        upper_text, lower_text = text, ""
-
-    base_font_size = max(20, int((70 / 640) * i_w))
-    pad = max(6, int(i_w * 0.006))
-
-    # Draw on each frame
-    for fname in files:
-        fpath = os.path.join(frames_dir, fname)
-        img = Image.open(fpath).convert("RGBA")
-        draw = ImageDraw.Draw(img)
-
-        def draw_outline_text(x, y, t, font):
-            o = 2
-            for dx in range(-o, o + 1):
-                for dy in range(-o, o + 1):
-                    if dx == 0 and dy == 0:
-                        continue
-                    draw.text((x + dx, y + dy), t, font=font, fill=(0, 0, 0, 255))
-            draw.text((x, y), t, font=font, fill=(255, 255, 255, 255))
-
-        # upper lines
-        cur_y = max(8, int(i_w * 0.015))
-        if upper_text.strip():
-            for line in textwrap.wrap(upper_text.strip(), width=20):
-                font = fit_font_for_line(draw, line, base_font_size, i_w - 20)
-                bbox = draw.textbbox((0, 0), line, font=font)
-                w = bbox[2] - bbox[0]
-                h = bbox[3] - bbox[1]
-                x = (i_w - w) / 2
-                draw_outline_text(x, cur_y, line, font)
-                cur_y += h + pad
-
-        # lower lines
-        if lower_text.strip():
-            lines = textwrap.wrap(lower_text.strip(), width=20)
-            block_h = 0
-            fonts = []
-            for line in lines:
-                font = fit_font_for_line(draw, line, base_font_size, i_w - 20)
-                bbox = draw.textbbox((0, 0), line, font=font)
-                h = bbox[3] - bbox[1]
-                fonts.append(font)
-                block_h += h + pad
-            cur_y = i_h - block_h - max(8, int(i_w * 0.02))
-            for idx, line in enumerate(lines):
-                font = fonts[idx]
-                bbox = draw.textbbox((0, 0), line, font=font)
-                w = bbox[2] - bbox[0]
-                h = bbox[3] - bbox[1]
-                x = (i_w - w) / 2
-                draw_outline_text(x, cur_y, line, font)
-                cur_y += h + pad
-
-        # overwrite frame
-        img.save(fpath, "PNG")
-
-    # Rebuild webm with libvpx-vp9 using CRF (quality-controlled)
-    output_webm = os.path.join(workdir, "memify_video.webm")
-    # Use -r copy? we set fps to 30 default; we can preserve original FPS by probing input, but 30 is safe.
-    encode_cmd = [
-        "ffmpeg", "-y", "-framerate", "30", "-i", os.path.join(frames_dir, "frame_%04d.png"),
-        "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p",
-        "-b:v", "0", "-crf", "32", "-row-mt", "1",
-        "-an", output_webm
-    ]
-    subprocess.run(encode_cmd, check=True)
-
-    # Final check file exists
-    if not os.path.exists(output_webm):
-        raise Exception("Failed to create video sticker.")
-
-    return output_webm
+            except:
+                continue
+    
+    # Fallback to default font
+    default_font = ImageFont.load_default()
+    get_font.font_cache[cache_key] = default_font
+    return default_font
